@@ -78,6 +78,7 @@ export function renderFinderForm(el, { values, centre, busy, hint, onChange, onS
       number('roverRange', 'Range (km)', 'roverRangeKm', { min: '0' }),
       number('roverSpeed', 'Average speed (m per hour)', 'roverSpeedMPerHour', { min: '1', title: 'Including stops' }),
     ),
+    check('roverEarth', 'Needs Earth in view to drive', 'roverNeedsEarthToDrive'),
   ];
   clear(el).append(...parts.filter(Boolean));
 }

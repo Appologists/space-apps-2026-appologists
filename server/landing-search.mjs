@@ -104,6 +104,10 @@ export function searchLanding(dem, params) {
   const maxDark = new Uint16Array(count);
   const sunAtStart = new Uint8Array(count);
   const earthAtStart = new Uint8Array(count);
+  // One bit per cell per time step, for the timed drive: is the panel sunlit, is Earth in view?
+  const maskStride = Math.ceil(count / 8);
+  const sunMask = new Uint8Array(steps * maskStride);
+  const earthMask = new Uint8Array(steps * maskStride);
 
   for (let i = 0; i < steps; i++) {
     const sample = series.samples[i];
@@ -117,6 +121,7 @@ export function searchLanding(dem, params) {
       const lit = fine.Y[c] + p.panelHeightM > fine.S[c] && upX[c] * s.x + upY[c] * s.y + upZ[c] * s.z > -sinDipPanel[c];
       if (lit) {
         sunCount[c]++;
+        sunMask[i * maskStride + (c >> 3)] |= 1 << (c & 7);
         darkRun[c] = 0;
         if (++litRun[c] > maxLit[c]) maxLit[c] = litRun[c];
       } else {
@@ -133,7 +138,10 @@ export function searchLanding(dem, params) {
     for (let c = 0; c < count; c++) {
       if (!valid[c]) continue;
       const inView = fine.Y[c] + p.antennaHeightM > fine.S[c] && upX[c] * e.x + upY[c] * e.y + upZ[c] * e.z > -sinDipAntenna[c];
-      if (inView) earthCount[c]++;
+      if (inView) {
+        earthCount[c]++;
+        earthMask[i * maskStride + (c >> 3)] |= 1 << (c & 7);
+      }
       if (i === 0) earthAtStart[c] = inView ? 1 : 0;
     }
   }
@@ -242,12 +250,14 @@ export function searchLanding(dem, params) {
       stepHours,
       steps,
       windowHours,
+      maskStride,
       params: p,
       sites,
       counts,
       computeMs: Math.round(performance.now() - started),
       dataset: dem.id ?? 'lola',
+      terrainPixelM: dem.pixelM ?? dem.label?.scaleM ?? null,
     },
-    rasters: { elevation, slope, ellipseSlope, sunFraction, longestLitH, longestDarkH, earthFraction, fail, score },
+    rasters: { elevation, slope, ellipseSlope, sunFraction, longestLitH, longestDarkH, earthFraction, fail, score, sunMask, earthMask },
   };
 }

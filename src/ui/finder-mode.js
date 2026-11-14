@@ -3,12 +3,14 @@
 import { finderStepMinutes, searchLanding } from '../finder/client.js';
 import { latLonToCell } from '../finder/grid.js';
 import { pathStats, pathTo, reachFrom } from '../finder/route.js';
+import { bestDeparture, simulateDrive } from '../finder/schedule.js';
 import { MAP_LAYERS, createFinderMap } from '../finder/map-view.js';
 import { defaultFinder } from '../finder/score.js';
 import { coverageText, terrainCovers } from '../terrain/client.js';
 import { formatHours, formatLatLon } from '../format.js';
 import { clear, debounce, h } from './dom.js';
 import { renderFinderForm } from './finder-form.js';
+import { renderSchedule } from './finder-schedule.js';
 
 const $ = (id) => document.getElementById(id);
 const percent = (fraction) => `${Math.round(fraction * 100)}%`;
@@ -32,6 +34,10 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   let start = null; // { row, col, lat, lon }
   let target = null;
   let reach = null;
+  // The timed drive along the current route.
+  let currentPath = null;
+  let departHours = 0; // hours after landing
+  let workable = null; // how many departure hours work, once the user has asked for the best one
 
   const CLICK_MODES = [
     ['start', 'Start'],
@@ -71,6 +77,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     renderFinderForm($('finderForm'), { values, centre: site, busy, hint, onChange: (patch) => {
         Object.assign(values, patch);
         if (Object.keys(patch).some((key) => key.startsWith('rover'))) updateRouteSoon(); // no new search needed
+        if ('maxDarknessHours' in patch && result) updateRouteSoon(); // the timed drive depends on it
       },
       onSearch: run,
       // When the only problem is where the search is centred, offer a spot that works.
@@ -150,9 +157,39 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
         `Drive: ${km.toFixed(km < 10 ? 1 : 0)} km, about ${formatHours(s.hours)} at ${values.roverSpeedMPerHour} m per hour. ` +
         `Steepest slope on the way ${s.steepestDeg.toFixed(0)}°, climbing ${Math.round(s.climbM)} m and descending ${Math.round(s.descentM)} m. ` +
         `Along the way the worst spot has ${formatHours(s.longestDarkH)} of darkness, is sunlit ${percent(s.minSunFraction)} of the mission and sees Earth ${percent(s.minEarthFraction)} of it. ` +
-        'This is the shortest drivable path on this terrain. It does not check that the Sun is up or Earth is in view at the hour the rover passes.';
+        'This is the shortest drivable path on this terrain. The timing below checks sunlight and darkness hour by hour.';
     }
     $('finderRoute').textContent = text;
+    currentPath = path;
+    workable = null;
+    drawSchedule();
+  }
+
+  /** Time the drive along the current route: where the rover is each hour, where it waits, whether it survives. */
+  const driveOptions = () => ({
+    speedMPerHour: values.roverSpeedMPerHour,
+    maxDarknessHours: values.maxDarknessHours,
+    needSunToDrive: true,
+    needEarthToDrive: values.roverNeedsEarthToDrive,
+  });
+  function drawSchedule() {
+    const drive = currentPath && result?.sunMask ? simulateDrive(result, currentPath, { ...driveOptions(), departHours }) : null;
+    renderSchedule($('finderSchedule'), {
+      result,
+      drive,
+      workable,
+      onDepart: (hours) => {
+        departHours = Math.max(0, hours);
+        workable = null;
+        drawSchedule();
+      },
+      onFindBest: () => {
+        const found = bestDeparture(result, currentPath, driveOptions());
+        workable = found.workable;
+        if (found.best) departHours = found.best.departHours;
+        drawSchedule();
+      },
+    });
   }
   const updateRouteSoon = debounce(updateRoute, 250);
 
@@ -167,6 +204,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     const middle = latLonToCell(result, result.center, result.center.lat, result.center.lon);
     start = middle ? { ...middle, lat: result.center.lat, lon: result.center.lon } : null;
     target = null;
+    departHours = 0;
     updateRoute();
 
     const { counts, sites, cellM, radiusKm, computeMs, params } = result;
