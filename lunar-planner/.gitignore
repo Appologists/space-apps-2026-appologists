@@ -1,0 +1,7 @@
+# Your own keys: never commit
+lunar_keys.json
+# Terrain made by build_terrain.py (about 130 MB)
+data/
+public/textures/moon-elevation-grid.bin
+__pycache__/
+.venv/
