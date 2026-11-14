@@ -11,6 +11,7 @@
 // slopes into shadow. Shadowed ground is given a small fixed brightness so its shape stays readable.
 import * as THREE from 'three';
 import { DEG, MOON_RADIUS_KM } from '../astro/coords.js';
+import { createGroundMaterial } from './ground-grain.js';
 import { buildShadowGrid, litFraction, sampleGrid, sweepShadows } from './shadows.js';
 
 const R = MOON_RADIUS_KM * 1000;
@@ -18,7 +19,10 @@ const SKY_DISTANCE = 5_000_000; // how far away the Sun, Earth and their paths a
 export const SUN_RADIUS_KM = 695_700;
 export const EARTH_RADIUS_KM = 6371;
 
-const GROUND_COLOR = [0.64, 0.62, 0.59];
+const GROUND_COLOR = [0.6, 0.585, 0.56];
+// Exposure: how bright flat sunlit ground is drawn. 0.55 gives mid-grey, leaving room for sun-facing slopes
+// to be brighter. (The real surface is darker still: the Moon reflects only about a tenth of the light.)
+const EXPOSURE = 0.55;
 const NO_DATA_COLOR = [0.3, 0.34, 0.42];
 const SHADOW_FILL = 0.045; // brightness of ground in shadow: not physical, just enough to see its shape
 // Shadow grids: a coarse one for the whole patch and a fine one for the ground near the viewer.
@@ -88,6 +92,7 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
   let eyeHeightM = 1.7;
 
   // ---- Ground ---------------------------------------------------------------------------------------
+  const groundMaterial = createGroundMaterial(); // vertex colours carry sunlight and shadow; the shader adds grain
   let ground = null; // { mesh, positions, normals, colors, noData }
   const sun = { direction: new THREE.Vector3(0, 1, 0), elevation: 90 };
 
@@ -149,7 +154,7 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
     geometry.computeVertexNormals();
     const colors = new Float32Array(count * 3);
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true }));
+    const mesh = new THREE.Mesh(geometry, groundMaterial.material);
     mesh.frustumCulled = false;
     scene.add(mesh);
     const heightAt = makeHeightSampler(patch, positions);
@@ -177,7 +182,7 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
     const fineLimit = fine.halfSizeM - 2 * fine.cellM;
     // Low Sun means very little light per square metre of flat ground. Raise the exposure to compensate,
     // as a camera would, so flat sunlit ground stays mid-grey whatever the Sun's height.
-    const gain = 1.2 / Math.max(Math.sin(sun.elevation * DEG), 0.035);
+    const gain = EXPOSURE / Math.max(Math.sin(sun.elevation * DEG), 0.035);
     for (let v = 0, n = positions.length / 3; v < n; v++) {
       const i = v * 3;
       const x = positions[i];
@@ -257,6 +262,7 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
     sunLight.position.copy(sky.sunDir);
     sun.direction.copy(sky.sunDir);
     sun.elevation = s.elevation;
+    groundMaterial.setSun(sky.sunDir, s.elevation);
     shadeGround();
     requestRender();
   }

@@ -94,5 +94,8 @@ Checks we ran (2026-11-14):
   unbroken stretch 154 days. Same character, not a reproduction: we use 80 m data, the Sun's centre rather
   than any part of its disc, and one year rather than 18.6.
 
-What is missing: detail finer than 80 m, light bounced into shadow, any terrain north of 80° S (if the data
+The fine grain on the ground is decoration generated in the shader (`src/surface/ground-grain.js`), at scales
+below 80 m only. It is not data.
+
+What is missing: real detail finer than 80 m, light bounced into shadow, any terrain north of 80° S (if the data
 ends within 300 km of the viewer, the ground beyond is drawn flat and blue-grey, and the app says so).

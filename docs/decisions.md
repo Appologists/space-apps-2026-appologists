@@ -29,6 +29,7 @@ These were chosen to get a working skeleton. None is settled until the team says
 | F | **The 2.6 MB Moon map stays in git.** | The app must start after `npm install` with nothing else to download. | Move it to the catalog. |
 | G | **Terrain is served on demand by the dev server**, as a polar grid around the point: 720 compass directions, about 660 distances out to 300 km. | Lets you stand anywhere the data covers without preparing files first, and the same samples draw the ground and give the horizon. | Needs `npm run dev` and the 115 MB download. For a hosted demo, precompute patches for chosen sites into `data/derived/`. |
 | H | **In the surface view, ground in shadow is drawn dark grey, not black.** | So you can see its shape. Real shadowed ground gets only faint light bounced from sunlit slopes. | `SHADOW_FILL` in `src/surface/surface-view.js`. |
+| I | **The surface view's ground has decorative grain** (generated in the shader, no image file), and flat sunlit ground is drawn mid-grey. | Without it the ground was a blank white sheet. Every grain scale is smaller than the data's 80 m pixels, so nothing the data could show is invented, and the app says the grain is decoration. | `src/surface/ground-grain.js`; `EXPOSURE` in `src/surface/surface-view.js`. A real photo texture or LROC imagery would be the next step up. |
 
 ## Open questions
 

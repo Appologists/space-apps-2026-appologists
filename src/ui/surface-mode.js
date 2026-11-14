@@ -116,7 +116,7 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     );
     const edge = patch.coverage < 0.995 && patch.dataEdgeM ? ` The data ends ${Math.round(patch.dataEdgeM / 1000)} km away in some directions; ground beyond is drawn flat and blue-grey.` : '';
     $('hudNotes').textContent =
-      `Terrain: NASA LOLA at ${patch.pixelM} m per pixel, so no rocks or small craters. Shadows are computed from the terrain; ground in shadow is brightened a little so you can see its shape.${edge}`;
+      `Terrain: NASA LOLA at ${patch.pixelM} m per pixel, so no rocks or small craters. The fine grain on the ground is decoration, not data. Shadows are computed from the terrain; ground in shadow is brightened a little so you can see its shape.${edge}`;
   }
 
   /** The time slider moved: move the Sun and Earth and say what is visible now. */
