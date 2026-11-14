@@ -138,9 +138,9 @@ export function renderDetail(el, { entry, ctx, viewIndex, criteria, meta, surfac
     ? null
     : !info.available
       ? h('div', { class: 'caveats' }, `Surface view needs terrain data. Run "${info.hint ?? 'npm run data:fetch -- lola-south-80s-80m'}", then reload.`)
-      : site.lat <= info.coversSouthOfLat
+      : surface.covered
         ? h('button', { type: 'button', class: 'primary', onClick: surface.onLookAround }, 'Look around from here')
-        : h('div', { class: 'caveats' }, `Surface view: terrain data only covers ${Math.abs(info.coversSouthOfLat)}° S to the south pole.`);
+        : h('div', { class: 'caveats' }, `Surface view: the chosen terrain data covers ${surface.coverage} only.`);
 
   const source = site.source ? meta.sources[site.source] : null;
   const caveats = [...new Set(Object.values(entry.results).flatMap((r) => r.caveats ?? []))];

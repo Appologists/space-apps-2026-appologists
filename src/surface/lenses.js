@@ -107,7 +107,7 @@ export const LENSES = [
         color: (deg) => lookup[Math.round(Math.min(Math.max(deg / SLOPE_MAX_DEG, 0), 1) * 255)],
         legend: {
           title: 'Slope',
-          note: `Steepness measured over ${patch.pixelM ?? 80} m, one terrain pixel: rocks and small craters do not show. ${CONTOUR_NOTE}`,
+          note: `Steepness measured over ${Math.round(patch.pixelM ?? 80)} m, one terrain pixel: rocks and small craters do not show. ${CONTOUR_NOTE}`,
           kind: 'ramp',
           stops,
           positioned: true, // tick labels sit at their place on the scale, not evenly spread
