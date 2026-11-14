@@ -8,6 +8,8 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 - `npm run dev` runs the app. `npm test` must pass before you say a change is done.
 - `npm run check:horizons` compares our Sun/Earth maths with NASA JPL Horizons. Run it after touching
   `src/astro/`.
+- `npm run check:landing` after changing the landing search; `npm run check:tiles` after changing how the
+  59 m whole-Moon tiles are read (it compares them with the other terrain datasets you have downloaded).
 
 ## Where a change goes
 

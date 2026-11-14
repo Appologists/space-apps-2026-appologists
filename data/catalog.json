@@ -146,7 +146,7 @@
     {
       "id": "lola-global-512",
       "title": "Whole Moon elevation, 512 pixels per degree (about 59 m per pixel), in 16 tiles",
-      "description": "LOLA gridded elevation for the whole Moon, in sixteen tiles of 90 by 45 degrees. About 34 GB in all. The app cannot read it yet: see docs/plan.md.",
+      "description": "LOLA gridded elevation for the whole Moon, in sixteen tiles of 90 by 45 degrees. About 34 GB in all. The app reads whatever tiles are complete, a piece at a time, so a partial download works for the tiles that are there.",
       "format": "PDS3 image + label per tile: 16-bit signed integers, little-endian; height in metres = value x 0.5, relative to the 1737.4 km sphere; equirectangular, 46080 x 23040 pixels per tile, longitudes 0 to 360 east",
       "sourcePage": "https://pds-geosciences.wustl.edu/missions/lro/lola.htm",
       "license": "Public (NASA Planetary Data System). Cite the LRO LOLA team and the PDS Geosciences Node.",
