@@ -7,7 +7,8 @@ const NEIGHBOURS = [
   [-1, -1], [-1, 1], [1, -1], [1, 1],
 ];
 
-function drivableMask(result, maxSlopeDeg) {
+/** 1 for every cell the rover may stand on: has terrain data, inside the search area, slope within the limit. */
+export function drivableMask(result, maxSlopeDeg) {
   const size = result.n * result.n;
   const ok = new Uint8Array(size);
   for (let i = 0; i < size; i++) {
@@ -17,7 +18,7 @@ function drivableMask(result, maxSlopeDeg) {
 }
 
 /** Binary min-heap of (key, value) pairs on typed arrays; grows as needed. */
-function createHeap(capacity = 4096) {
+export function createHeap(capacity = 4096) {
   let keys = new Float64Array(capacity);
   let vals = new Int32Array(capacity);
   let size = 0;

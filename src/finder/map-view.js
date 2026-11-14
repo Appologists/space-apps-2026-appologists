@@ -18,7 +18,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   let selected = null; // { lat, lon }
   let shade = null;
   let reach = null;
-  let route = null; // { path, target }
+  let route = null; // { path, stops: [{ row, col, label }], waits: [{ row, col }] }
   let box = { x: 0, y: 0, size: 0 }; // raster rectangle in CSS pixels
   let down = null;
 
@@ -85,7 +85,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     ctx.stroke();
 
     if (route) {
-      const { path, target } = route;
+      const { path, stops = [], waits = [] } = route;
       if (path && path.length > 1) {
         ctx.beginPath();
         path.forEach((i, k) => {
@@ -102,9 +102,19 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
         ctx.lineWidth = 2.5;
         ctx.stroke();
       }
-      if (target) {
-        const p = cellCentre(target.row, target.col);
-        const r = 7;
+      for (const wait of waits) {
+        const p = cellCentre(wait.row, wait.col);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffd36b';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#06080c';
+        ctx.stroke();
+      }
+      for (const stop of stops) {
+        const p = cellCentre(stop.row, stop.col);
+        const r = 9;
         ctx.beginPath();
         ctx.moveTo(p.x, p.y - r);
         ctx.lineTo(p.x + r, p.y);
@@ -116,6 +126,13 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
         ctx.lineWidth = 1.5;
         ctx.strokeStyle = '#06080c';
         ctx.stroke();
+        if (stop.label) {
+          ctx.font = FONT;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#06080c';
+          ctx.fillText(stop.label, p.x, p.y + 0.5);
+        }
       }
     }
 

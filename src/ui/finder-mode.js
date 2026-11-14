@@ -2,8 +2,9 @@
 // sites. Like surface-mode.js, it owns its part of the page and talks to main.js through callbacks.
 import { finderStepMinutes, searchLanding } from '../finder/client.js';
 import { latLonToCell } from '../finder/grid.js';
-import { pathStats, pathTo, reachFrom } from '../finder/route.js';
-import { bestDeparture, simulateDrive } from '../finder/schedule.js';
+import { pathStats, reachFrom } from '../finder/route.js';
+import { MAX_DESTINATIONS, latestDeparture, planMission } from '../finder/planner.js';
+import { destinationName, planText } from '../finder/plan-text.js';
 import { MAP_LAYERS, createFinderMap } from '../finder/map-view.js';
 import { defaultFinder } from '../finder/score.js';
 import { coverageText, terrainCovers } from '../terrain/client.js';
@@ -32,16 +33,14 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   // Reach and route: where the rover starts (the landing point), where it is going, and what it can reach.
   let clickMode = 'start'; // what a click on the map sets: 'start' or 'dest'
   let start = null; // { row, col, lat, lon }
-  let target = null;
+  let targets = []; // destinations, in the order added: { row, col, lat, lon }
   let reach = null;
-  // The timed drive along the current route.
-  let currentPath = null;
-  let departHours = 0; // hours after landing
-  let workable = null; // how many departure hours work, once the user has asked for the best one
+  let plan = null; // the latest plan, or null when there are no destinations
+  let departHours = 0; // "leave no earlier than", hours after landing
 
   const CLICK_MODES = [
     ['start', 'Start'],
-    ['dest', 'Destination'],
+    ['dest', 'Add destination'],
   ];
   const modeButtons = CLICK_MODES.map(([id, label]) =>
     h('button', { type: 'button', 'aria-pressed': String(id === clickMode), onClick: () => setClickMode(id) }, label),
@@ -77,7 +76,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     renderFinderForm($('finderForm'), { values, centre: site, busy, hint, onChange: (patch) => {
         Object.assign(values, patch);
         if (Object.keys(patch).some((key) => key.startsWith('rover'))) updateRouteSoon(); // no new search needed
-        if ('maxDarknessHours' in patch && result) updateRouteSoon(); // the timed drive depends on it
+        if ('maxDarknessHours' in patch && result) updateRouteSoon(); // the drive plan depends on it
       },
       onSearch: run,
       // When the only problem is where the search is centred, offer a spot that works.
@@ -113,11 +112,16 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     drawForm();
   }
 
-  /** A click on the map or on a listed site: sets the start or the destination. */
+  /** A click on the map or on a listed site: sets the start or adds a destination. */
   function pick(lat, lon, as = clickMode) {
     const cell = result ? latLonToCell(result, result.center, lat, lon) : null;
     if (as === 'dest') {
-      target = cell ? { ...cell, lat, lon } : null;
+      if (!cell) return;
+      if (targets.length >= MAX_DESTINATIONS) {
+        $('finderRoute').textContent = `At most ${MAX_DESTINATIONS} destinations. Remove one to add another.`;
+        return;
+      }
+      targets.push({ ...cell, lat, lon });
       updateRoute();
       return;
     }
@@ -126,68 +130,97 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     updateRoute();
   }
 
-  /** Recompute what the rover can reach from the start, and the path to the destination if there is one. */
+  const roverNow = () => ({
+    maxSlopeDeg: values.roverMaxSlopeDeg,
+    rangeM: values.roverRangeKm * 1000,
+    speedMPerHour: values.roverSpeedMPerHour,
+    maxDarknessHours: values.maxDarknessHours,
+    needEarthToDrive: values.roverNeedsEarthToDrive,
+    departHours,
+  });
+
+  function removeTarget(i) {
+    targets.splice(i, 1);
+    updateRoute();
+  }
+
+  /** The destination list: visiting order when there is a plan, otherwise the order added. */
+  function drawDests() {
+    const el = clear($('finderDests'));
+    if (!targets.length) return;
+    const order = plan?.order?.length ? plan.order : targets.map((_, i) => i);
+    for (const i of order) {
+      const t = targets[i];
+      const stop = plan?.stops?.find((s) => s.destination === i);
+      el.append(
+        h('div', { class: 'dest-row' },
+          h('span', { class: 'dest-letter' }, destinationName(i)),
+          h('span', { class: 'dest-coords' }, formatLatLon(t.lat, t.lon, 3)),
+          h('span', { class: 'dest-arrival' }, stop ? `arrives ${formatHours(stop.arrivalHours)} after landing` : ''),
+          h('button', { type: 'button', onClick: () => removeTarget(i) }, 'Remove')),
+      );
+    }
+    el.append(h('button', { type: 'button', class: 'dest-clear', onClick: () => { targets = []; updateRoute(); } }, 'Clear destinations'));
+  }
+
+  /** Recompute what the rover can reach from the start, and the plan for the destinations if there are any. */
   function updateRoute() {
     if (!result || !map) return;
-    const rover = { maxSlopeDeg: values.roverMaxSlopeDeg, rangeM: values.roverRangeKm * 1000 };
-    reach = start ? reachFrom(result, start, rover) : null;
+    const rover = roverNow();
+    reach = start ? reachFrom(result, start, { maxSlopeDeg: rover.maxSlopeDeg, rangeM: rover.rangeM }) : null;
     map.setReach(reach);
     map.setSelected(start ? { lat: start.lat, lon: start.lon } : null);
-    const path = reach && target ? pathTo(reach, target) : null;
-    map.setRoute(target ? { path, target } : null);
-
-    const limits = `within ${values.roverRangeKm} km on slopes up to ${values.roverMaxSlopeDeg}°`;
-    let text;
+    plan = null;
+    let text = null;
+    let routeText = '';
     if (!start) {
-      text = 'Click the map to choose where the rover starts.';
-    } else if (!target) {
+      routeText = 'Click the map to choose where the rover starts.';
+      map.setRoute(null);
+    } else if (!targets.length) {
+      const limits = `within ${values.roverRangeKm} km on slopes up to ${values.roverMaxSlopeDeg}°`;
       let cells = 0;
       for (let i = 0; i < reach.dist.length; i++) if (Number.isFinite(reach.dist[i])) cells++;
       const area = (cells * result.cellM * result.cellM) / 1e6;
-      text =
+      routeText =
         cells <= 1
           ? `From the start the rover cannot move: the ground there is steeper than ${values.roverMaxSlopeDeg}°, or off the map.`
-          : `From the start the rover can reach ${area.toFixed(area < 10 ? 1 : 0)} km² ${limits}. Choose "Destination" and click the map to plan a drive. The "Reach" layer shows how far each spot is.`;
-    } else if (!path) {
-      text = `No drivable path from the start to that destination ${limits}.`;
+          : `From the start the rover can reach ${area.toFixed(area < 10 ? 1 : 0)} km² ${limits}. Choose "Add destination" and click the map to plan a drive. The "Reach" layer shows how far each spot is.`;
+      map.setRoute(null);
     } else {
-      const s = pathStats(result, path, { speedMPerHour: values.roverSpeedMPerHour });
-      const km = s.distanceM / 1000;
-      text =
-        `Drive: ${km.toFixed(km < 10 ? 1 : 0)} km, about ${formatHours(s.hours)} at ${values.roverSpeedMPerHour} m per hour. ` +
-        `Steepest slope on the way ${s.steepestDeg.toFixed(0)}°, climbing ${Math.round(s.climbM)} m and descending ${Math.round(s.descentM)} m. ` +
-        `Along the way the worst spot has ${formatHours(s.longestDarkH)} of darkness, is sunlit ${percent(s.minSunFraction)} of the mission and sees Earth ${percent(s.minEarthFraction)} of it. ` +
-        'This is the shortest drivable path on this terrain. The timing below checks sunlight and darkness hour by hour.';
+      plan = planMission(result, start, targets, rover);
+      text = planText(result, plan, { rover, destinations: targets });
+      if (plan.path) {
+        const s = pathStats(result, plan.path, { speedMPerHour: rover.speedMPerHour });
+        const km = s.distanceM / 1000;
+        routeText = `Planned route: ${km.toFixed(km < 10 ? 1 : 0)} km, steepest slope ${s.steepestDeg.toFixed(0)}°, climbing ${Math.round(s.climbM)} m and descending ${Math.round(s.descentM)} m.`;
+      }
+      map.setRoute({
+        path: plan.path,
+        stops: targets.map((t, i) => ({ row: t.row, col: t.col, label: destinationName(i) })),
+        waits: plan.waits ?? [],
+      });
     }
-    $('finderRoute').textContent = text;
-    currentPath = path;
-    workable = null;
-    drawSchedule();
+    $('finderRoute').textContent = routeText;
+    drawDests();
+    drawSchedule(text);
   }
 
-  /** Time the drive along the current route: where the rover is each hour, where it waits, whether it survives. */
-  const driveOptions = () => ({
-    speedMPerHour: values.roverSpeedMPerHour,
-    maxDarknessHours: values.maxDarknessHours,
-    needSunToDrive: true,
-    needEarthToDrive: values.roverNeedsEarthToDrive,
-  });
-  function drawSchedule() {
-    const drive = currentPath && result?.sunMask ? simulateDrive(result, currentPath, { ...driveOptions(), departHours }) : null;
+  function drawSchedule(text) {
     renderSchedule($('finderSchedule'), {
       result,
-      drive,
-      workable,
+      plan,
+      text,
+      departHours,
       onDepart: (hours) => {
         departHours = Math.max(0, hours);
-        workable = null;
-        drawSchedule();
+        updateRoute();
       },
-      onFindBest: () => {
-        const found = bestDeparture(result, currentPath, driveOptions());
-        workable = found.workable;
-        if (found.best) departHours = found.best.departHours;
-        drawSchedule();
+      onFindLatest: () => {
+        const found = latestDeparture(result, start, targets, roverNow());
+        if (found) {
+          departHours = found.departHours;
+          updateRoute();
+        }
       },
     });
   }
@@ -203,7 +236,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     // A new search starts the rover at the middle of the search area, with no destination.
     const middle = latLonToCell(result, result.center, result.center.lat, result.center.lon);
     start = middle ? { ...middle, lat: result.center.lat, lon: result.center.lon } : null;
-    target = null;
+    targets = [];
     departHours = 0;
     updateRoute();
 
@@ -257,5 +290,5 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   }
   $('finderBack').addEventListener('click', close);
 
-  return { drawForm, close, isOpen: () => !$('finder').hidden, getResult: () => result, debug: { pick, route: () => ({ start, target, reach }) } };
+  return { drawForm, close, isOpen: () => !$('finder').hidden, getResult: () => result, debug: { pick, route: () => ({ start, targets, reach, plan }) } };
 }

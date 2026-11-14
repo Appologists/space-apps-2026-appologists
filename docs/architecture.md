@@ -171,3 +171,49 @@ finder and the surface view can differ by a few percent, because they sample tim
 **Reach and route** run in the browser on the finder's rasters (`src/finder/route.js`): a shortest-path search
 over cells whose slope is within the rover's limit, stopping at the rover's range. A 400 by 400 raster takes
 about 70 ms, so it is redone whenever the start, the destination or the rover changes.
+
+## The drive planner
+
+```
+ start, destinations, rover ──▶ planMission() ──▶ plan: route, order, when to leave each cell
+ (src/ui/finder-mode.js)        (src/finder/planner.js)      │
+                                                             ▼
+        map: route, stops, waits ◀── simulatePlan() replays it step by step ──▶ strip and words
+        (src/finder/map-view.js)     (src/finder/schedule.js)                   (src/ui/finder-schedule.js, src/finder/plan-text.js)
+```
+
+It runs in the browser on the finder's rasters and the two per-step masks (`sunMask`, `earthMask`).
+
+- **The rules** live in `schedule.js` (decision O): the rover leaves a cell only while that cell is sunlit (and
+  sees Earth, if required), checked on the hour and at every cell it reaches; darkness is counted at the end of
+  each step for the cell it last reached; too long a run of darkness and it is lost.
+- **The search** is over place and time. For every cell the masks are first turned into its unbroken stretches
+  of sunlight (once per search result). A state is "on this cell during this stretch": waiting inside a stretch
+  costs nothing, so only the earliest moment the rover can be there is kept (plus, rarely, a slightly later one
+  with less darkness behind it). From a state the rover can hop to a neighbour at once; wait and hop so that it
+  arrives as the neighbour's next stretch of sunlight begins, or in the last dark hour before it; or stay
+  through the dark until its own cell is lit again. States are taken in time order, so the first way found to
+  each is the earliest.
+- **Several destinations:** one such search per set of destinations already visited, each started from every
+  way the smaller sets ended, so every order is covered (at most five destinations, 31 searches). A first quick
+  pass in "nearest next" order gives a finishing time that lets the full pass stop early.
+- **Distance and range:** every state remembers how far the rover has driven; ways that could no longer reach
+  the remaining destinations within the range are dropped. After the earliest arrival is known, a second pass
+  that also keeps shorter ways looks for a drive arriving in the same hour with less driving.
+- **The replay is the judge.** The plan is a route plus, for each cell, the earliest time to leave it.
+  `simulatePlan` drives it by the rules, and what the map, the strip and the text show is that replay. If the
+  two ever disagree the plan carries `selfCheck: false` and the panel says so.
+- **When nothing works** the planner tries again with one limit lifted at a time (darkness, range, Earth) and,
+  for several destinations, each destination alone, and `plan-text.js` puts the result into words.
+
+Simplifications, all on the safe side: the rover pauses only on cell centres; it starts a hop only when the
+whole hop fits in one stretch of light; times are good to one step of the search (an hour for missions up to
+14 days). It finds a workable plan and prefers the earliest arrival; it does not promise the best plan, and it
+does not look for the safest one.
+
+Checks we ran (2026-11-14): on 8,182 random maps of 16 to 25 cells an exhaustive search of every allowed drive
+agreed with the planner on whether a plan exists and on the arrival hour, every time (400 of these run in
+`npm test`). On a real search at Shackleton's rim (89.45° S, 137.31° W, 250 by 250 cells of 80 m, 337 hourly
+steps) one destination took 35 to 290 ms and tours of three to five stops 0.5 to 3 s; every plan's replay
+matched. Not checked: other sites, the coarser whole-Moon terrain, missions longer than 14 days.
+

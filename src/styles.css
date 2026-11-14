@@ -1071,3 +1071,21 @@ button:disabled {
 .schedule-legend { margin-top: 6px; color: var(--dim); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .schedule-key { display: inline-flex; align-items: center; gap: 4px; }
 .schedule-key i { width: 10px; height: 10px; display: inline-block; border: 1px solid var(--rule); }
+
+/* Destinations list and plan lines */
+.finder-dests { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.finder-dests:empty { display: none; }
+.dest-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; grid-template-areas: "letter coords remove" "letter arrival remove"; align-items: center; column-gap: 8px; font-size: 13px; }
+.dest-row .dest-letter { grid-area: letter; }
+.dest-row .dest-coords { grid-area: coords; }
+.dest-row .dest-arrival { grid-area: arrival; }
+.dest-row .dest-arrival:empty { display: none; }
+.dest-row button { grid-area: remove; }
+.dest-letter { flex: none; width: 20px; height: 20px; border-radius: 3px; background: #fff; color: #06080c; font: 600 12px var(--font-num); display: inline-flex; align-items: center; justify-content: center; }
+.dest-coords { font-family: var(--font-num); color: var(--ink); }
+.dest-arrival { color: var(--dim); font-size: 12px; flex: 1; }
+.dest-row button, .dest-clear { font-size: 12px; padding: 2px 8px; }
+.dest-clear { align-self: flex-start; margin-top: 2px; }
+.schedule-lines { margin: 0 0 10px; padding-left: 18px; font-size: 13px; color: var(--ink); }
+.schedule-lines li { margin: 2px 0; }
+.schedule-lines li::marker { color: var(--dim); }
