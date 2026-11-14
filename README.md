@@ -1,38 +1,76 @@
-# Moon rover
+# Lunar Landing Site Navigator
 
-A Moon rover simulation, starting from an interactive globe of the Moon.
+Team Appologists' project for the NASA Space Apps Challenge 2026,
+[Lunar Landing Site Navigator](https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/).
 
-## What's here
+A web app that runs on your own computer. You choose a landing date, how long the mission lasts and what
+matters most; it ranks landing sites and shows where the Sun and Earth are in each site's sky.
+
+**What works today:** a 3D Moon with 23 sites, ranking by uninterrupted sunlight and Earth visibility, a
+time slider, your own points by click or coordinates, and a one-click check against NASA JPL Horizons.
+
+**What does not work yet:** terrain. Horizons are those of a smooth Moon, so no ridge or crater rim casts a
+shadow. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
+
+## Start
+
+You need [Node.js](https://nodejs.org/) 22.12 or newer (`node --version` to check).
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+Then open the address it prints (normally http://localhost:5173).
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Runs the app with live reload |
+| `npm test` | Runs the tests (about 2 seconds) |
+| `npm run check:horizons` | Compares our Sun/Earth maths with JPL Horizons over the next 28 days |
+| `npm run data:list` | Lists the large datasets we know about and which ones you have |
+| `npm run data:fetch -- <id>` | Downloads one into `data/raw/` (never committed) |
+| `npm run build` | Builds a static copy into `dist/` |
+
+## Where things are
 
 | Path | What |
 | --- | --- |
-| `globe/index.html` | **Lunar Coordinate Globe.** Drag to turn the Moon, click for selenographic latitude/longitude, colour-coded poles, near/far side tint, sunlight and Earth position from a date. |
-| `globe/moon-texture.js` | The Moon map wrapped as a `data:` URL, so the page works opened straight from disk. Rebuild it with `tools/make-texture-js.sh`. |
-| `assets/lroc_color_poles_4k.jpg` | NASA LRO/LROC colour Moon map, 4096×2048, equirectangular, centred on 0° longitude, east to the right. |
-| `tools/make-texture-js.sh` | Regenerates `globe/moon-texture.js` from a map JPEG. |
+| `index.html`, `src/main.js` | The page, and the file that wires everything together |
+| `src/astro/` | Sun and Earth positions, the sky from a site, the JPL Horizons client |
+| `src/criteria/` | One file per thing we score a site on. **Most new work goes here.** |
+| `src/scoring/` | Turns criteria and weights into a ranking |
+| `src/globe/` | The 3D Moon |
+| `src/ui/` | The panel, ranked list and site card |
+| `data/sites.json` | The curated sites, each with its source |
+| `data/catalog.json` | Large datasets: where they come from and how big they are |
+| `tools/` | Command-line helpers: dataset download, Horizons check |
+| `tests/` | Tests, including reference values from JPL Horizons |
+| `docs/` | Plan, decisions, architecture, how-tos |
 
-## Running the globe
+## How to…
 
-Open `globe/index.html` in a browser. It needs an internet connection for two libraries loaded from jsDelivr:
-three.js 0.160.0 and Astronomy Engine 2.1.19.
+- **Add a way to score sites** (terrain, water, temperature…): [docs/adding-a-criterion.md](docs/adding-a-criterion.md)
+- **Add a site:** add an entry to `data/sites.json` with its `source`. `npm test` checks the format.
+- **Use a big dataset:** [data/README.md](data/README.md)
+- **See what to build next, or record a decision:** [docs/plan.md](docs/plan.md), [docs/decisions.md](docs/decisions.md)
+- **Work with an AI coding tool:** it should read [AGENTS.md](AGENTS.md) first.
 
-## Coordinates and conventions
+## Accuracy
 
-- **Selenographic frame:** X toward 0° longitude (mean sub-Earth point), Y toward 90° E, Z toward the north pole.
-  Longitude is east-positive, shown both as ±180° and 0–360° E.
-- **three.js mapping:** the Moon mesh's local axes are `x = X`, `y = Z` (north up), `z = −Y`. This matches
-  `THREE.SphereGeometry`'s UVs for a map centred on 0° longitude. `latLonToLocal` / `localToLatLon` in
-  `globe/index.html` are the single place this conversion lives.
-- **Moon orientation:** IAU (WGCCRE) rotation model via Astronomy Engine's `RotationAxis(Body.Moon)`, which
-  approximates the mean-Earth/polar-axis frame used by LRO maps. Good to well under a kilometre on the ground.
-  For rover-grade accuracy, switch to JPL's DE440 lunar orientation kernels (`MOON_ME` frame) through SPICE or
-  Skyfield.
-- **Sun and Earth:** Astronomy Engine `GeoMoon` and `GeoVector(Sun)`, about 1′ accuracy. Checked against
-  Astronomy Engine's own `Libration()`: the sub-Earth point agreed within 0.02° on four dates in 2026–27.
-- **Elevations** of the Sun and Earth at a clicked point ignore terrain (crater rims, mountains).
+Sun and Earth positions are computed in the browser with Astronomy Engine and agree with JPL Horizons to
+about 0.004° (the Sun's disc is 0.53° wide). Coordinates use the Moon's mean-Earth / polar-axis frame, the
+same one LRO maps and Horizons use: latitude north-positive, longitude east-positive.
+Details and assumptions: [docs/architecture.md](docs/architecture.md).
 
-## Sources and credits
+## Credits
 
-- Moon map: NASA's Scientific Visualization Studio, CGI Moon Kit (https://svs.gsfc.nasa.gov/4720/), built from
-  LRO LROC data. NASA imagery is public domain; credit NASA's Scientific Visualization Studio.
-- three.js (MIT), Astronomy Engine by Don Cross (MIT).
+- Moon colour map: NASA's Scientific Visualization Studio, [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/),
+  from Lunar Reconnaissance Orbiter data. Public domain.
+- Reference ephemeris: [NASA JPL Horizons](https://ssd.jpl.nasa.gov/horizons/).
+- Libraries: [Astronomy Engine](https://github.com/cosinekitty/astronomy) by Don Cross (MIT),
+  [three.js](https://threejs.org/) (MIT), [Vite](https://vite.dev/) and Vitest (MIT).
+- Site coordinates: see the `sources` section of `data/sites.json`.

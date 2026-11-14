@@ -1,0 +1,44 @@
+# Guide for AI coding tools (and new teammates)
+
+This is a hackathon project: NASA Space Apps 2026, "Lunar Landing Site Navigator". Read `README.md` for
+what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for how it fits together.
+
+## Commands
+
+- `npm run dev` runs the app. `npm test` must pass before you say a change is done.
+- `npm run check:horizons` compares our Sun/Earth maths with NASA JPL Horizons. Run it after touching
+  `src/astro/`.
+
+## Where a change goes
+
+- A new way to score sites: one new file in `src/criteria/`, registered in `src/criteria/index.js`.
+  Follow `docs/adding-a-criterion.md`. Do not put scoring logic in the UI or the globe.
+- A new user input (a constraint, a height, a limit): add it to `src/mission.js`, then a field in
+  `src/ui/panel.js`.
+- A new site: `data/sites.json`. A new large dataset: `data/catalog.json`.
+- A script that prepares data: `tools/`, with small results written to `data/derived/`.
+
+## Rules
+
+1. **Never invent data.** If a criterion has no data for a site, return `score: null`. The ranking leaves it
+   out; it is never counted as zero and never guessed. Estimates are fine when the result says so in `caveats`.
+2. **Every site, dataset and number has a source.** Sites name one in `data/sites.json`. Science claims in
+   the UI or docs need a source or the words "our estimate".
+3. **Say what a number leaves out.** Today that is terrain: every sunlight and Earth result carries a caveat
+   that the horizon is a smooth sphere. Keep caveats honest when you add things.
+4. **No large files in git.** Anything over about 5 MB goes in `data/catalog.json` and is downloaded with
+   `npm run data:fetch`. `data/raw/` is git-ignored.
+5. **One coordinate convention.** Moon-fixed mean-Earth/polar-axis frame, latitude north-positive, longitude
+   east-positive in (-180, 180], degrees. Many datasets use 0–360° E: convert at the edge with `wrapLon`.
+   The 3D mesh uses a different axis order; only `src/globe/globe.js` knows about it.
+6. **Keep `src/astro/`, `src/criteria/` and `src/scoring/` free of browser and three.js code** so they run in
+   tests and in Node scripts.
+7. **Build the page with the `h()` helper in `src/ui/dom.js`, not `innerHTML`.**
+8. **Add a test with each criterion or maths change.** Tests live in `tests/` and run in Node.
+9. Plain words in the UI and docs. Times are UTC and say so.
+
+## Keeping the team in sync
+
+- When you finish or start something, update its row in `docs/plan.md`.
+- When the team settles a question, add it to `docs/decisions.md` with the date and the reason.
+- Pull before you start and before you push. Keep commits small and say what changed and why.

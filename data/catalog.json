@@ -1,0 +1,147 @@
+{
+  "about": "Large datasets are NOT stored in git. This catalog lists where each one comes from; `npm run data:fetch -- <id>` downloads it into data/raw/<id>/ (git-ignored). Sizes were read from the servers on 2026-11-14. Add a dataset by adding an entry here.",
+  "datasets": [
+    {
+      "id": "moon-color-4k",
+      "title": "Moon colour map, 4096x2048",
+      "description": "LRO/LROC colour mosaic. The app's committed texture (public/textures/moon_lroc_color_4k.jpg) is a JPEG conversion of this file.",
+      "format": "TIFF, equirectangular, centred on 0 deg longitude",
+      "sourcePage": "https://svs.gsfc.nasa.gov/4720/",
+      "license": "Public domain (NASA). Credit: NASA's Scientific Visualization Studio.",
+      "files": [
+        {
+          "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_4k.tif",
+          "bytes": 13095388
+        }
+      ]
+    },
+    {
+      "id": "moon-color-8k",
+      "title": "Moon colour map, 8192x4096",
+      "description": "Sharper version of the colour map, for close-up views.",
+      "format": "TIFF, equirectangular, centred on 0 deg longitude",
+      "sourcePage": "https://svs.gsfc.nasa.gov/4720/",
+      "license": "Public domain (NASA). Credit: NASA's Scientific Visualization Studio.",
+      "files": [
+        {
+          "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_8k.tif",
+          "bytes": 50641970
+        }
+      ]
+    },
+    {
+      "id": "ldem-4",
+      "title": "Global elevation, 4 px/degree (about 7.6 km per pixel)",
+      "description": "LOLA elevation from the CGI Moon Kit. Small enough for quick experiments.",
+      "format": "32-bit float TIFF, equirectangular, kilometres relative to the 1737.4 km sphere",
+      "sourcePage": "https://svs.gsfc.nasa.gov/4720/",
+      "license": "Public domain (NASA). Credit: NASA's Scientific Visualization Studio.",
+      "files": [
+        {
+          "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/ldem_4.tif",
+          "bytes": 4153352
+        }
+      ]
+    },
+    {
+      "id": "ldem-16",
+      "title": "Global elevation, 16 px/degree (about 1.9 km per pixel)",
+      "description": "LOLA elevation from the CGI Moon Kit. Good for globe relief shading and regional slopes.",
+      "format": "32-bit float TIFF, equirectangular, kilometres relative to the 1737.4 km sphere",
+      "sourcePage": "https://svs.gsfc.nasa.gov/4720/",
+      "license": "Public domain (NASA). Credit: NASA's Scientific Visualization Studio.",
+      "files": [
+        {
+          "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/ldem_16.tif",
+          "bytes": 66378634
+        }
+      ]
+    },
+    {
+      "id": "ldem-64",
+      "title": "Global elevation, 64 px/degree (about 474 m per pixel)",
+      "description": "LOLA elevation from the CGI Moon Kit at its highest resolution. 1 GB.",
+      "format": "32-bit float TIFF, equirectangular, kilometres relative to the 1737.4 km sphere",
+      "sourcePage": "https://svs.gsfc.nasa.gov/4720/",
+      "license": "Public domain (NASA). Credit: NASA's Scientific Visualization Studio.",
+      "files": [
+        {
+          "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/ldem_64.tif",
+          "bytes": 1061775722
+        }
+      ]
+    },
+    {
+      "id": "lola-south-75s-120m",
+      "title": "South pole elevation, 75S to the pole, 120 m per pixel",
+      "description": "LOLA gridded elevation. Wide view of the south polar region for horizons seen from far away.",
+      "format": "PDS3 image + label: 16-bit signed integers, little-endian; height in metres = value x 0.5, relative to the 1737.4 km sphere; south polar stereographic",
+      "sourcePage": "https://pds-geosciences.wustl.edu/missions/lro/lola.htm",
+      "license": "Public (NASA Planetary Data System). Cite the LRO LOLA team and the PDS Geosciences Node.",
+      "files": [
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_75s_120m.img",
+          "bytes": 116250752
+        },
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_75s_120m.lbl",
+          "bytes": 4991
+        }
+      ]
+    },
+    {
+      "id": "lola-south-80s-80m",
+      "title": "South pole elevation, 80S to the pole, 80 m per pixel",
+      "description": "LOLA gridded elevation, 7600 x 7600 pixels. First choice for slopes and horizon masks at south-pole sites.",
+      "format": "PDS3 image + label: 16-bit signed integers, little-endian; height in metres = value x 0.5, relative to the 1737.4 km sphere; south polar stereographic",
+      "sourcePage": "https://pds-geosciences.wustl.edu/missions/lro/lola.htm",
+      "license": "Public (NASA Planetary Data System). Cite the LRO LOLA team and the PDS Geosciences Node.",
+      "files": [
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_80s_80m.img",
+          "bytes": 115520000
+        },
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_80s_80m.lbl",
+          "bytes": 4986
+        }
+      ]
+    },
+    {
+      "id": "lola-south-80s-20m",
+      "title": "South pole elevation, 80S to the pole, 20 m per pixel",
+      "description": "LOLA gridded elevation at 20 m. 1.8 GB.",
+      "format": "PDS3 image + label: 16-bit signed integers, little-endian; height in metres = value x 0.5, relative to the 1737.4 km sphere; south polar stereographic",
+      "sourcePage": "https://pds-geosciences.wustl.edu/missions/lro/lola.htm",
+      "license": "Public (NASA Planetary Data System). Cite the LRO LOLA team and the PDS Geosciences Node.",
+      "files": [
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_80s_20m.img",
+          "bytes": 1848320000
+        },
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_80s_20m.lbl",
+          "bytes": 4993
+        }
+      ]
+    },
+    {
+      "id": "lola-south-875s-5m",
+      "title": "South pole elevation, 87.5S to the pole, 5 m per pixel",
+      "description": "LOLA gridded elevation at 5 m around the pole itself. 1.8 GB.",
+      "format": "PDS3 image + label: 16-bit signed integers, little-endian; height in metres = value x 0.5, relative to the 1737.4 km sphere; south polar stereographic",
+      "sourcePage": "https://pds-geosciences.wustl.edu/missions/lro/lola.htm",
+      "license": "Public (NASA Planetary Data System). Cite the LRO LOLA team and the PDS Geosciences Node.",
+      "files": [
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_875s_5m.img",
+          "bytes": 1840545792
+        },
+        {
+          "url": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_875s_5m.lbl",
+          "bytes": 4990
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,240 @@
+{
+  "about": "Curated points to compare. Coordinates are Moon-fixed mean-Earth/polar-axis: latitude north-positive, longitude east-positive, degrees. Every site names its source; add new ones the same way.",
+  "categories": {
+    "apollo": "Apollo landing",
+    "robotic": "Robotic lander",
+    "south-pole": "South-pole feature",
+    "custom": "Your point"
+  },
+  "sources": {
+    "nssdc-apollo": {
+      "title": "NASA NSSDCA, Apollo Landing Site Coordinates (Lunar Module positions from LRO images; Wagner et al. 2017)",
+      "url": "https://nssdc.gsfc.nasa.gov/planetary/lunar/lunar_sites.html"
+    },
+    "wikipedia": {
+      "title": "Wikipedia article coordinates, retrieved 2026-11-14. Crater positions there cite the IAU Gazetteer of Planetary Nomenclature. Check against the primary source before relying on them.",
+      "url": "https://en.wikipedia.org/"
+    }
+  },
+  "sites": [
+    {
+      "id": "apollo-11",
+      "name": "Apollo 11",
+      "lat": 0.67416,
+      "lon": 23.47314,
+      "category": "apollo",
+      "agency": "NASA",
+      "year": 1969,
+      "source": "nssdc-apollo"
+    },
+    {
+      "id": "apollo-12",
+      "name": "Apollo 12",
+      "lat": -3.0128,
+      "lon": -23.4219,
+      "category": "apollo",
+      "agency": "NASA",
+      "year": 1969,
+      "source": "nssdc-apollo"
+    },
+    {
+      "id": "apollo-14",
+      "name": "Apollo 14",
+      "lat": -3.64589,
+      "lon": -17.47194,
+      "category": "apollo",
+      "agency": "NASA",
+      "year": 1971,
+      "source": "nssdc-apollo"
+    },
+    {
+      "id": "apollo-15",
+      "name": "Apollo 15",
+      "lat": 26.13239,
+      "lon": 3.6333,
+      "category": "apollo",
+      "agency": "NASA",
+      "year": 1971,
+      "source": "nssdc-apollo"
+    },
+    {
+      "id": "apollo-16",
+      "name": "Apollo 16",
+      "lat": -8.9734,
+      "lon": 15.5011,
+      "category": "apollo",
+      "agency": "NASA",
+      "year": 1972,
+      "source": "nssdc-apollo"
+    },
+    {
+      "id": "apollo-17",
+      "name": "Apollo 17",
+      "lat": 20.1911,
+      "lon": 30.7723,
+      "category": "apollo",
+      "agency": "NASA",
+      "year": 1972,
+      "source": "nssdc-apollo"
+    },
+    {
+      "id": "luna-9",
+      "name": "Luna 9",
+      "lat": 7.03,
+      "lon": -64.33,
+      "category": "robotic",
+      "agency": "Soviet Union",
+      "year": 1966,
+      "source": "wikipedia"
+    },
+    {
+      "id": "change-3",
+      "name": "Chang'e 3",
+      "lat": 44.1214,
+      "lon": -19.5116,
+      "category": "robotic",
+      "agency": "CNSA",
+      "year": 2013,
+      "source": "wikipedia"
+    },
+    {
+      "id": "change-4",
+      "name": "Chang'e 4",
+      "lat": -45.444,
+      "lon": 177.599,
+      "category": "robotic",
+      "agency": "CNSA",
+      "year": 2019,
+      "source": "wikipedia"
+    },
+    {
+      "id": "change-5",
+      "name": "Chang'e 5",
+      "lat": 43.0576,
+      "lon": -51.9161,
+      "category": "robotic",
+      "agency": "CNSA",
+      "year": 2020,
+      "source": "wikipedia"
+    },
+    {
+      "id": "chandrayaan-3",
+      "name": "Chandrayaan-3",
+      "lat": -69.373,
+      "lon": 32.319,
+      "category": "robotic",
+      "agency": "ISRO",
+      "year": 2023,
+      "source": "wikipedia"
+    },
+    {
+      "id": "slim",
+      "name": "SLIM",
+      "lat": -13.316,
+      "lon": 25.251,
+      "category": "robotic",
+      "agency": "JAXA",
+      "year": 2024,
+      "source": "wikipedia"
+    },
+    {
+      "id": "shackleton",
+      "name": "Shackleton crater",
+      "lat": -89.67,
+      "lon": 129.78,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "de-gerlache",
+      "name": "de Gerlache crater",
+      "lat": -88.5,
+      "lon": -87.1,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "sverdrup",
+      "name": "Sverdrup crater",
+      "lat": -88.5,
+      "lon": -152,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "shoemaker",
+      "name": "Shoemaker crater",
+      "lat": -88.1,
+      "lon": 44.9,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "slater",
+      "name": "Slater crater",
+      "lat": -88.08,
+      "lon": 111.29,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "faustini",
+      "name": "Faustini crater",
+      "lat": -87.3,
+      "lon": 77,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "haworth",
+      "name": "Haworth crater",
+      "lat": -86.9,
+      "lon": -4,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "nobile",
+      "name": "Nobile crater",
+      "lat": -85.28,
+      "lon": 53.27,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "malapert",
+      "name": "Malapert crater",
+      "lat": -84.9,
+      "lon": 12.9,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "cabeus",
+      "name": "Cabeus crater",
+      "lat": -84.9,
+      "lon": -35.5,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    },
+    {
+      "id": "amundsen",
+      "name": "Amundsen crater",
+      "lat": -84.5,
+      "lon": 82.8,
+      "category": "south-pole",
+      "note": "Centre of the crater: a reference point, not a vetted landing site. Many crater floors near the pole are permanently shadowed, which the smooth-sphere model cannot show.",
+      "source": "wikipedia"
+    }
+  ]
+}

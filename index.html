@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lunar Landing Site Navigator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="panel" aria-label="Mission and ranking">
+        <header>
+          <h1>Lunar Landing Site Navigator</h1>
+          <p class="lede">Pick a landing date and what matters to your mission. Sites are ranked by how well they fit.</p>
+        </header>
+
+        <p class="notice" id="terrainNotice">
+          <strong>Terrain is not included yet.</strong> Horizons assume a smooth Moon: no shadows from ridges or
+          crater rims, which decide the real answer near the poles.
+        </p>
+
+        <section aria-labelledby="missionTitle">
+          <h2 class="eyebrow" id="missionTitle">Mission</h2>
+          <div id="mission" class="fields"></div>
+        </section>
+
+        <section aria-labelledby="weightsTitle">
+          <h2 class="eyebrow" id="weightsTitle">What matters</h2>
+          <div id="weights" class="weights"></div>
+        </section>
+
+        <section aria-labelledby="rankingTitle">
+          <h2 class="eyebrow" id="rankingTitle">Ranked sites</h2>
+          <ol id="ranking" class="ranking"></ol>
+          <form id="addPoint" class="addpoint">
+            <span class="eyebrow">Add your own point</span>
+            <div class="row">
+              <label>Lat <input id="addLat" type="number" min="-90" max="90" step="any" placeholder="-89.5" required /></label>
+              <label>Lon <input id="addLon" type="number" min="-180" max="360" step="any" placeholder="0" required /></label>
+              <button type="submit">Add</button>
+            </div>
+            <span class="hint">Degrees, north and east positive. Or click anywhere on the Moon.</span>
+          </form>
+        </section>
+
+        <footer class="sources">
+          Sun and Earth positions: Astronomy Engine, checked against NASA JPL Horizons. Moon map: NASA LRO/LROC (CGI
+          Moon Kit). Coordinates: mean-Earth / polar-axis frame, east-positive longitude.
+        </footer>
+      </aside>
+
+      <main class="stage" id="stage">
+        <canvas
+          id="globe"
+          tabindex="0"
+          aria-label="3D Moon. Drag to turn, scroll to zoom, click a marker to select a site or click the surface to add your own point."
+        ></canvas>
+        <div class="labels" id="labels" aria-hidden="true"></div>
+        <div class="tip" id="tip" hidden></div>
+
+        <div class="views" role="group" aria-label="Turn the Moon">
+          <button type="button" data-view="near">Near side</button>
+          <button type="button" data-view="far">Far side</button>
+          <button type="button" data-view="north">North pole</button>
+          <button type="button" data-view="south">South pole</button>
+          <button type="button" data-view="southClose">South pole close-up</button>
+        </div>
+
+        <div class="zoom">
+          <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+          <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+        </div>
+
+        <div class="timebar">
+          <button type="button" id="play" aria-pressed="false">Play</button>
+          <input type="range" id="viewTime" min="0" max="1" step="1" value="0" aria-label="Time within the mission" />
+          <output id="viewTimeText" for="viewTime"></output>
+        </div>
+
+        <div class="status" id="status">Loading the Moon map…</div>
+      </main>
+
+      <section class="detail" id="detail" aria-live="polite" hidden></section>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

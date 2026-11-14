@@ -1,1 +1,15 @@
+# macOS
 .DS_Store
+
+# Node
+node_modules/
+dist/
+
+# Large datasets: pulled with `npm run data:fetch -- <id>`, never committed (see data/README.md)
+data/raw/*
+!data/raw/.gitkeep
+
+# Local settings and secrets
+.env
+.env.*
+*.local
