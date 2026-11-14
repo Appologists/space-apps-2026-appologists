@@ -13,6 +13,7 @@ export const MAP_LAYERS = [
   { id: 'dark', label: 'Darkness' },
   { id: 'earth', label: 'Earth link' },
   { id: 'slope', label: 'Slope' },
+  { id: 'reach', label: 'Reach' },
 ];
 
 const BACKGROUND = [6, 8, 12];
@@ -66,7 +67,7 @@ export function hillshade(elevation, n, cellM) {
  * sRGB [r, g, b] (0-255) for one cell on a layer. `shade` is that cell's hillshade value.
  * Colours from the ramps are shared table entries: do not modify the returned array.
  */
-export function layerPixel(layerId, result, index, shade) {
+export function layerPixel(layerId, result, index, shade, extra) {
   const fail = result.fail[index];
   if (fail & FAIL.OUTSIDE || Number.isNaN(result.elevation[index])) return BACKGROUND;
   switch (layerId) {
@@ -87,6 +88,13 @@ export function layerPixel(layerId, result, index, shade) {
     }
     case 'slope':
       return at(ORANGE, Math.min(result.slope[index] / SLOPE_MAX_DEG, 1));
+    case 'reach': {
+      const reach = extra?.reach;
+      const d = reach ? reach.dist[index] : Infinity;
+      if (Number.isFinite(d)) return at(BLUE, 1 - d / reach.rangeM);
+      const v = Math.round(28 + shade * 0.42);
+      return [v, v, v];
+    }
     default:
       return BACKGROUND;
   }
@@ -95,7 +103,7 @@ export function layerPixel(layerId, result, index, shade) {
 const pct = (v) => `${Math.round(v * 100)}%`;
 
 /** What the legend shows for a layer, in the shape the surface view's legend uses, plus optional `swatches`. */
-export function layerLegend(layerId, result) {
+export function layerLegend(layerId, result, extra) {
   const blue = BLUE_RAMP.filter((_, i) => i % 3 === 0 || i === BLUE_RAMP.length - 1);
   const orange = ORANGE_RAMP.filter((_, i) => i % 3 === 0 || i === ORANGE_RAMP.length - 1);
   const withLabels = (stops, first, last) => stops.map((hex, i) => ({ hex, ...(i === 0 ? { label: first } : i === stops.length - 1 ? { label: last } : {}) }));
@@ -128,6 +136,18 @@ export function layerLegend(layerId, result) {
         note: `Steepness of the ground at each point. ${SLOPE_MAX_DEG}° or more gets the lightest colour.`,
         stops: withLabels(orange, '0°', `${SLOPE_MAX_DEG}°`),
       };
+    case 'reach': {
+      const reach = extra?.reach;
+      const km = (m) => `${Math.round((m / 1000) * 10) / 10} km`;
+      return {
+        title: 'Reach',
+        note: reach
+          ? `How far the rover must drive from the start to get there, on slopes up to ${reach.maxSlopeDeg}°.`
+          : 'Pick a start point to see how far the rover can drive. No reach data yet.',
+        stops: withLabels(blue, reach ? km(reach.rangeM) : 'range', '0 km'),
+        swatches: [{ hex: FAIL_GREY_HEX, label: 'too steep or out of range' }],
+      };
+    }
     default:
       return {
         title: 'Landing sites',
@@ -139,11 +159,13 @@ export function layerLegend(layerId, result) {
 }
 
 /** One plain-text line describing a cell, for the hover tooltip. */
-export function describeCell(result, row, col) {
+export function describeCell(result, row, col, extra) {
   const i = row * result.n + col;
   if (result.fail[i] & FAIL.OUTSIDE || Number.isNaN(result.elevation[i])) return 'outside the search area';
   const { lat, lon } = cellToLatLon(result, result.center, row, col);
   const verdict = result.fail[i] === 0 ? 'passes every check' : `fails: ${describeFail(result.fail[i]).join('; ')}`;
+  const reach = extra?.reach;
+  const drive = !reach ? [] : [Number.isFinite(reach.dist[i]) ? `${(reach.dist[i] / 1000).toFixed(1)} km drive from the start` : 'not reachable from the start'];
   return [
     formatLatLon(lat, lon, 3),
     `${Math.round(result.elevation[i]).toLocaleString('en-US')} m`,
@@ -152,5 +174,6 @@ export function describeCell(result, row, col) {
     `longest darkness ${formatHours(result.longestDarkH[i])}`,
     `Earth in view ${pct(result.earthFraction[i])}`,
     verdict,
+    ...drive,
   ].join(' · ');
 }

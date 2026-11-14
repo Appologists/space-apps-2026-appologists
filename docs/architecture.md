@@ -135,3 +135,7 @@ against JPL Horizons).
 Known limits: the search blocks the dev server while it runs (about 10 s); darkness that starts before
 landing or runs past the end of the mission is counted only inside the window; at marginal spots the
 finder and the surface view can differ by a few percent, because they sample time and terrain differently.
+
+**Reach and route** run in the browser on the finder's rasters (`src/finder/route.js`): a shortest-path search
+over cells whose slope is within the rover's limit, stopping at the rover's range. A 400 by 400 raster takes
+about 70 ms, so it is redone whenever the start, the destination or the rover changes.

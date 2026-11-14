@@ -1,11 +1,13 @@
 // The landing-site finder: runs the search, shows the result as a map over the stage, and lists the best
 // sites. Like surface-mode.js, it owns its part of the page and talks to main.js through callbacks.
 import { finderStepMinutes, searchLanding } from '../finder/client.js';
+import { latLonToCell } from '../finder/grid.js';
+import { pathStats, pathTo, reachFrom } from '../finder/route.js';
 import { MAP_LAYERS, createFinderMap } from '../finder/map-view.js';
 import { defaultFinder } from '../finder/score.js';
 import { terrainCovers } from '../terrain/client.js';
 import { formatHours, formatLatLon } from '../format.js';
-import { clear, h } from './dom.js';
+import { clear, debounce, h } from './dom.js';
 import { renderFinderForm } from './finder-form.js';
 
 const $ = (id) => document.getElementById(id);
@@ -25,6 +27,24 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   let centreName = '';
   let busy = false;
   let layerId = MAP_LAYERS[0].id;
+  // Reach and route: where the rover starts (the landing point), where it is going, and what it can reach.
+  let clickMode = 'start'; // what a click on the map sets: 'start' or 'dest'
+  let start = null; // { row, col, lat, lon }
+  let target = null;
+  let reach = null;
+
+  const CLICK_MODES = [
+    ['start', 'Start'],
+    ['dest', 'Destination'],
+  ];
+  const modeButtons = CLICK_MODES.map(([id, label]) =>
+    h('button', { type: 'button', 'aria-pressed': String(id === clickMode), onClick: () => setClickMode(id) }, label),
+  );
+  $('finderClickMode').append(...modeButtons);
+  function setClickMode(id) {
+    clickMode = id;
+    modeButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(CLICK_MODES[i][0] === id)));
+  }
 
   const layerButtons = MAP_LAYERS.map((layer) =>
     h('button', { type: 'button', 'aria-pressed': String(layer.id === layerId), onClick: () => chooseLayer(layer.id) }, layer.label),
@@ -48,7 +68,12 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
           : !terrainCovers(terrain, site.lat)
             ? `Choose a centre south of ${Math.abs(terrain.coversSouthOfLat)}° S: the terrain data stops there.`
             : null;
-    renderFinderForm($('finderForm'), { values, centre: site, busy, hint, onChange: (patch) => Object.assign(values, patch), onSearch: run });
+    renderFinderForm($('finderForm'), { values, centre: site, busy, hint, onChange: (patch) => {
+        Object.assign(values, patch);
+        if (Object.keys(patch).some((key) => key.startsWith('rover'))) updateRouteSoon(); // no new search needed
+      },
+      onSearch: run,
+    });
   }
 
   async function run() {
@@ -78,10 +103,55 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     drawForm();
   }
 
-  function pick(lat, lon) {
-    map?.setSelected({ lat, lon });
-    onPick(lat, lon);
+  /** A click on the map or on a listed site: sets the start or the destination. */
+  function pick(lat, lon, as = clickMode) {
+    const cell = result ? latLonToCell(result, result.center, lat, lon) : null;
+    if (as === 'dest') {
+      target = cell ? { ...cell, lat, lon } : null;
+      updateRoute();
+      return;
+    }
+    start = cell ? { ...cell, lat, lon } : null;
+    onPick(lat, lon); // also makes it the app's selected point, so "Look around from here" works
+    updateRoute();
   }
+
+  /** Recompute what the rover can reach from the start, and the path to the destination if there is one. */
+  function updateRoute() {
+    if (!result || !map) return;
+    const rover = { maxSlopeDeg: values.roverMaxSlopeDeg, rangeM: values.roverRangeKm * 1000 };
+    reach = start ? reachFrom(result, start, rover) : null;
+    map.setReach(reach);
+    map.setSelected(start ? { lat: start.lat, lon: start.lon } : null);
+    const path = reach && target ? pathTo(reach, target) : null;
+    map.setRoute(target ? { path, target } : null);
+
+    const limits = `within ${values.roverRangeKm} km on slopes up to ${values.roverMaxSlopeDeg}°`;
+    let text;
+    if (!start) {
+      text = 'Click the map to choose where the rover starts.';
+    } else if (!target) {
+      let cells = 0;
+      for (let i = 0; i < reach.dist.length; i++) if (Number.isFinite(reach.dist[i])) cells++;
+      const area = (cells * result.cellM * result.cellM) / 1e6;
+      text =
+        cells <= 1
+          ? `From the start the rover cannot move: the ground there is steeper than ${values.roverMaxSlopeDeg}°, or off the map.`
+          : `From the start the rover can reach ${area.toFixed(area < 10 ? 1 : 0)} km² ${limits}. Choose "Destination" and click the map to plan a drive. The "Reach" layer shows how far each spot is.`;
+    } else if (!path) {
+      text = `No drivable path from the start to that destination ${limits}.`;
+    } else {
+      const s = pathStats(result, path, { speedMPerHour: values.roverSpeedMPerHour });
+      const km = s.distanceM / 1000;
+      text =
+        `Drive: ${km.toFixed(km < 10 ? 1 : 0)} km, about ${formatHours(s.hours)} at ${values.roverSpeedMPerHour} m per hour. ` +
+        `Steepest slope on the way ${s.steepestDeg.toFixed(0)}°, climbing ${Math.round(s.climbM)} m and descending ${Math.round(s.descentM)} m. ` +
+        `Along the way the worst spot has ${formatHours(s.longestDarkH)} of darkness, is sunlit ${percent(s.minSunFraction)} of the mission and sees Earth ${percent(s.minEarthFraction)} of it. ` +
+        'This is the shortest drivable path on this terrain. It does not check that the Sun is up or Earth is in view at the hour the rover passes.';
+    }
+    $('finderRoute').textContent = text;
+  }
+  const updateRouteSoon = debounce(updateRoute, 250);
 
   function show() {
     app.classList.add('finder-open');
@@ -90,6 +160,11 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     map.setResult(result);
     map.setLayer(layerId);
     map.resize();
+    // A new search starts the rover at the middle of the search area, with no destination.
+    const middle = latLonToCell(result, result.center, result.center.lat, result.center.lon);
+    start = middle ? { ...middle, lat: result.center.lat, lon: result.center.lon } : null;
+    target = null;
+    updateRoute();
 
     const { counts, sites, cellM, radiusKm, computeMs, params } = result;
     const km2 = (cells) => {
@@ -117,7 +192,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
           {},
           h(
             'button',
-            { type: 'button', class: 'found-site', onClick: () => pick(site.lat, site.lon) },
+            { type: 'button', class: 'found-site', onClick: () => pick(site.lat, site.lon, 'start') },
             h('span', { class: 'num' }, `${site.rank}`),
             h('span', {}, formatLatLon(site.lat, site.lon, 3), h('span', { class: 'rank-score' }, ` ${Math.round(site.score * 100)}`)),
             h(
@@ -141,5 +216,5 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   }
   $('finderBack').addEventListener('click', close);
 
-  return { drawForm, close, isOpen: () => !$('finder').hidden, getResult: () => result };
+  return { drawForm, close, isOpen: () => !$('finder').hidden, getResult: () => result, debug: { pick, route: () => ({ start, target, reach }) } };
 }

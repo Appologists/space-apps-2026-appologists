@@ -17,6 +17,8 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   let layer = MAP_LAYERS[0].id;
   let selected = null; // { lat, lon }
   let shade = null;
+  let reach = null;
+  let route = null; // { path, target }
   let box = { x: 0, y: 0, size: 0 }; // raster rectangle in CSS pixels
   let down = null;
 
@@ -28,7 +30,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     const rctx = raster.getContext('2d');
     const img = rctx.createImageData(n, n);
     for (let i = 0; i < n * n; i++) {
-      const [r, g, b] = layerPixel(layer, result, i, shade[i]);
+      const [r, g, b] = layerPixel(layer, result, i, shade[i], { reach });
       img.data[i * 4] = r;
       img.data[i * 4 + 1] = g;
       img.data[i * 4 + 2] = b;
@@ -81,6 +83,41 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     ctx.moveTo(centre.x, centre.y - 5);
     ctx.lineTo(centre.x, centre.y + 5);
     ctx.stroke();
+
+    if (route) {
+      const { path, target } = route;
+      if (path && path.length > 1) {
+        ctx.beginPath();
+        path.forEach((i, k) => {
+          const p = cellCentre(Math.floor(i / result.n), i % result.n);
+          if (k === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#06080c';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
+      if (target) {
+        const p = cellCentre(target.row, target.col);
+        const r = 7;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - r);
+        ctx.lineTo(p.x + r, p.y);
+        ctx.lineTo(p.x, p.y + r);
+        ctx.lineTo(p.x - r, p.y);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#06080c';
+        ctx.stroke();
+      }
+    }
 
     ctx.font = FONT;
     ctx.textAlign = 'center';
@@ -138,7 +175,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       legendEl.hidden = true;
       return;
     }
-    const legend = layerLegend(layer, result);
+    const legend = layerLegend(layer, result, { reach });
     const last = legend.stops.length - 1;
     const ticks = legend.stops.map((stop, i) => ({ ...stop, at: i / last })).filter((stop) => stop.label);
     legendEl.replaceChildren(
@@ -173,7 +210,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     if (event.pointerType && event.pointerType !== 'mouse') return;
     const cell = cellAt(event);
     if (!cell) return hideTip();
-    tipEl.textContent = describeCell(result, cell.row, cell.col);
+    tipEl.textContent = describeCell(result, cell.row, cell.col, { reach });
     tipEl.hidden = false;
     const cw = container.clientWidth;
     const ch = container.clientHeight;
@@ -210,6 +247,8 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     setResult(next) {
       result = next;
       selected = null;
+      reach = null;
+      route = null;
       hideTip();
       if (result) {
         shade = hillshade(result.elevation, result.n, result.cellM);
@@ -222,6 +261,16 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       layer = id;
       paintRaster();
       renderLegend();
+      draw();
+    },
+    setReach(next) {
+      reach = next || null;
+      paintRaster();
+      if (layer === 'reach') renderLegend();
+      draw();
+    },
+    setRoute(next) {
+      route = next || null;
       draw();
     },
     getLayer: () => layer,

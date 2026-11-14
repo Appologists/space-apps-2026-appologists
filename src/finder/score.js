@@ -24,6 +24,10 @@ export function defaultFinder() {
     maxDarknessHours: 50, // NASA's VIPER planning papers aim for under 50 hours of shadow
     needSunAtLanding: true,
     needEarthAtLanding: true,
+    // The rover, for reach and routes (stage 2). Also placeholders.
+    roverMaxSlopeDeg: 15,
+    roverSpeedMPerHour: 200,
+    roverRangeKm: 20,
   };
 }
 
