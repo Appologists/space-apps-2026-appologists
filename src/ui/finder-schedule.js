@@ -1,6 +1,5 @@
-// Timed-drive panel: departure control, a plain-language summary and a strip of what the rover does over the mission.
+// Plan panel: "leave no earlier than" control, a plain-language summary and a strip of what the rover does over the mission.
 import { h } from './dom.js';
-import { formatHours } from '../format.js';
 import { STATE } from '../finder/schedule.js';
 
 const STATE_COLOURS = {
@@ -10,30 +9,12 @@ const STATE_COLOURS = {
   [STATE.WAIT_EARTH]: '#2f4f7a',
   [STATE.ARRIVED]: '#5fe0c0',
   [STATE.LOST]: '#d03b3b',
+  [STATE.HOLD]: '#8a93a6',
 };
 const LIT = '#ffd36b';
 const DARK = '#1d2530';
 
-const km = (m) => (m / 1000).toFixed(1);
-
-export function describeDrive(result, drive, workable) {
-  const leave = `Leaving ${formatHours(drive.departHours)} after landing`;
-  let text;
-  if (!drive.survived) {
-    text = `${leave}, the rover is lost ${formatHours(drive.lostAtHours)} after landing: it sits in darkness longer than it can survive.`;
-  } else if (!drive.arrived) {
-    const covered = drive.positionM[drive.positionM.length - 1] ?? 0;
-    text = `${leave}, the rover does not arrive before the mission ends (it covers ${km(covered)} of ${km(drive.distanceM)} km).`;
-  } else {
-    text = `${leave}, the rover arrives ${formatHours(drive.arrivalHours)} after landing: ${formatHours(drive.drivingHours)} of driving and ${formatHours(drive.waitingHours)} waiting. Its longest stretch in darkness is ${formatHours(drive.longestDarkH)}.`;
-  }
-  if (typeof workable === 'number') {
-    text += workable > 0 ? ` ${workable} of ${result.steps} departure hours work.` : ' No departure hour works with these limits.';
-  }
-  return text;
-}
-
-function drawStrip(canvas, drive) {
+function drawStrip(canvas, drive, stops, stepHours) {
   const dpr = window.devicePixelRatio || 1;
   const w = Math.max(1, Math.round((canvas.clientWidth || 300) * dpr));
   const hgt = Math.round(46 * dpr);
@@ -46,17 +27,23 @@ function drawStrip(canvas, drive) {
   for (let s = 0; s < steps; s++) {
     const x0 = Math.floor((s / steps) * w);
     const x1 = Math.max(x0 + 1, Math.floor(((s + 1) / steps) * w));
-    ctx.fillStyle = STATE_COLOURS[drive.timeline[s]];
+    ctx.fillStyle = STATE_COLOURS[drive.timeline[s]] ?? STATE_COLOURS[STATE.PARKED];
     ctx.fillRect(x0, 0, x1 - x0, rowH - 1);
     ctx.fillStyle = drive.lit[s] ? LIT : DARK;
     ctx.fillRect(x0, rowH + 1, x1 - x0, hgt - rowH - 1);
   }
+  ctx.fillStyle = '#ffffff';
+  for (const stop of stops) {
+    if (stop.arrivalHours == null) continue;
+    const x = Math.min(w - 1, Math.floor((stop.arrivalHours / stepHours / steps) * w));
+    ctx.fillRect(x, 0, Math.max(1, Math.round(dpr)), hgt);
+  }
 }
 
-export function renderSchedule(el, { result, drive, workable, onDepart, onFindBest }) {
+export function renderSchedule(el, { result, plan, text, departHours, onDepart, onFindLatest }) {
   el.replaceChildren();
-  if (!drive) {
-    el.append(h('p', { class: 'schedule-hint' }, 'Choose a destination to time the drive.'));
+  if (!plan) {
+    el.append(h('p', { class: 'schedule-hint' }, 'Add a destination to plan a drive.'));
     return;
   }
   const input = h('input', {
@@ -65,30 +52,39 @@ export function renderSchedule(el, { result, drive, workable, onDepart, onFindBe
     min: 0,
     max: result.windowHours,
     step: result.stepHours,
-    value: drive.departHours,
+    value: departHours,
     onChange: (e) => {
       const v = Number(e.target.value);
       if (Number.isFinite(v)) onDepart?.(Math.min(result.windowHours, Math.max(0, v)));
     },
   });
-  const canvas = h('canvas', { id: 'scheduleStrip', class: 'schedule-strip' });
   const sw = (colour, label) => h('span', { class: 'schedule-key' }, h('i', { style: `background:${colour}` }), label);
   el.append(
     h('div', { class: 'schedule-row' },
-      h('label', { for: 'scheduleDepart' }, 'Leave this many hours after landing', input),
-      h('button', { id: 'scheduleBest', type: 'button', onClick: () => onFindBest?.() }, 'Find the best time to leave')),
-    h('p', { id: 'scheduleText', class: 'schedule-text' }, describeDrive(result, drive, workable)),
-    canvas,
-    h('div', { class: 'schedule-legend' },
-      'Top row: ',
-      sw(STATE_COLOURS[STATE.PARKED], 'parked'),
-      sw(STATE_COLOURS[STATE.DRIVING], 'driving'),
-      sw(STATE_COLOURS[STATE.WAIT_SUN], 'waiting for sunlight'),
-      sw(STATE_COLOURS[STATE.WAIT_EARTH], 'waiting for Earth'),
-      sw(STATE_COLOURS[STATE.ARRIVED], 'arrived'),
-      sw(STATE_COLOURS[STATE.LOST], 'lost'),
-      ' Bottom row: ',
-      sw(LIT, 'sunlit'),
-      sw(DARK, 'dark')));
-  drawStrip(canvas, drive);
+      h('label', { for: 'scheduleDepart' }, 'Leave no earlier than (hours after landing)', input),
+      h('button', { id: 'scheduleBest', type: 'button', disabled: !plan.ok, onClick: () => onFindLatest?.() }, 'Find the latest time to leave')),
+    h('p', { id: 'scheduleText', class: 'schedule-text' }, text.headline),
+    text.lines?.length ? h('ul', { id: 'scheduleLines', class: 'schedule-lines' }, text.lines.map((line) => h('li', {}, line))) : null,
+  );
+  if (plan.drive) {
+    const canvas = h('canvas', { id: 'scheduleStrip', class: 'schedule-strip' });
+    el.append(
+      canvas,
+      h('div', { class: 'schedule-legend' },
+        'Top row: ',
+        sw(STATE_COLOURS[STATE.PARKED], 'parked'),
+        sw(STATE_COLOURS[STATE.DRIVING], 'driving'),
+        sw(STATE_COLOURS[STATE.WAIT_SUN], 'waiting for sunlight'),
+        sw(STATE_COLOURS[STATE.WAIT_EARTH], 'waiting for Earth'),
+        sw(STATE_COLOURS[STATE.HOLD], 'waiting in sunlight (planned)'),
+        sw(STATE_COLOURS[STATE.ARRIVED], 'arrived'),
+        sw(STATE_COLOURS[STATE.LOST], 'lost'),
+        ' Bottom row: ',
+        sw(LIT, 'sunlit'),
+        sw(DARK, 'dark'),
+        ' White lines: arrivals'),
+    );
+    drawStrip(canvas, plan.drive, plan.stops ?? [], result.stepHours);
+  }
+  if (text.notes) el.append(h('p', { id: 'scheduleNotes', class: 'caveats' }, text.notes));
 }

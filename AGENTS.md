@@ -25,6 +25,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 - The landing-site finder: rules and scoring in `src/finder/score.js`, the search itself in
   `server/landing-search.mjs`, the map in `src/finder/map-view.js`. Its data contract is `src/finder/types.js`.
   After changing the search, run `npm run check:landing`.
+- The drive planner: the rover's rules and the step-by-step replay in `src/finder/schedule.js`, the search in
+  `src/finder/planner.js`, its words in `src/finder/plan-text.js`. All three are pure (no browser code) and
+  tested; `tests/finder-planner.test.js` checks the search against an exhaustive one on small maps.
 - A new lens (a way to colour the ground in the surface view): one entry in `src/surface/lenses.js`, which
   also states the colour rules every lens follows. The switch and legend appear by themselves.
 

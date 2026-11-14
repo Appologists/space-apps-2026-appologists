@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestDeparture, maskBit, simulateDrive, STATE } from '../src/finder/schedule.js';
+import { maskBit, simulateDrive, simulatePlan, STATE } from '../src/finder/schedule.js';
 
 const setBit = (mask, stride, step, cell, v = 1) => {
   const i = step * stride + (cell >> 3);
@@ -120,39 +120,38 @@ describe('simulateDrive', () => {
   });
 });
 
-describe('bestDeparture', () => {
-  it('picks the earliest arrival and counts workable departures', () => {
-    const r = fake({ steps: 24 });
-    // cell 53 is dark for steps 0..9: a rover standing there waits, one leaving later does not
-    for (let s = 0; s <= 9; s++) setBit(r.sunMask, r.maskStride, s, 53, 0);
-    const { best, tried, workable } = bestDeparture(r, row5, { speedMPerHour: 100, maxDarknessHours: 3 });
-    expect(tried).toBe(24);
-    expect(best.survived).toBe(true);
-    expect(best.arrivalHours).toBeLessThanOrEqual(24);
-    // leaving at 7 or 8 puts the rover on cell 53 in the dark too long or waiting; verify against brute force
-    let count = 0;
-    let earliest = Infinity;
-    for (let s = 0; s < 24; s++) {
-      const d = simulateDrive(r, row5, { speedMPerHour: 100, maxDarknessHours: 3, departHours: s });
-      if (d.arrived && d.survived) { count++; earliest = Math.min(earliest, d.arrivalHours); }
-    }
-    expect(workable).toBe(count);
-    expect(best.arrivalHours).toBe(earliest);
-    expect(workable).toBeGreaterThan(0);
-    expect(workable).toBeLessThan(24);
+describe('simulatePlan', () => {
+  it('holds where the plan says, in sunlight, then drives on', () => {
+    const d = simulatePlan(fake(), row5, { ...opts, leave: [0, 0, 6] });
+    // reaches cell 52 at hour 2, may not leave before hour 6
+    expect(d.timeline[2]).toBe(STATE.HOLD);
+    expect(d.timeline[5]).toBe(STATE.HOLD);
+    expect(d.timeline[6]).toBe(STATE.DRIVING);
+    expect(d.arrivalHours).toBe(9);
+    expect(d.waitingHours).toBe(4);
+    expect(d.reachHours[2]).toBeCloseTo(2, 6);
+    expect(d.reachHours[5]).toBeCloseTo(9, 6);
+    expect(d.cellIndex[4]).toBe(2);
   });
 
-  it('breaks ties by the later departure and returns null when nothing works', () => {
-    const r = fake({ steps: 12 });
-    for (let s = 0; s < 12; s++) setBit(r.sunMask, r.maskStride, s, 55, 0);
-    const none = bestDeparture(r, row5, { speedMPerHour: 100, maxDarknessHours: 0 });
-    expect(none.best).toBeNull();
-    expect(none.workable).toBe(0);
-    const r2 = fake({ steps: 12 });
-    for (let s = 0; s <= 3; s++) setBit(r2.sunMask, r2.maskStride, s, 50, 0);
-    const { best } = bestDeparture(r2, row5, { speedMPerHour: 100, maxDarknessHours: 100 });
-    // sun needed at start cell: departing at 4 arrives at 9; departing earlier waits at 50 and also arrives at 9
-    expect(best.arrivalHours).toBe(9);
-    expect(best.departHours).toBe(4);
+  it('counts a planned stay at the start as parked', () => {
+    const d = simulatePlan(fake(), row5, { ...opts, leave: [3] });
+    expect(d.timeline[2]).toBe(STATE.PARKED);
+    expect(d.timeline[3]).toBe(STATE.DRIVING);
+    expect(d.parkedHours).toBe(3);
+    expect(d.arrivalHours).toBe(8);
+  });
+
+  it('stops at a dark cell it reaches part-way through an hour', () => {
+    const r = fake();
+    for (let s = 0; s <= 3; s++) setBit(r.sunMask, r.maskStride, s, 52, 0);
+    const d = simulatePlan(r, row5, { speedMPerHour: 250, maxDarknessHours: 100 });
+    // hour 0: 50 -> 51 -> 52 (0.8 h); 52 is dark, so it stays there until hour 4
+    expect(d.positionM[0]).toBeCloseTo(200, 3);
+    expect(d.timeline[1]).toBe(STATE.WAIT_SUN);
+    expect(d.timeline[3]).toBe(STATE.WAIT_SUN);
+    expect(d.timeline[4]).toBe(STATE.DRIVING);
+    expect(d.longestDarkH).toBe(4);
+    expect(d.arrivalHours).toBe(6);
   });
 });
