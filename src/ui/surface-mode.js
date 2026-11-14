@@ -1,0 +1,180 @@
+// "Look around from here": opens the surface view for a site, keeps it in step with the mission and the
+// time slider, and fills the heads-up panel (what you can see now, and what real terrain does to the
+// mission's sunlight and Earth contact).
+import { altAz, horizonDipDeg, skySeries, visibilityStats } from '../astro/sky.js';
+import { compass, formatHours, formatLatLon } from '../format.js';
+import { createSurfaceView } from '../surface/surface-view.js';
+import { fetchTerrainPatch } from '../terrain/client.js';
+import { clearanceSeries, horizonAt, horizonProfile } from '../terrain/polar-grid.js';
+import { clear, h } from './dom.js';
+
+const $ = (id) => document.getElementById(id);
+
+/**
+ * @param {Object} options
+ * @param {HTMLElement} options.app                 the .app element (gets the class "surface-open")
+ * @param {() => {ctx: import('../criteria/types.js').Context, viewIndex: number}} options.getState
+ * @param {(message: string|null, hideAfterMs?: number) => void} options.setStatus
+ */
+export function createSurfaceMode({ app, getState, setStatus }) {
+  let view = null; // the 3D view, created the first time it is needed
+  let current = null; // { site, patch, sky, profiles }
+  let eyeHeightM = 1.7;
+  let request = 0;
+
+  const showHeading = ({ yaw, pitch }) => {
+    $('hudHeading').textContent = `Looking ${compass(yaw)} · ${String(Math.round(yaw) % 360).padStart(3, '0')}° · ${pitch >= 0 ? '+' : '−'}${Math.abs(pitch).toFixed(0)}°`;
+  };
+
+  /** @returns {Promise<boolean>} true if the view opened */
+  async function open(site) {
+    const mine = ++request;
+    setStatus('Loading terrain…');
+    let patch;
+    try {
+      patch = await fetchTerrainPatch(site.lat, site.lon);
+    } catch (error) {
+      if (mine === request) setStatus(error.message, 8000);
+      return false;
+    }
+    if (mine !== request) return false; // a newer request replaced this one
+    setStatus(null);
+    app.classList.add('surface-open');
+    $('surface').hidden = false;
+    if (innerWidth <= 900) $('hudDetails').open = false; // on a phone the panel would cover the view
+    view ??= createSurfaceView({ canvas: $('surfaceCanvas'), container: $('surface'), labelsEl: $('surfaceLabels'), onLook: showHeading });
+    view.resize();
+    view.setEyeHeight(eyeHeightM);
+    view.setTerrain(patch);
+    current = { site: { ...site, elevationM: patch.groundHeightM }, patch };
+    missionChanged();
+    // Start facing the Sun if it is near or above the horizon, otherwise Earth, otherwise north.
+    const { viewIndex } = getState();
+    const { sky } = current;
+    const yaw = sky.sunEl[viewIndex] > -2 ? sky.sunAz[viewIndex] : sky.earthEl[viewIndex] > -2 ? sky.earthAz[viewIndex] : 0;
+    view.setLook({ yaw, pitch: 4, fov: 60 });
+    $('surfaceCanvas').focus({ preventScroll: true });
+    return true;
+  }
+
+  function close() {
+    request++;
+    current = null;
+    app.classList.remove('surface-open');
+    $('surface').hidden = true;
+  }
+
+  /** The mission (or the eye height) changed: redo the paths, the horizons and the mission numbers. */
+  function missionChanged() {
+    if (!current) return;
+    const { ctx } = getState();
+    const { mission } = ctx;
+    const { patch, site } = current;
+    current.sky = skySeries(site, ctx.series);
+    current.profiles = {
+      eye: horizonProfile(patch, eyeHeightM),
+      panel: horizonProfile(patch, mission.panelHeightM),
+      antenna: horizonProfile(patch, mission.antennaHeightM),
+    };
+    view.setPaths(current.sky);
+    drawStatic(ctx);
+    timeChanged();
+  }
+
+  function drawStatic(ctx) {
+    const { mission } = ctx;
+    const { site, patch, sky, profiles } = current;
+    $('hudTitle').textContent = site.name;
+    $('hudCoords').textContent = `${formatLatLon(site.lat, site.lon)} · ground ${Math.round(patch.groundHeightM).toLocaleString('en-US')} m`;
+
+    const real = {
+      sun: visibilityStats(clearanceSeries(sky.sunEl, sky.sunAz, profiles.panel), mission.minSunElevationDeg, ctx.stepHours),
+      earth: visibilityStats(clearanceSeries(sky.earthEl, sky.earthAz, profiles.antenna), mission.minEarthElevationDeg, ctx.stepHours),
+    };
+    // The smooth-Moon numbers are the ones the ranked list uses: same site, no terrain, ground at the mean radius.
+    const smoothSky = ctx.sky({ lat: site.lat, lon: site.lon });
+    const smooth = {
+      sun: visibilityStats(smoothSky.sunEl, mission.minSunElevationDeg - horizonDipDeg(mission.panelHeightM), ctx.stepHours),
+      earth: visibilityStats(smoothSky.earthEl, mission.minEarthElevationDeg - horizonDipDeg(mission.antennaHeightM), ctx.stepHours),
+    };
+    const pct = (stats) => `${Math.round(stats.fraction * 100)}%`;
+    clear($('hudStats')).append(
+      h(
+        'li',
+        {},
+        h('i', { class: 'dot', style: 'background:var(--sun)' }),
+        ` Solar panel ${mission.panelHeightM} m up: lit ${pct(real.sun)} of the time, longest unbroken ${formatHours(real.sun.longestRunHours)}.`,
+        h('small', {}, `A smooth Moon would give ${pct(smooth.sun)} and ${formatHours(smooth.sun.longestRunHours)}.`),
+      ),
+      h(
+        'li',
+        {},
+        h('i', { class: 'dot', style: 'background:var(--earth)' }),
+        ` Antenna ${mission.antennaHeightM} m up: Earth in view ${pct(real.earth)} of the time, longest pass ${formatHours(real.earth.longestRunHours)}.`,
+        h('small', {}, `A smooth Moon would give ${pct(smooth.earth)}.`),
+      ),
+    );
+    const edge = patch.coverage < 0.995 && patch.dataEdgeM ? ` The data ends ${Math.round(patch.dataEdgeM / 1000)} km away in some directions; ground beyond is drawn flat and blue-grey.` : '';
+    $('hudNotes').textContent =
+      `Terrain: NASA LOLA at ${patch.pixelM} m per pixel, so no rocks or small craters. Shadows are computed from the terrain; ground in shadow is brightened a little so you can see its shape.${edge}`;
+  }
+
+  /** The time slider moved: move the Sun and Earth and say what is visible now. */
+  function timeChanged() {
+    if (!current) return;
+    const { ctx, viewIndex } = getState();
+    const sample = ctx.series.samples[viewIndex];
+    const { site, patch, sky, profiles } = current;
+    // From high ground you see past the level horizon: a smooth Moon's horizon sits lower the higher you stand.
+    const smoothHorizon = -horizonDipDeg(Math.max(patch.groundHeightM, 0) + eyeHeightM);
+    const signed = (deg) => `${deg >= 0 ? '+' : '−'}${Math.abs(deg).toFixed(1)}°`;
+
+    const describe = (name, now, elevations, azimuths) => {
+      const terrain = horizonAt(profiles.eye, now.azimuth);
+      const state = now.elevation > terrain ? 'visible' : now.elevation > smoothHorizon ? 'behind' : 'below';
+      const where = compass(now.azimuth);
+      const text =
+        state === 'visible'
+          ? `Visible to the ${where} at ${signed(now.elevation)} elevation. It clears the terrain by ${(now.elevation - terrain).toFixed(1)}°.`
+          : state === 'behind'
+            ? `Hidden behind terrain to the ${where}. It is at ${signed(now.elevation)} elevation; the terrain there reaches ${signed(terrain)}.`
+            : `Below the horizon to the ${where}, at ${signed(now.elevation)} elevation.`;
+      // When does that change? Walk forward through the mission.
+      const visibleNow = state === 'visible';
+      let hours = null;
+      for (let i = viewIndex + 1; i < elevations.length; i++) {
+        if (elevations[i] > horizonAt(profiles.eye, azimuths[i]) !== visibleNow) {
+          hours = (i - viewIndex) * ctx.stepHours;
+          break;
+        }
+      }
+      const next = hours == null ? 'No change for the rest of the mission.' : `${visibleNow ? 'Disappears' : 'Appears'} in ${formatHours(hours)}.`;
+      const label = state === 'visible' ? name : `${name} (${state === 'behind' ? 'behind terrain' : 'below horizon'})`;
+      return { text, next, label };
+    };
+
+    const sunNow = altAz(site, sample.sunKm);
+    const earthNow = altAz(site, sample.earthKm);
+    const sun = describe('Sun', sunNow, sky.sunEl, sky.sunAz);
+    const earth = describe('Earth', earthNow, sky.earthEl, sky.earthAz);
+    view.setSky({ sun: sunNow, earth: earthNow, sunText: sun.label, earthText: earth.label });
+    clear($('hudSky')).append(
+      h('dt', {}, h('i', { class: 'dot', style: 'background:var(--sun)' }), 'Sun'),
+      h('dd', {}, sun.text, h('small', {}, sun.next)),
+      h('dt', {}, h('i', { class: 'dot', style: 'background:var(--earth)' }), 'Earth'),
+      h('dd', {}, earth.text, h('small', {}, earth.next)),
+    );
+  }
+
+  $('eyeHeight').addEventListener('input', (e) => {
+    const value = parseFloat(e.target.value);
+    if (!Number.isFinite(value) || value <= 0 || !current) return;
+    eyeHeightM = value;
+    view.setEyeHeight(value);
+    current.profiles.eye = horizonProfile(current.patch, value);
+    timeChanged();
+  });
+  $('surfaceBack').addEventListener('click', close);
+
+  return { open, close, isOpen: () => !!current, missionChanged, timeChanged, getView: () => view };
+}

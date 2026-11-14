@@ -57,3 +57,42 @@ A per-site horizon profile: for each compass direction, the elevation angle of t
 `visibilityStats` the flat threshold becomes "the horizon's elevation at the body's azimuth". `skySeries`
 already returns azimuth for this reason. Slope, travel paths and shadowed regions come from the same
 elevation data. See `data/README.md` for where derived files go.
+
+## Terrain and the surface view
+
+```
+ data/raw/lola-south-80s-80m  ──▶  server/lola-polar.mjs  ──▶  /api/terrain/polar  ──▶  src/terrain/client.js
+ (115 MB, not in git)              (dev server, Node)          (one patch per point)          │
+                                                                                               ▼
+                         horizonProfile() ──▶ real sunlight and Earth numbers        src/surface/surface-view.js
+                         (src/terrain/polar-grid.js)                                  ground mesh, shadows, sky
+```
+
+- **The patch.** Terrain around the viewer on a polar grid: a spoke every 0.5° of compass direction, rings
+  from 2 m to 300 km (close together nearby, 1 km apart far away). About 480,000 heights, 2 MB.
+- **Curvature.** Each sample is placed where it really is relative to the viewer, on a Moon of radius
+  1737.4 km: ground 50 km away sits 720 m below your level. This is why far mountains can hide behind a
+  nearby rise, and why a peak can show from 130 km.
+- **The real horizon.** For each spoke, the highest elevation angle any ring reaches (`horizonProfile`).
+  A body is visible when its elevation is above the horizon at its azimuth (`terrainVisibility`).
+- **Shadows.** The ground heights are resampled to two square grids (500 m cells for the whole patch, 30 m
+  cells within 12 km). One pass across each grid, starting from the Sun's side, carries the shadow line
+  downwind (`src/surface/shadows.js`). It is redone every time the Sun moves.
+- **The sky.** The Sun and Earth are drawn at their computed direction and true angular size; the terrain
+  hides them when it is in the way. Earth is a plain blue ball lit from the Sun's side, so its phase is right.
+
+Checks we ran (2026-11-14):
+
+- Crater floors sit at the catalogued crater centres (Shackleton −2,788 m, Shoemaker −3,932 m), and the
+  mirror image of Shackleton is high ground, so east and west are not swapped.
+- From Shackleton's floor the rim stands 20–24° above level all the way round. The Sun never climbs past
+  about 1.6° there, so the floor is never lit: a permanently shadowed crater, as expected.
+- Same method as Mazarico et al. (2011, Icarus 211), who built horizon profiles from 240 m LOLA maps and
+  report a spot near Shackleton's rim that is sunlit for 240 days in a row each year, with a few metres of
+  height making a large difference. At 89.45° S, 222.69° E (a rim location; coordinates from memory of that
+  paper, not checked against it) we get, for 2026: lit 80% of the time at 2 m and 93% at 10 m, longest
+  unbroken stretch 154 days. Same character, not a reproduction: we use 80 m data, the Sun's centre rather
+  than any part of its disc, and one year rather than 18.6.
+
+What is missing: detail finer than 80 m, light bounced into shadow, any terrain north of 80° S (if the data
+ends within 300 km of the viewer, the ground beyond is drawn flat and blue-grey, and the app says so).

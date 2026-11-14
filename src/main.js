@@ -12,7 +12,9 @@ import { createGlobe } from './globe/globe.js';
 import { defaultMission, stepMinutesFor } from './mission.js';
 import { createContext, evaluateSites, rankSites } from './scoring/rank.js';
 import { wrapLon } from './astro/coords.js';
+import { terrainCovers, terrainInfo } from './terrain/client.js';
 import { renderDetail } from './ui/detail.js';
+import { createSurfaceMode } from './ui/surface-mode.js';
 import { renderMission, renderRanking, renderWeights } from './ui/panel.js';
 
 const $ = (id) => document.getElementById(id);
@@ -29,6 +31,7 @@ const state = {
   selectedId: null,
   viewIndex: 0, // which sample of the mission window the globe and the card show
   started: false,
+  terrain: null, // what /api/terrain/info said: is terrain data installed, and what does it cover?
 };
 let ctx = null;
 let evaluations = [];
@@ -40,15 +43,42 @@ const globe = createGlobe({
   labelsEl: $('labels'),
   tipEl: $('tip'),
   textureUrl: `${import.meta.env.BASE_URL}textures/moon_lroc_color_4k.jpg`,
-  onStatus: (message) => {
-    $('status').hidden = !message;
-    if (message) $('status').textContent = message;
-  },
+  onStatus: (message) => setStatus(message),
   onPick: (pick) => {
     if (pick.siteId) select(pick.siteId);
     else setCustomSite(pick.lat, pick.lon);
   },
+  // The two clicks of a double-click have already selected the site or dropped "Your point" there.
+  onDoublePick: (pick) => lookAround(pick.siteId ? allSites().find((s) => s.id === pick.siteId) : state.customSite),
 });
+
+let statusTimer = null;
+/** Show a message in the pill at the top of the stage; null hides it. */
+function setStatus(message, hideAfterMs) {
+  clearTimeout(statusTimer);
+  $('status').hidden = !message;
+  if (message) $('status').textContent = message;
+  if (message && hideAfterMs) statusTimer = setTimeout(() => setStatus(null), hideAfterMs);
+}
+
+const surface = createSurfaceMode({
+  app: document.querySelector('.app'),
+  getState: () => ({ ctx, viewIndex: state.viewIndex }),
+  setStatus,
+});
+
+/** Stand on the surface at a site and look around, if terrain data covers it. */
+async function lookAround(site) {
+  if (!site) return;
+  const info = await terrainInfo();
+  if (!info.available) {
+    return setStatus(`The surface view needs terrain data. Run "${info.hint ?? 'npm run data:fetch -- lola-south-80s-80m'}", then reload.`, 10_000);
+  }
+  if (!terrainCovers(info, site.lat)) {
+    return setStatus(`No terrain data here yet. The surface view covers ${Math.abs(info.coversSouthOfLat)}° S to the south pole.`, 7000);
+  }
+  await surface.open(site);
+}
 
 const allSites = () => (state.customSite ? [...sitesData.sites, state.customSite] : sitesData.sites);
 
@@ -59,6 +89,7 @@ function evaluate() {
   const last = ctx.series.samples.length - 1;
   state.viewIndex = Math.min(state.viewIndex, last);
   $('viewTime').max = String(last);
+  surface.missionChanged();
   rank();
   showViewTime();
 }
@@ -98,6 +129,7 @@ function drawDetail() {
     viewIndex: state.viewIndex,
     criteria: readyCriteria,
     meta: sitesData,
+    surface: { info: state.terrain, onLookAround: () => lookAround(allSites().find((s) => s.id === state.selectedId)) },
     onScrub: setViewIndex,
     onClose: () => {
       state.selectedId = null;
@@ -113,12 +145,21 @@ function select(id, { focus = false } = {}) {
   rank();
   const site = allSites().find((s) => s.id === id);
   if (focus && site) globe.focus(site.lat, site.lon);
+  moveSurfaceTo(site);
+}
+
+/** Already standing on the surface? Move to the newly chosen site, or go back to the globe if it has no terrain. */
+function moveSurfaceTo(site) {
+  if (!surface.isOpen() || !site) return;
+  if (terrainCovers(state.terrain, site.lat)) surface.open(site);
+  else surface.close();
 }
 
 function setCustomSite(lat, lon) {
   state.customSite = { id: 'custom', name: 'Your point', lat, lon: wrapLon(lon), category: 'custom' };
   state.selectedId = 'custom';
   evaluate();
+  moveSurfaceTo(state.customSite);
 }
 
 function showViewTime() {
@@ -127,6 +168,7 @@ function showViewTime() {
   $('viewTime').value = String(state.viewIndex);
   const day = (state.viewIndex * ctx.stepHours) / 24;
   $('viewTimeText').textContent = `${formatUTC(sample.date)} · day ${day.toFixed(1)} of ${(state.mission.durationHours / 24).toFixed(1)}`;
+  surface.timeChanged();
 }
 
 function setViewIndex(index) {
@@ -195,10 +237,14 @@ $('addPoint').addEventListener('submit', (e) => {
 // ---- Start ------------------------------------------------------------------------------------------
 drawMission();
 evaluate();
+terrainInfo().then((info) => {
+  state.terrain = info;
+  drawDetail(); // the site card can now offer "Look around from here"
+});
 {
   const top = ranking[0]?.site;
   if (top) globe.focus(top.lat, top.lon); // open looking at the best site
 }
 
 // Handy in the browser console while developing.
-window.__app = { state, globe, get ctx() { return ctx; }, get ranking() { return ranking; } };
+window.__app = { state, globe, surface, lookAround, get ctx() { return ctx; }, get ranking() { return ranking; } };

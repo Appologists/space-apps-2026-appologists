@@ -30,9 +30,10 @@ const COLORS = {
  * @param {HTMLElement} options.tipEl     tooltip element
  * @param {string} options.textureUrl
  * @param {(pick: {siteId?: string, lat: number, lon: number}) => void} [options.onPick]
+ * @param {(pick: {siteId?: string, lat: number, lon: number}) => void} [options.onDoublePick]
  * @param {(message: string|null) => void} [options.onStatus]
  */
-export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick, onStatus }) {
+export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick, onDoublePick, onStatus }) {
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -368,6 +369,12 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     canvas.classList.remove('dragging');
   }
   canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('dblclick', (e) => {
+    const entry = siteNear(e.clientX, e.clientY);
+    if (entry) return onDoublePick?.({ siteId: entry.site.id, lat: entry.site.lat, lon: entry.site.lon });
+    const sp = spherePointAt(e.clientX, e.clientY);
+    if (sp.hit) onDoublePick?.(latLonOfLocal(worldToLocal(sp.point)));
+  });
   canvas.addEventListener('pointercancel', endPointer);
   canvas.addEventListener('pointerleave', () => {
     if (!drag) tipEl.hidden = true;

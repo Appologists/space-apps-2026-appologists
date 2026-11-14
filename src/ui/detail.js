@@ -80,10 +80,11 @@ let horizonsMemo = { key: null, text: '' };
  * @param {number} options.viewIndex
  * @param {import('../criteria/types.js').Criterion[]} options.criteria
  * @param {{categories: Object<string,string>, sources: Object<string,{title:string,url:string}>}} options.meta
+ * @param {{info: {available: boolean, coversSouthOfLat?: number, hint?: string}|null, onLookAround: () => void}} [options.surface]
  * @param {(index: number) => void} options.onScrub
  * @param {() => void} options.onClose
  */
-export function renderDetail(el, { entry, ctx, viewIndex, criteria, meta, onScrub, onClose }) {
+export function renderDetail(el, { entry, ctx, viewIndex, criteria, meta, surface, onScrub, onClose }) {
   if (!entry) {
     el.hidden = true;
     return;
@@ -131,6 +132,16 @@ export function renderDetail(el, { entry, ctx, viewIndex, criteria, meta, onScru
     'Check against JPL Horizons',
   );
 
+  // "Look around from here": needs terrain data on this machine, and the data must cover the site.
+  const info = surface?.info;
+  const lookAround = !info
+    ? null
+    : !info.available
+      ? h('div', { class: 'caveats' }, `Surface view needs terrain data. Run "${info.hint ?? 'npm run data:fetch -- lola-south-80s-80m'}", then reload.`)
+      : site.lat <= info.coversSouthOfLat
+        ? h('button', { type: 'button', class: 'primary', onClick: surface.onLookAround }, 'Look around from here')
+        : h('div', { class: 'caveats' }, `Surface view: terrain data only covers ${Math.abs(info.coversSouthOfLat)}° S to the south pole.`);
+
   const source = site.source ? meta.sources[site.source] : null;
   const caveats = [...new Set(Object.values(entry.results).flatMap((r) => r.caveats ?? []))];
 
@@ -150,6 +161,7 @@ export function renderDetail(el, { entry, ctx, viewIndex, criteria, meta, onScru
       h('dt', {}, h('i', { class: 'dot', style: 'background:var(--earth)' }), 'Earth'),
       skyLine('Earth', sky.earthEl[viewIndex], sky.earthAz[viewIndex], thresholds.earth, hoursUntilChange(sky.earthEl, thresholds.earth, viewIndex, ctx.stepHours)),
     ),
+    lookAround,
     h('div', { class: 'eyebrow' }, `Whole mission · ${formatHours(mission.durationHours)} from landing`),
     timeline,
     h(

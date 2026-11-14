@@ -17,6 +17,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
   `src/ui/panel.js`.
 - A new site: `data/sites.json`. A new large dataset: `data/catalog.json`.
 - A script that prepares data: `tools/`, with small results written to `data/derived/`.
+- Anything that reads the big files in `data/raw/` while the app runs: `server/` (it runs inside the dev
+  server; see `server/terrain-plugin.mjs`). The browser asks it for small pieces.
+- The view from the ground: `src/surface/`. Terrain maths shared by browser and server: `src/terrain/`.
 
 ## Rules
 
@@ -31,8 +34,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 5. **One coordinate convention.** Moon-fixed mean-Earth/polar-axis frame, latitude north-positive, longitude
    east-positive in (-180, 180], degrees. Many datasets use 0–360° E: convert at the edge with `wrapLon`.
    The 3D mesh uses a different axis order; only `src/globe/globe.js` knows about it.
-6. **Keep `src/astro/`, `src/criteria/` and `src/scoring/` free of browser and three.js code** so they run in
-   tests and in Node scripts.
+6. **Keep `src/astro/`, `src/criteria/`, `src/scoring/`, `src/terrain/polar-grid.js` and
+   `src/surface/shadows.js` free of browser and three.js code** so they run in tests and in Node scripts.
+   `server/` is the opposite: Node only, never imported by the browser.
 7. **Build the page with the `h()` helper in `src/ui/dom.js`, not `innerHTML`.**
 8. **Add a test with each criterion or maths change.** Tests live in `tests/` and run in Node.
 9. Plain words in the UI and docs. Times are UTC and say so.

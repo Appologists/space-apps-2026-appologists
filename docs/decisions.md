@@ -27,6 +27,8 @@ These were chosen to get a working skeleton. None is settled until the team says
 | D | **"Sun up" means the centre of the Sun's disc is above the horizon**, lowered a little for panel height. | Simple and standard. The Sun's disc is 0.53° wide, which matters at the poles. | `minSunElevationDeg` in `src/mission.js`. |
 | E | **Default mission: lands now, lasts 14 Earth days, panel and antenna at 2 m.** | Placeholders. | `defaultMission` in `src/mission.js`. |
 | F | **The 2.6 MB Moon map stays in git.** | The app must start after `npm install` with nothing else to download. | Move it to the catalog. |
+| G | **Terrain is served on demand by the dev server**, as a polar grid around the point: 720 compass directions, about 660 distances out to 300 km. | Lets you stand anywhere the data covers without preparing files first, and the same samples draw the ground and give the horizon. | Needs `npm run dev` and the 115 MB download. For a hosted demo, precompute patches for chosen sites into `data/derived/`. |
+| H | **In the surface view, ground in shadow is drawn dark grey, not black.** | So you can see its shape. Real shadowed ground gets only faint light bounced from sunlit slopes. | `SHADOW_FILL` in `src/surface/surface-view.js`. |
 
 ## Open questions
 

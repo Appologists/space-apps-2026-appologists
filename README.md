@@ -8,9 +8,12 @@ matters most; it ranks landing sites and shows where the Sun and Earth are in ea
 
 **What works today:** a 3D Moon with 23 sites, ranking by uninterrupted sunlight and Earth visibility, a
 time slider, your own points by click or coordinates, and a one-click check against NASA JPL Horizons.
+Within 10° of the south pole you can also **stand on the surface and look around**: real terrain from NASA's
+LOLA instrument, real shadows, the Sun and Earth where they would be, and what the terrain does to the
+mission's sunlight and Earth contact.
 
-**What does not work yet:** terrain. Horizons are those of a smooth Moon, so no ridge or crater rim casts a
-shadow. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
+**What does not work yet:** the ranking itself still assumes a smooth Moon, so no ridge or crater rim casts
+a shadow in the scores. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
 
 ## Start
 
@@ -25,6 +28,14 @@ npm run dev
 ```
 
 Then open the address it prints (normally http://localhost:5173).
+
+For the surface view, download the south-pole terrain once (115 MB, kept out of git) and reload the page:
+
+```bash
+npm run data:fetch -- lola-south-80s-80m
+```
+
+Then choose a south-pole site and press "Look around from here", or double-click the Moon near the south pole.
 
 | Command | What it does |
 | --- | --- |
@@ -44,6 +55,9 @@ Then open the address it prints (normally http://localhost:5173).
 | `src/criteria/` | One file per thing we score a site on. **Most new work goes here.** |
 | `src/scoring/` | Turns criteria and weights into a ranking |
 | `src/globe/` | The 3D Moon |
+| `src/surface/` | The view from the ground, and its shadows |
+| `src/terrain/` | Terrain around a point: the real horizon, and the format terrain travels in |
+| `server/` | Runs inside the dev server: reads the big terrain files and serves the piece the app asks for |
 | `src/ui/` | The panel, ranked list and site card |
 | `data/sites.json` | The curated sites, each with its source |
 | `data/catalog.json` | Large datasets: where they come from and how big they are |
@@ -62,7 +76,8 @@ Then open the address it prints (normally http://localhost:5173).
 ## Accuracy
 
 Sun and Earth positions are computed in the browser with Astronomy Engine and agree with JPL Horizons to
-about 0.004° (the Sun's disc is 0.53° wide). Coordinates use the Moon's mean-Earth / polar-axis frame, the
+about 0.004° (the Sun's disc is 0.53° wide). Terrain horizons come from 80 m LOLA data, sampled every half
+degree of compass direction out to 300 km. Coordinates use the Moon's mean-Earth / polar-axis frame, the
 same one LRO maps and Horizons use: latitude north-positive, longitude east-positive.
 Details and assumptions: [docs/architecture.md](docs/architecture.md).
 

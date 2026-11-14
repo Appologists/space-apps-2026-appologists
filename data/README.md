@@ -52,7 +52,12 @@ The browser cannot load a 100 MB elevation file. The pattern is:
    360-point horizon profile for each site in `data/sites.json`.
 3. A criterion in `src/criteria/` imports the derived file.
 
-Step 2 does not exist yet. It is the first job under "Next" in `docs/plan.md`.
+Step 2 does not exist yet for criteria. It is the first job under "Next" in `docs/plan.md`.
+
+There is a second pattern, already working, for things that need terrain at any point the user clicks: the
+dev server reads the raw file itself and hands the browser just the piece it asks for.
+`server/terrain-plugin.mjs` does this for the surface view (`GET /api/terrain/polar?lat=…&lon=…`), using
+`lola-south-80s-80m`. If the file is not downloaded, the app says which command to run.
 
 ## The datasets in the catalog
 

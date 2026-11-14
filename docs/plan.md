@@ -15,13 +15,16 @@ The team's working list. Update a row when you start or finish something. "Who" 
 | Time slider and Play across the mission | `src/main.js` |
 | Check against JPL Horizons, in the app and from the command line | `src/astro/horizons.js`, `tools/check-horizons.mjs` |
 | Large-dataset catalog and download | `data/catalog.json`, `tools/fetch-data.mjs` |
+| **Surface view** ("Street View"), 80° S to the pole: stand at a site or any clicked point, look around, real terrain and cast shadows, Sun and Earth with their paths over the mission, eye height | `src/surface/`, `src/ui/surface-mode.js` |
+| Real horizon at the viewed point, and what it does to the mission's sunlight and Earth contact (shown in the surface view only) | `src/terrain/polar-grid.js` |
+| Terrain service: the dev server cuts terrain around any point from the 115 MB LOLA file | `server/` |
 
 ## Next: the site-recommendation demo
 
 | # | What | Notes | Who | Status |
 | --- | --- | --- | --- | --- |
-| 1 | **Terrain data pipeline** | A script in `tools/` that reads LOLA (`lola-south-80s-80m`) and writes small per-site files to `data/derived/`. Everything below marked (T) needs it. | | not started |
-| 2 | **Real horizons** (T) | For each site, how high the terrain rises in each compass direction. Sunlight and Earth criteria then compare against that instead of a flat horizon. Biggest accuracy gain, and the heart of the challenge. | | not started |
+| 1 | **Terrain data pipeline** | Reading LOLA works (`server/lola-polar.mjs`), served on demand by the dev server. Still to do for (T) items: a script in `tools/` that writes small per-site files to `data/derived/`, so criteria can use terrain without the dev server. | | partly done |
+| 2 | **Real horizons in the ranking** (T) | The surface view already computes the real horizon for the point you stand on (`horizonProfile`, `terrainVisibility`). Next: do it for every site and have the sunlight and Earth criteria use it, so the ranked list stops assuming a smooth Moon. Biggest accuracy gain, and the heart of the challenge. | | half done |
 | 3 | **Landing terrain** (T) | Slope and roughness at the site. Planned criterion `slope`. | | not started |
 | 4 | **Travel paths** (T) | Ground a rover can reach without crossing slopes over a limit. Planned criterion `traverse`. | | not started |
 | 5 | **Water ice access** | Distance to permanently shadowed ground. Planned criterion `water`. Needs a shadow map (can be derived in step 2) or published ice detections. | | not started |
@@ -33,8 +36,10 @@ The team's working list. Update a row when you start or finish something. "Who" 
 
 ## Later, and stretch
 
-- **Sky view** ("Street View"): look around from the site, see the horizon, the Sun and Earth's paths; step
-  through time. Camera or eye height belongs here.
+- **Surface view, next steps:** it works from 80° S to the pole. Ideas: finer terrain near the pole (the 20 m
+  and 5 m LOLA files), coverage elsewhere (global LOLA is 0.5–2 km per pixel), a photo or texture on the
+  ground, Earth drawn as a real globe, day marks along the Sun's path, walking or driving, and speed (each
+  time step costs roughly 50–90 ms because the shadows are recomputed).
 - **Power estimate:** Sun elevation and Sun distance to watts for a given panel. Sun distance is already in
   the ephemeris (`sunDistanceAU`).
 - **Polar map for close-ups:** the colour map is blurry at the poles. A LOLA shaded-relief layer would fix it.
