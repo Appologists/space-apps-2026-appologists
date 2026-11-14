@@ -28,6 +28,7 @@ export function defaultFinder() {
     roverMaxSlopeDeg: 15,
     roverSpeedMPerHour: 200,
     roverRangeKm: 20,
+    roverNeedsEarthToDrive: false,
   };
 }
 

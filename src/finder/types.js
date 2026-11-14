@@ -66,6 +66,10 @@
  * @property {Float32Array} earthFraction 0–1
  * @property {Uint8Array}   fail          0 = passes; otherwise a sum of the FAIL bits in ./score.js
  * @property {Float32Array} score         0–1 where fail is 0, NaN elsewhere
+ * Per time step (each `steps * maskStride` bytes; `maskStride` = ceil(n * n / 8) is in the header):
+ * @property {Uint8Array}   sunMask       one bit per cell per step: 1 = the panel there is sunlit in that step
+ * @property {Uint8Array}   earthMask     one bit per cell per step: 1 = Earth is in view from there
+ *           bit for (step, cell): (mask[step * maskStride + (cell >> 3)] >> (cell & 7)) & 1
  */
 
 export {};
