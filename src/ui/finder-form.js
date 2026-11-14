@@ -34,7 +34,7 @@ export function renderFinderForm(el, { values, centre, busy, hint, onChange, onS
   const check = (id, label, key) =>
     h('label', { class: 'check' }, h('input', { id, type: 'checkbox', checked: values[key], onChange: (e) => onChange({ [key]: e.target.checked }) }), label);
 
-  clear(el).append(
+  const parts = [
     h(
       'p',
       { class: 'finder-centre' },
@@ -61,5 +61,14 @@ export function renderFinderForm(el, { values, centre, busy, hint, onChange, onS
     check('finderSun', 'Must land in sunlight', 'needSunAtLanding'),
     h('button', { type: 'button', class: 'primary', id: 'finderSearch', disabled: busy || !!hint, onClick: onSearch }, busy ? 'Searching…' : 'Find landing sites'),
     hint ? h('p', { class: 'hint' }, hint) : null,
-  );
+    h('div', { class: 'eyebrow' }, 'Rover, for reach and routes'),
+    h(
+      'div',
+      { class: 'fields' },
+      number('roverSlope', 'Steepest slope it drives (°)', 'roverMaxSlopeDeg', { min: '0', max: '45' }),
+      number('roverRange', 'Range (km)', 'roverRangeKm', { min: '0' }),
+      number('roverSpeed', 'Average speed (m per hour)', 'roverSpeedMPerHour', { min: '1', title: 'Including stops' }),
+    ),
+  ];
+  clear(el).append(...parts.filter(Boolean));
 }

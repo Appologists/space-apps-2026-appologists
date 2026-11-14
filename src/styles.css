@@ -1000,3 +1000,12 @@ button:disabled {
   border-radius: 2px;
   border: 1px solid var(--rule);
 }
+
+.lensbuttons.two {
+  grid-template-columns: 1fr 1fr;
+}
+.route-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+}

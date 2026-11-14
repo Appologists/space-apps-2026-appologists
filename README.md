@@ -13,7 +13,9 @@ LOLA instrument, real shadows, the Sun and Earth where they would be, and what t
 mission's sunlight and Earth contact. Lenses recolour the ground by elevation or by slope, and pointing at
 any spot reads out its height, slope and distance. The **landing-site finder** takes the landing accuracy,
 slope limit and the darkness the rover can survive, searches the area round a chosen point, and maps where
-a landing passes every check, with sunlight, darkness, Earth-link and slope layers.
+a landing passes every check, with sunlight, darkness, Earth-link and slope layers. On that map you can also
+see the ground a rover can **reach** from a starting point within its slope limit and range, and the shortest
+drivable **route** to a destination.
 
 **What does not work yet:** the ranking itself still assumes a smooth Moon, so no ridge or crater rim casts
 a shadow in the scores. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).

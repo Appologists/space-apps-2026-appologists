@@ -126,3 +126,49 @@ describe('describeCell', () => {
     expect(describeCell(r, 0, 0)).toBe('outside the search area');
   });
 });
+
+describe('reach layer', () => {
+  const reachFor = (r, dists, rangeM = 1000) => {
+    const dist = new Float32Array(r.n * r.n).fill(Infinity);
+    for (const [i, d] of Object.entries(dists)) dist[i] = d;
+    return { dist, rangeM, maxSlopeDeg: 15 };
+  };
+  const sum = (p) => p[0] + p[1] + p[2];
+  it('is registered as the last layer', () => {
+    expect(MAP_LAYERS.at(-1)).toEqual({ id: 'reach', label: 'Reach' });
+  });
+  it('draws reachable cells blue, lighter when nearer, and others grey', () => {
+    const r = fakeResult();
+    const reach = reachFor(r, { 0: 100, 1: 900 });
+    const near = layerPixel('reach', r, 0, 100, { reach });
+    const far = layerPixel('reach', r, 1, 100, { reach });
+    expect(near[2]).toBeGreaterThan(near[0]);
+    expect(sum(near)).toBeGreaterThan(sum(far));
+    const grey = layerPixel('reach', r, 2, 100, { reach });
+    expect(grey[0]).toBe(grey[1]);
+    expect(grey[1]).toBe(grey[2]);
+    const none = layerPixel('reach', r, 0, 100);
+    expect(none[0]).toBe(none[1]);
+  });
+  it('keeps the background outside the search area', () => {
+    const r = fakeResult();
+    r.fail[0] = FAIL.OUTSIDE;
+    expect(layerPixel('reach', r, 0, 0, { reach: reachFor(r, { 0: 10 }) })).toEqual([6, 8, 12]);
+  });
+  it('has legend labels for the range and the grey swatch', () => {
+    const r = fakeResult();
+    const l = layerLegend('reach', r, { reach: reachFor(r, {}, 5000) });
+    const labels = l.stops.filter((s) => s.label).map((s) => s.label);
+    expect(labels).toEqual(['5 km', '0 km']);
+    expect(l.swatches[0].label).toBe('too steep or out of range');
+    expect(l.note).toContain('15°');
+    expect(layerLegend('reach', r).note).toContain('No reach data yet');
+  });
+  it('adds the drive distance to the cell description', () => {
+    const r = fakeResult();
+    const reach = reachFor(r, { [3 * n + 3]: 1234 });
+    expect(describeCell(r, 3, 3, { reach })).toContain(' · 1.2 km drive from the start');
+    expect(describeCell(r, 3, 4, { reach })).toContain(' · not reachable from the start');
+    expect(describeCell(r, 3, 3)).not.toContain('start');
+  });
+});
