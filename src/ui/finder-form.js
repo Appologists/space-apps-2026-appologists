@@ -12,8 +12,9 @@ import { clear, h } from './dom.js';
  * @param {string|null} options.hint        why the search cannot run, if it cannot
  * @param {(patch: object) => void} options.onChange
  * @param {() => void} options.onSearch
+ * @param {(() => void)|null} [options.onUseExample]  offered beside the hint: jump to a spot the search works on
  */
-export function renderFinderForm(el, { values, centre, busy, hint, onChange, onSearch }) {
+export function renderFinderForm(el, { values, centre, busy, hint, onChange, onSearch, onUseExample }) {
   const number = (id, label, key, attrs) =>
     h(
       'label',
@@ -59,8 +60,16 @@ export function renderFinderForm(el, { values, centre, busy, hint, onChange, onS
     ),
     check('finderEarth', 'Earth must be in view at touchdown', 'needEarthAtLanding'),
     check('finderSun', 'Must land in sunlight', 'needSunAtLanding'),
+    // Say why the search cannot run before the (disabled) button, where it will be seen.
+    hint
+      ? h(
+          'p',
+          { class: 'notice finder-why', id: 'finderWhy' },
+          hint,
+          onUseExample ? h('button', { type: 'button', id: 'finderExample', onClick: onUseExample }, 'Use Shackleton’s rim instead') : null,
+        )
+      : null,
     h('button', { type: 'button', class: 'primary', id: 'finderSearch', disabled: busy || !!hint, onClick: onSearch }, busy ? 'Searching…' : 'Find landing sites'),
-    hint ? h('p', { class: 'hint' }, hint) : null,
     h('div', { class: 'eyebrow' }, 'Rover, for reach and routes'),
     h(
       'div',

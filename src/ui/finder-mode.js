@@ -64,15 +64,17 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
       : !terrain.available
         ? `Needs terrain data. Run "${terrain.hint ?? 'npm run data:fetch -- lola-south-80s-80m'}", then reload.`
         : !site
-          ? 'Select a site first.'
+          ? 'The search needs a centre. Select a site near the south pole first.'
           : !terrainCovers(terrain, site.lat)
-            ? `Choose a centre south of ${Math.abs(terrain.coversSouthOfLat)}° S: the terrain data stops there.`
+            ? `${site.name} is outside the terrain data, which covers ${Math.abs(terrain.coversSouthOfLat)}° S to the south pole. Select a site near the south pole first.`
             : null;
     renderFinderForm($('finderForm'), { values, centre: site, busy, hint, onChange: (patch) => {
         Object.assign(values, patch);
         if (Object.keys(patch).some((key) => key.startsWith('rover'))) updateRouteSoon(); // no new search needed
       },
       onSearch: run,
+      // When the only problem is where the search is centred, offer a spot that works.
+      onUseExample: terrain?.available && (!site || !terrainCovers(terrain, site.lat)) ? () => onPick(-89.45, -137.31) : null,
     });
   }
 

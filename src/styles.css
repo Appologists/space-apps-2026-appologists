@@ -1009,3 +1009,12 @@ button:disabled {
   font-size: 13px;
   color: var(--ink);
 }
+
+.finder-why {
+  font-size: 13.5px;
+}
+.finder-why button {
+  display: block;
+  margin-top: 7px;
+  font-size: 13px;
+}
