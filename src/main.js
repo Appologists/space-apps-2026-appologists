@@ -14,6 +14,7 @@ import { createContext, evaluateSites, rankSites } from './scoring/rank.js';
 import { wrapLon } from './astro/coords.js';
 import { terrainCovers, terrainInfo } from './terrain/client.js';
 import { renderDetail } from './ui/detail.js';
+import { createFinderMode } from './ui/finder-mode.js';
 import { createSurfaceMode } from './ui/surface-mode.js';
 import { renderMission, renderRanking, renderWeights } from './ui/panel.js';
 
@@ -65,6 +66,18 @@ const surface = createSurfaceMode({
   app: document.querySelector('.app'),
   getState: () => ({ ctx, viewIndex: state.viewIndex }),
   setStatus,
+});
+
+const finder = createFinderMode({
+  app: document.querySelector('.app'),
+  getState: () => ({
+    mission: state.mission,
+    weights: state.weights,
+    terrain: state.terrain,
+    site: allSites().find((s) => s.id === state.selectedId) ?? null,
+  }),
+  setStatus,
+  onPick: (lat, lon) => setCustomSite(lat, lon),
 });
 
 /** Stand on the surface at a site and look around, if terrain data covers it. */
@@ -136,6 +149,7 @@ function drawDetail() {
       globe.setSelected(null);
       $('detail').hidden = true;
       $('ranking').querySelector('[aria-current]')?.removeAttribute('aria-current');
+      finder.drawForm();
     },
   });
 }
@@ -146,6 +160,7 @@ function select(id, { focus = false } = {}) {
   const site = allSites().find((s) => s.id === id);
   if (focus && site) globe.focus(site.lat, site.lon);
   moveSurfaceTo(site);
+  finder.drawForm();
 }
 
 /** Already standing on the surface? Move to the newly chosen site, or go back to the globe if it has no terrain. */
@@ -160,6 +175,7 @@ function setCustomSite(lat, lon) {
   state.selectedId = 'custom';
   evaluate();
   moveSurfaceTo(state.customSite);
+  finder.drawForm();
 }
 
 function showViewTime() {
@@ -237,9 +253,11 @@ $('addPoint').addEventListener('submit', (e) => {
 // ---- Start ------------------------------------------------------------------------------------------
 drawMission();
 evaluate();
+finder.drawForm();
 terrainInfo().then((info) => {
   state.terrain = info;
   drawDetail(); // the site card can now offer "Look around from here"
+  finder.drawForm();
 });
 {
   const top = ranking[0]?.site;
@@ -247,4 +265,4 @@ terrainInfo().then((info) => {
 }
 
 // Handy in the browser console while developing.
-window.__app = { state, globe, surface, lookAround, get ctx() { return ctx; }, get ranking() { return ranking; } };
+window.__app = { state, globe, surface, finder, lookAround, get ctx() { return ctx; }, get ranking() { return ranking; } };

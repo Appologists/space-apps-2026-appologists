@@ -872,3 +872,131 @@ button.primary:hover {
 .legend-ticks.positioned span:last-child {
   transform: translateX(-100%);
 }
+
+/* Landing-site finder: a results column and a map, covering the globe. The surface view opens on top of it. */
+.finder {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--space);
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+}
+.finder-side {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.finder-side .hud {
+  position: static;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+}
+.finder-map {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+#finderCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+.finder .tip {
+  white-space: normal;
+  max-width: 300px;
+  line-height: 1.4;
+}
+.found {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.found-site {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 1px 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  font: 13.5px var(--font-num);
+}
+.found-site .num {
+  color: var(--dim);
+}
+.found-site .rank-score {
+  float: right;
+  font-size: 15px;
+}
+.found-site small {
+  grid-column: 2;
+  font: 12.5px var(--font-ui);
+  color: var(--dim);
+}
+.finder-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.finder-centre {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--dim);
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.check input {
+  accent-color: var(--regolith);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.app.finder-open:not(.surface-open) .timebar {
+  display: none;
+}
+@media (max-width: 900px) {
+  .finder {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .finder-map {
+    order: -1;
+  }
+}
+.legend-swatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+}
+.legend-swatches li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.legend-swatches i {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid var(--rule);
+}

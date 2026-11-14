@@ -105,3 +105,33 @@ below 80 m only. It is not data.
 
 What is missing: real detail finer than 80 m, light bounced into shadow, any terrain north of 80° S (if the data
 ends within 300 km of the viewer, the ground beyond is drawn flat and blue-grey, and the app says so).
+
+## The landing-site finder
+
+```
+ form (src/ui/finder-form.js) ──▶ POST /api/terrain/landing-search ──▶ server/landing-search.mjs
+                                                                              │ rasters (src/finder/wire.js)
+ list of best sites, map with layers (src/finder/map-view.js) ◀──────────────┘
+```
+
+- **Grids.** A fine raster over the search area (80–200 m cells, at most about 400 across) and a coarse one
+  (500 m cells) reaching 150 km further, both laid out flat around the search centre with the Moon's
+  curvature in the heights. The fine raster is a small flat map, north up; `src/finder/grid.js` converts
+  cells to latitude and longitude.
+- **Time.** For each time step, the shadow sweep from the surface view gives the height of the lowest
+  unblocked sunbeam above every cell. A panel standing above that height is lit. The same sweep with
+  Earth's direction gives the Earth link for the antenna. About 340 steps per search.
+- **Checks.** Slope at the cell, Sun and Earth at touchdown, longest run of darkness. Then every cell takes
+  the worst result found anywhere within the landing accuracy, because the lander may come down anywhere
+  in that circle.
+- **Score and sites.** Passing cells are scored like the ranked list; the ten best, kept apart, are listed.
+
+Check we ran (2026-11-14, `npm run check:landing`): at 16 places round Shackleton's rim, over 14 days, the
+finder and the slower point-by-point horizon method agreed to within 0.012 on the share of time sunlit,
+0.033 on the share of time with Earth in view, and 5 hours on the longest darkness. The two methods share
+the ephemeris, so this checks the terrain handling, not the Sun and Earth positions (those are checked
+against JPL Horizons).
+
+Known limits: the search blocks the dev server while it runs (about 10 s); darkness that starts before
+landing or runs past the end of the mission is counted only inside the window; at marginal spots the
+finder and the surface view can differ by a few percent, because they sample time and terrain differently.

@@ -20,6 +20,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 - Anything that reads the big files in `data/raw/` while the app runs: `server/` (it runs inside the dev
   server; see `server/terrain-plugin.mjs`). The browser asks it for small pieces.
 - The view from the ground: `src/surface/`. Terrain maths shared by browser and server: `src/terrain/`.
+- The landing-site finder: rules and scoring in `src/finder/score.js`, the search itself in
+  `server/landing-search.mjs`, the map in `src/finder/map-view.js`. Its data contract is `src/finder/types.js`.
+  After changing the search, run `npm run check:landing`.
 - A new lens (a way to colour the ground in the surface view): one entry in `src/surface/lenses.js`, which
   also states the colour rules every lens follows. The switch and legend appear by themselves.
 

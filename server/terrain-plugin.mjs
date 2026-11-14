@@ -3,11 +3,15 @@
 //   GET /api/terrain/info                    is terrain data installed, and what does it cover?
 //   GET /api/terrain/polar?lat=-89.5&lon=0   the ground around a point, as a polar grid (binary; see
 //                                            encodePatch/decodePatch in src/terrain/polar-grid.js)
+//   POST /api/terrain/landing-search         the landing-site finder (JSON in: see src/finder/types.js;
+//                                            rasters out: src/finder/wire.js). Takes several seconds.
 //
 // Like the Horizons proxy, this only exists while `npm run dev` or `npm run preview` is running.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { encodePatch } from '../src/terrain/polar-grid.js';
+import { encodeRasters } from '../src/finder/wire.js';
+import { searchLanding } from './landing-search.mjs';
 import { openLolaPolar, samplePolarPatch } from './lola-polar.mjs';
 
 const DATASET = 'lola-south-80s-80m';
@@ -25,6 +29,17 @@ export function terrainApi({ root = process.cwd() } = {}) {
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify(body));
   };
+
+  const readBody = (req) =>
+    new Promise((resolve, reject) => {
+      let text = '';
+      req.on('data', (chunk) => {
+        text += chunk;
+        if (text.length > 100_000) reject(new Error('Request too large'));
+      });
+      req.on('end', () => resolve(text));
+      req.on('error', reject);
+    });
 
   async function handle(req, res, next) {
     const url = new URL(req.url, 'http://localhost');
@@ -44,6 +59,18 @@ export function terrainApi({ root = process.cwd() } = {}) {
         res.statusCode = 200;
         res.setHeader('content-type', 'application/octet-stream');
         return res.end(Buffer.from(encodePatch(patch)));
+      }
+      if (url.pathname === '/landing-search' && req.method === 'POST') {
+        if (!installed()) return json(res, 404, { error: 'Terrain data is not downloaded yet.', hint: FETCH_HINT });
+        const params = JSON.parse(await readBody(req));
+        if (!Number.isFinite(params?.center?.lat) || !Number.isFinite(params?.center?.lon) || !params.start || !(params.durationHours > 0)) {
+          return json(res, 400, { error: 'center, start and durationHours are required' });
+        }
+        const found = searchLanding(await dem(), params);
+        if (!found) return json(res, 404, { error: 'No terrain data at the centre of the search. The 80 m data covers 80° S to the south pole.' });
+        res.statusCode = 200;
+        res.setHeader('content-type', 'application/octet-stream');
+        return res.end(Buffer.from(encodeRasters(found.header, found.rasters)));
       }
       return next();
     } catch (error) {

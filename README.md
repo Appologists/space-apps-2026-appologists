@@ -11,7 +11,9 @@ time slider, your own points by click or coordinates, and a one-click check agai
 Within 10° of the south pole you can also **stand on the surface and look around**: real terrain from NASA's
 LOLA instrument, real shadows, the Sun and Earth where they would be, and what the terrain does to the
 mission's sunlight and Earth contact. Lenses recolour the ground by elevation or by slope, and pointing at
-any spot reads out its height, slope and distance.
+any spot reads out its height, slope and distance. The **landing-site finder** takes the landing accuracy,
+slope limit and the darkness the rover can survive, searches the area round a chosen point, and maps where
+a landing passes every check, with sunlight, darkness, Earth-link and slope layers.
 
 **What does not work yet:** the ranking itself still assumes a smooth Moon, so no ridge or crater rim casts
 a shadow in the scores. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
@@ -43,6 +45,7 @@ Then choose a south-pole site and press "Look around from here", or double-click
 | `npm run dev` | Runs the app with live reload |
 | `npm test` | Runs the tests (about 2 seconds) |
 | `npm run check:horizons` | Compares our Sun/Earth maths with JPL Horizons over the next 28 days |
+| `npm run check:landing` | Compares the landing-site finder with the slower point-by-point method at 16 places |
 | `npm run data:list` | Lists the large datasets we know about and which ones you have |
 | `npm run data:fetch -- <id>` | Downloads one into `data/raw/` (never committed) |
 | `npm run build` | Builds a static copy into `dist/` |
@@ -59,6 +62,7 @@ Then choose a south-pole site and press "Look around from here", or double-click
 | `src/surface/` | The view from the ground, and its shadows |
 | `src/terrain/` | Terrain around a point: the real horizon, and the format terrain travels in |
 | `server/` | Runs inside the dev server: reads the big terrain files and serves the piece the app asks for |
+| `src/finder/` | The landing-site finder: its rules, the map of results, and the format results travel in |
 | `src/ui/` | The panel, ranked list and site card |
 | `data/sites.json` | The curated sites, each with its source |
 | `data/catalog.json` | Large datasets: where they come from and how big they are |

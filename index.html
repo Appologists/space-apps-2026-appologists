@@ -34,6 +34,11 @@
           <div id="weights" class="weights"></div>
         </section>
 
+        <section aria-labelledby="finderFormTitle">
+          <h2 class="eyebrow" id="finderFormTitle">Find landing sites</h2>
+          <div id="finderForm" class="finder-form"></div>
+        </section>
+
         <section aria-labelledby="rankingTitle">
           <h2 class="eyebrow" id="rankingTitle">Ranked sites</h2>
           <ol id="ranking" class="ranking"></ol>
@@ -80,6 +85,27 @@
           <button type="button" id="play" aria-pressed="false">Play</button>
           <input type="range" id="viewTime" min="0" max="1" step="1" value="0" aria-label="Time within the mission" />
           <output id="viewTimeText" for="viewTime"></output>
+        </div>
+
+        <div class="finder" id="finder" hidden>
+          <div class="finder-side">
+            <aside class="hud finder-hud" aria-label="Landing sites found">
+              <div class="hud-head"><button type="button" id="finderBack">Back to the Moon</button></div>
+              <h2 id="finderTitle"></h2>
+              <p class="caveats" id="finderSummary"></p>
+              <ol class="found" id="finderSites"></ol>
+              <p class="caveats" id="finderNotes"></p>
+            </aside>
+            <div class="legend" id="finderLegend" hidden></div>
+            <div class="lensbar" role="group" aria-label="Colour the map by">
+              <span class="eyebrow">Colour the map by</span>
+              <div class="lensbuttons" id="finderLayers"></div>
+            </div>
+          </div>
+          <div class="finder-map" id="finderMap">
+            <canvas id="finderCanvas" aria-label="Map of the search area, north up. Point at it to read values; click to select a spot."></canvas>
+            <div class="tip" id="finderTip" hidden></div>
+          </div>
         </div>
 
         <div class="surface" id="surface" hidden>
