@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Selene Navigator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080c; --panel:#0c1016; --panel2:#111720; --line:#1b232e; --line2:#26303d;
+  --text:#e7eaef; --muted:#8792a2; --dim:#55606f;
+  --sun:#ffb547; --sun2:#ffd98a; --earth:#4ea8ff; --good:#3ddc97; --warn:#ff6b5b; --violet:#a78bfa;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',system-ui,sans-serif;width:1600px;height:1000px;overflow:hidden}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+header{height:56px;display:flex;align-items:center;gap:28px;padding:0 20px;border-bottom:1px solid var(--line);background:linear-gradient(#0a0e14,#080b10)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em;font-size:17px}
+.logo small{display:block;font-weight:400;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.logo .mk{width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 65% 40%,#f3efe6 0 38%,#1a1f27 39%);box-shadow:0 0 0 1px #2c3542,0 0 18px rgba(255,181,71,.25)}
+nav{display:flex;gap:4px;margin-left:10px}
+nav a{color:var(--muted);text-decoration:none;font-size:14px;padding:8px 14px;border-radius:8px}
+nav a.on{color:var(--text);background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line2)}
+nav a .b{font-size:9px;color:var(--violet);border:1px solid #4b3f78;border-radius:4px;padding:1px 4px;margin-left:5px;vertical-align:2px}
+.hright{margin-left:auto;display:flex;align-items:center;gap:12px}
+.chip{font-size:11.5px;color:var(--muted);border:1px solid var(--line2);border-radius:999px;padding:5px 11px;display:flex;align-items:center;gap:7px;background:var(--panel)}
+.live{color:var(--text)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
+.btn{font:inherit;font-size:13px;color:var(--text);background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:7px 12px}
+.btn.pri{background:#ffb54722;border-color:#ffb54766;color:var(--sun2)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.h{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.k{font-size:11px;color:var(--muted)}
+.v{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:500}
+.v small{font-size:12px;color:var(--muted);margin-left:2px}
+/* layout explore */
+.explore{display:grid;grid-template-columns:330px 1fr 380px;grid-template-rows:1fr 168px;gap:12px;padding:12px;height:944px}
+.left{grid-row:1;display:flex;flex-direction:column;gap:12px;min-height:0}
+.center{position:relative;grid-row:1;overflow:hidden;border-radius:14px;border:1px solid var(--line);background:radial-gradient(ellipse at 45% 40%,#0d131c 0%,#06080c 70%)}
+.right{grid-row:1;display:flex;flex-direction:column;gap:12px;min-height:0}
+.bottom{grid-column:1/4;grid-row:2}
+.stars{position:absolute;inset:0}
+.field{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.field:last-child{border-bottom:0}
+.slider{height:4px;background:var(--line2);border-radius:4px;position:relative;margin-top:8px}
+.slider i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--sun)}
+.slider b{position:absolute;top:-5px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--sun);margin-left:-7px}
+.tog{width:30px;height:17px;border-radius:9px;background:var(--good);position:relative}
+.tog:after{content:"";position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+.tog.off{background:var(--line2)}.tog.off:after{left:2px;right:auto}
+.site{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:9px;border:1px solid transparent}
+.site.sel{background:#3ddc9712;border-color:#3ddc9750}
+.site .r{font-family:'JetBrains Mono';font-size:12px;color:var(--muted);text-align:center}
+.site .n{font-size:14px;font-weight:500}
+.site .c{font-size:11px;color:var(--muted);font-family:'JetBrains Mono'}
+.score{font-family:'JetBrains Mono';font-weight:600;font-size:15px}
+.mbar{display:flex;gap:3px;margin-top:5px}
+.mbar span{height:3px;border-radius:2px}
+.legend{position:absolute;left:18px;bottom:16px;display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--muted);background:#0a0e14cc;border:1px solid var(--line);border-radius:10px;padding:11px 13px;backdrop-filter:blur(6px)}
+.legend div{display:flex;align-items:center;gap:8px}
+.sw{width:12px;height:12px;border-radius:3px}
+.ovl{position:absolute;font-size:12px;color:var(--muted)}
+.tools{position:absolute;right:16px;top:16px;display:flex;flex-direction:column;gap:6px}
+.tools span{width:34px;height:34px;display:grid;place-items:center;border-radius:8px;background:#0c1016dd;border:1px solid var(--line2);color:var(--muted);font-size:15px}
+.layers{position:absolute;left:18px;top:16px;display:flex;gap:6px}
+.layers span{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line2);background:#0c1016dd;color:var(--muted)}
+.layers span.on{color:var(--text);border-color:#3ddc9766}
+.layers span.on:before{content:"●";color:var(--good);margin-right:6px;font-size:9px;vertical-align:1px}
+.inset{position:absolute;right:16px;bottom:16px;width:400px;height:456px;border-radius:12px;border:1px solid var(--line2);background:#05070acc;overflow:hidden;box-shadow:0 20px 50px #000a}
+.inset .t{position:absolute;left:12px;top:10px;z-index:3}
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.grid4>div{background:var(--panel2);padding:11px 12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:3px 8px;border-radius:999px}
+.pill.g{background:#3ddc9718;color:var(--good)}
+.pill.w{background:#ff6b5b18;color:var(--warn)}
+.pill.s{background:#ffb54718;color:var(--sun)}
+.pill.e{background:#4ea8ff18;color:var(--earth)}
+.cmp{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:12px;height:944px}
+.tl{display:grid;grid-template-columns:1fr 360px;grid-template-rows:470px 1fr;gap:12px;padding:12px;height:944px}
+ul.pc{list-style:none;font-size:12.5px;line-height:1.55;color:#c9ced6}
+ul.pc li{padding-left:16px;position:relative}
+ul.pc li:before{position:absolute;left:0;font-family:'JetBrains Mono'}
+ul.pc.p li:before{content:"+";color:var(--good)}
+ul.pc.c li:before{content:"–";color:var(--warn)}
+table.m{width:100%;border-collapse:collapse;font-size:12.5px}
+table.m td{padding:7px 0;border-bottom:1px solid var(--line)}
+table.m td:last-child{text-align:right;font-family:'JetBrains Mono'}
+table.m tr.best td:last-child{color:var(--good)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ---------- utilities ----------
+const D2R=Math.PI/180, R2D=180/Math.PI;
+function rng(seed){let s=seed>>>0||1;return()=>{s^=s<<13;s>>>=0;s^=s>>17;s^=s<<5;s>>>=0;return s/4294967296}}
+function v3(lat,lon){lat*=D2R;lon*=D2R;return[Math.cos(lat)*Math.cos(lon),Math.cos(lat)*Math.sin(lon),Math.sin(lat)]}
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const VIEW=(new URLSearchParams(location.search).get('view'))||'explore';
+
+// ---------- sites + simulation (illustrative values for the mockup) ----------
+const START=Date.UTC(2026,10,14,18,0); const HOURS=720;
+const SITES=[
+ {id:'CR', name:'Connecting Ridge',      lat:-89.45,lon:-137.0,amp:0.42,seed:11,eph:0.3,lo:[14,10]},
+ {id:'SR', name:'Shackleton Rim (Peak)', lat:-89.78,lon:123.6, amp:0.50,seed:23,eph:0.9,lo:[16,-22]},
+ {id:'DG', name:'de Gerlache Rim 1',     lat:-88.67,lon:-68.7, amp:0.85,seed:7, eph:1.9,lo:[16,16]},
+ {id:'MM', name:'Malapert Massif',       lat:-85.99,lon:-2.9,  amp:0.75,seed:41,eph:0.1,lo:[12,-4]},
+ {id:'NR', name:'Nobile Rim 1',          lat:-85.42,lon:37.3,  amp:1.05,seed:5, eph:2.6,lo:[-10,22]},
+ {id:'HW', name:'Haworth (floor)',       lat:-87.45,lon:-5.0,  amp:1.6,seed:3, eph:1.2,lo:[-16,6]},
+];
+function terrainFn(site){const r=rng(site.seed*977+3);const t=[];for(let k=1;k<=9;k++)t.push([k,(0.4+r())/Math.pow(k,0.75),r()*6.283]);
+  return az=>{let s=0;for(const[k,a,p]of t)s+=a*Math.sin(k*az*D2R+p);return 0.25+site.amp*s*1.25+(site.id==='HW'?1.0:0)}}
+function sim(site){
+  const T=terrainFn(site);const sun=[],earth=[],sunEl=[],sunAz=[],eEl=[],eAz=[];
+  for(let h=0;h<HOURS;h++){const d=h/24;
+    const az=(110+360*d/29.53)%360, el=1.15+0.18*Math.sin(d/4.7);
+    const ea=180+8*Math.sin(2*Math.PI*d/27.55+site.eph*1.7), ee=6.6*Math.sin(2*Math.PI*d/27.21+site.eph);
+    sunAz.push(az);sunEl.push(el);eAz.push(ea);eEl.push(ee);
+    sun.push(el>T(az));earth.push(ee>T(ea));}
+  const run=a=>{let best=0,c=0;for(const x of a){c=x?c+1:0;best=Math.max(best,c)}return best};
+  const first=a=>{let i=a.indexOf(false);return i<0?HOURS:i};
+  const pct=a=>a.filter(Boolean).length/a.length;
+  const both=sun.map((s,i)=>s&&earth[i]);
+  const m={sun,earth,both,sunEl,sunAz,eEl,eAz,T,
+    pSun:pct(sun),pEarth:pct(earth),pBoth:pct(both),
+    longest:run(sun),toSunset:sun[0]?first(sun):0,toEarthset:earth[0]?first(earth):0,longestBoth:run(both)};
+  m.score=Math.round(100*(0.45*m.pSun+0.25*m.pEarth+0.30*Math.min(1,m.longest/400)));
+  return m;
+}
+SITES.forEach(s=>s.m=sim(s));
+SITES.sort((a,b)=>b.m.score-a.m.score);
+const SEL=SITES[0];
+const fmtH=h=>{if(h>=HOURS)return'30d+';const d=Math.floor(h/24),r=h%24;return d?`${d}d ${r}h`:`${r}h`};
+const scoreCol=s=>s>=80?'var(--good)':s>=60?'var(--sun)':'var(--warn)';
+
+// ---------- moon renderer ----------
+const MARIA=[[33,-18,17],[28,17,9],[8,31,10],[-8,51,8],[-21,-17,9],[15,-55,24],[-15,35,6],[17,59,7],[-24,-39,6],[56,0,8]];
+function makeCraters(seed,n,latMin,latMax,rMin,rMax){const r=rng(seed);const out=[];
+  for(let i=0;i<n;i++){const u=r();const sinLat=Math.sin(latMin*D2R)+u*(Math.sin(latMax*D2R)-Math.sin(latMin*D2R));
+    const rad=rMin*Math.pow(rMax/rMin,Math.pow(r(),2.2));out.push({c:v3(Math.asin(sinLat)*R2D,r()*360-180),r:rad*D2R,hill:false,dk:0.6+r()*0.6})}return out}
+function prep(cr){cr.forEach(c=>{c.cosO=Math.cos(c.r*1.35)});return cr}
+function shade(P,S,craters,grain){
+  let N=[P[0],P[1],P[2]];let alb=0.66;
+  for(const m of MARIA){const d=Math.acos(Math.min(1,dot(P,v3(m[0],m[1]))))*R2D;if(d<m[2]*1.25){alb-=0.24*Math.min(1,(m[2]*1.25-d)/(m[2]*0.35))}}
+  for(const c of craters){const dd=dot(P,c.c);if(dd<c.cosO)continue;
+    const d=Math.acos(Math.min(1,dd));const t=[c.c[0]-dd*P[0],c.c[1]-dd*P[1],c.c[2]-dd*P[2]];const tl=Math.hypot(...t)||1;
+    let k;if(c.hill){k=-0.9*Math.min(1,d/c.r)*(d<c.r*1.35?1:0)}
+    else if(d<c.r){k=0.95*c.dk*(d/c.r);alb-=0.04}else{k=-0.7*c.dk*(1-(d-c.r)/(0.35*c.r));alb+=0.03}
+    N[0]+=t[0]/tl*k;N[1]+=t[1]/tl*k;N[2]+=t[2]/tl*k;}
+  const nl=Math.hypot(...N);let L=dot(N,S)/nl;L=Math.max(0,L);
+  return {L,alb:alb+grain};
+}
+function renderOrtho(cv,R,lat0,lon0,sunLat,sunLon,craters){
+  const ctx=cv.getContext('2d');const W=cv.width,H=cv.height,cx=W/2,cy=H/2;
+  const img=ctx.createImageData(W,H);const S=v3(sunLat,sunLon);const r=rng(99);
+  const sl=Math.sin(lat0*D2R),cl=Math.cos(lat0*D2R);
+  for(let py=0;py<H;py++)for(let px=0;px<W;px++){
+    const x=(px-cx)/R,y=-(py-cy)/R;const q=x*x+y*y;const i=(py*W+px)*4;
+    if(q>1){continue}
+    const z=Math.sqrt(1-q);const lat=Math.asin(z*sl+y*cl)*R2D;const lon=lon0+Math.atan2(x,z*cl-y*sl)*R2D;
+    const P=v3(lat,lon);const {L,alb}=shade(P,S,craters,(r()-0.5)*0.05);
+    let v=Math.pow(L,0.75)*alb*1.35+0.018;const edge=Math.min(1,(1-Math.sqrt(q))*R*0.9);
+    v=Math.min(1,v);img.data[i]=v*236;img.data[i+1]=v*230;img.data[i+2]=v*220;img.data[i+3]=255*edge;}
+  ctx.putImageData(img,0,0);
+}
+function projOrtho(lat,lon,lat0,lon0){lat*=D2R;const dl=(lon-lon0)*D2R,l0=lat0*D2R;
+  return{x:Math.cos(lat)*Math.sin(dl),y:Math.cos(l0)*Math.sin(lat)-Math.sin(l0)*Math.cos(lat)*Math.cos(dl),z:Math.sin(l0)*Math.sin(lat)+Math.cos(l0)*Math.cos(lat)*Math.cos(dl)}}
+// polar stereographic-ish (azimuthal equidistant) around south pole; degPerPx = scale
+function renderPolar(cv,degR,sunLat,sunLon,craters){
+  const ctx=cv.getContext('2d');const W=cv.width,H=cv.height,cx=W/2,cy=H/2;const img=ctx.createImageData(W,H);
+  const S=v3(sunLat,sunLon);const r=rng(5);const k=degR/(W/2);
+  for(let py=0;py<H;py++)for(let px=0;px<W;px++){const dx=px-cx,dy=py-cy;const rho=Math.hypot(dx,dy)*k;
+    const lat=-90+rho,lon=Math.atan2(dx,-dy)*R2D;const P=v3(lat,lon);const {L,alb}=shade(P,S,craters,(r()-0.5)*0.06);
+    let v=Math.min(1,Math.pow(L,0.85)*alb*1.9+0.012);const i=(py*W+px)*4;img.data[i]=v*236;img.data[i+1]=v*231;img.data[i+2]=v*222;img.data[i+3]=255}
+  ctx.putImageData(img,0,0);
+}
+function projPolar(lat,lon,degR,W){const rho=(lat+90)/degR*(W/2);return{x:W/2+rho*Math.sin(lon*D2R),y:W/2-rho*Math.cos(lon*D2R)}}
+const GLOBAL_CR=prep(makeCraters(42,520,-90,90,0.8,9).concat([{c:v3(-43.3,-11.2),r:4.3*D2R,dk:1.2},{c:v3(9.6,-20.1),r:1.5*D2R,dk:1.2},{c:v3(-89.6,130),r:0.4*D2R,dk:1},{c:v3(-58.4,-14.4),r:3.7*D2R,dk:1}]));
+const POLAR_CR=prep(makeCraters(8,240,-90,-82.5,0.06,0.55).concat([
+ {c:v3(-89.67,129.8),r:0.36*D2R,dk:1.25},{c:v3(-87.45,-5),r:0.85*D2R,dk:1},{c:v3(-88.1,44.9),r:0.85*D2R,dk:1},{c:v3(-87.3,77),r:0.65*D2R,dk:1},
+ {c:v3(-88.5,-87),r:0.55*D2R,dk:1},{c:v3(-88.3,-152),r:0.55*D2R,dk:1},{c:v3(-84.9,-35.5),r:1.6*D2R,dk:.9},{c:v3(-85.5,95),r:1.2*D2R,dk:.9},
+ {c:v3(-85.9,-1),r:0.7*D2R,dk:1,hill:true},{c:v3(-89.45,-137),r:0.25*D2R,dk:1,hill:true},{c:v3(-85.6,40),r:0.5*D2R,dk:1,hill:true}]));
+
+function starfield(cv,n,seed){const c=cv.getContext('2d');const r=rng(seed);for(let i=0;i<n;i++){const a=r();c.fillStyle=`rgba(${200+r()*55|0},${210+r()*45|0},255,${0.15+a*0.6})`;const s=a>0.97?1.6:a>0.85?1.1:0.7;c.beginPath();c.arc(r()*cv.width,r()*cv.height,s,0,7);c.fill()}}
+
+// ---------- SVG helpers ----------
+function horizonSVG(site,W,H,opt={}){
+  const m=site.m,T=m.T;const e0=-4,e1=opt.e1||10;const X=a=>a/360*W,Y=e=>H-(e-e0)/(e1-e0)*H;
+  let terr=`M0 ${H} `;for(let a=0;a<=360;a+=1)terr+=`L${X(a).toFixed(1)} ${Y(T(a)).toFixed(1)} `;terr+=`L${W} ${H}Z`;
+  let grid='';for(let e=-2;e<=e1;e+=2)grid+=`<line x1="0" x2="${W}" y1="${Y(e)}" y2="${Y(e)}" stroke="#1b232e" stroke-width="${e===0?1.2:0.6}" ${e===0?'':'stroke-dasharray="2 4"'}/>`+(opt.labels?`<text x="4" y="${Y(e)-3}" fill="#55606f" font-size="9.5" font-family="JetBrains Mono">${e}°</text>`:'');
+  for(let a=0;a<=360;a+=45)grid+=`<line y1="0" y2="${H}" x1="${X(a)}" x2="${X(a)}" stroke="#1b232e" stroke-width=".6" stroke-dasharray="2 4"/>`+(opt.labels?`<text x="${X(a)+4}" y="${H-5}" fill="#55606f" font-size="9.5" font-family="JetBrains Mono">${a}°</text>`:'');
+  // sun track (lit vs blocked)
+  let sunPts='';const hrs=opt.hours||HOURS;
+  for(let h=0;h<hrs;h+=2){const a=m.sunAz[h],e=m.sunEl[h];sunPts+=`<circle cx="${X(a).toFixed(1)}" cy="${Y(e).toFixed(1)}" r="${opt.big?1.6:1.1}" fill="${m.sun[h]?'#ffb547':'#5a4a33'}"/>`}
+  let dayTicks='';if(opt.days){for(let d=1;d<30;d+=3){const h=d*24;dayTicks+=`<g transform="translate(${X(m.sunAz[h])},${Y(m.sunEl[h])})"><line y1="-4" y2="-12" stroke="#ffb54788"/><text y="-16" text-anchor="middle" fill="#ffb547aa" font-size="10" font-family="JetBrains Mono">+${d}d</text></g>`}}
+  let ePath='';for(let h=0;h<hrs;h+=3){ePath+=(h?'L':'M')+X(m.eAz[h]).toFixed(1)+' '+Y(m.eEl[h]).toFixed(1)}
+  const ci=opt.cursor||0;const sx=X(m.sunAz[ci]),sy=Y(m.sunEl[ci]),ex=X(m.eAz[ci]),ey=Y(m.eEl[ci]);
+  const id='g'+Math.random().toString(36).slice(2,7);
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
+  <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a4250"/><stop offset="1" stop-color="#11151b"/></linearGradient>
+  <radialGradient id="${id}s"><stop offset="0" stop-color="#fff6dd"/><stop offset=".35" stop-color="#ffb547"/><stop offset="1" stop-color="#ffb54700"/></radialGradient>
+  <radialGradient id="${id}e"><stop offset="0" stop-color="#bfe0ff"/><stop offset=".4" stop-color="#4ea8ff"/><stop offset="1" stop-color="#4ea8ff00"/></radialGradient></defs>
+  ${grid}
+  <path d="${ePath}" fill="none" stroke="#4ea8ff" stroke-opacity=".55" stroke-width="1.2" stroke-dasharray="3 3"/>
+  ${sunPts}${dayTicks}
+  <path d="${terr}" fill="url(#${id})" stroke="#8b97a8" stroke-width="1"/>
+  <circle cx="${sx}" cy="${sy}" r="${opt.big?22:14}" fill="url(#${id}s)"/><circle cx="${sx}" cy="${sy}" r="${opt.big?5.5:4}" fill="#fff4d6"/>
+  <circle cx="${ex}" cy="${ey}" r="${opt.big?18:12}" fill="url(#${id}e)"/><circle cx="${ex}" cy="${ey}" r="${opt.big?5:3.6}" fill="#cfe6ff"/>
+  ${opt.tags?`<text x="${sx+12}" y="${sy-10}" fill="#ffd98a" font-size="11" font-family="JetBrains Mono">☀ ${m.sunEl[ci].toFixed(2)}° · az ${m.sunAz[ci].toFixed(0)}°</text>
+  <text x="${ex+12}" y="${ey-10}" fill="#9fd0ff" font-size="11" font-family="JetBrains Mono">⊕ ${m.eEl[ci].toFixed(2)}° · az ${m.eAz[ci].toFixed(0)}°</text>`:''}
+  </svg>`;
+}
+function bandsSVG(rows,W,rowH,gap,opt={}){
+  // rows: [{label,arr,color}]
+  const X=h=>h/HOURS*W;let s='';let y=0;
+  for(const r of rows){s+=`<rect x="0" y="${y}" width="${W}" height="${rowH}" rx="3" fill="#121821"/>`;
+    let st=-1;for(let h=0;h<=HOURS;h++){const on=h<HOURS&&r.arr[h];if(on&&st<0)st=h;if(!on&&st>=0){s+=`<rect x="${X(st).toFixed(1)}" y="${y}" width="${(X(h)-X(st)).toFixed(1)}" height="${rowH}" rx="2" fill="${r.color}" fill-opacity="${r.op||0.85}"/>`;st=-1}}
+    y+=rowH+gap}
+  let ticks='';for(let d=0;d<=30;d++){const x=X(d*24);ticks+=`<line x1="${x}" x2="${x}" y1="0" y2="${y-gap}" stroke="#ffffff" stroke-opacity="${d%7===0?0.12:0.04}"/>`}
+  const cur=opt.cursor!=null?`<line x1="${X(opt.cursor)}" x2="${X(opt.cursor)}" y1="-6" y2="${y}" stroke="#fff" stroke-width="1.5"/><circle cx="${X(opt.cursor)}" cy="-6" r="4" fill="#fff"/>`:'';
+  return `<svg width="${W}" height="${y+4}" style="display:block;overflow:visible">${s}${ticks}${cur}</svg>`;
+}
+function dayAxis(W){let s='';const mo=['Nov','Dec'];for(let d=0;d<=30;d+=2){const dt=new Date(START+d*864e5);s+=`<span style="position:absolute;left:${d/30*W}px;transform:translateX(-50%)">${dt.getUTCDate()} ${mo[dt.getUTCMonth()-10]}</span>`}return `<div class="mono k" style="position:relative;height:14px;width:${W}px;font-size:10px">${s}</div>`}
+
+// ---------- header ----------
+function header(){const t=v=>VIEW===v?'on':'';return `<header>
+ <div class="logo"><div class="mk"></div><div>Selene Navigator<small>Lunar landing site planner</small></div></div>
+ <nav><a class="${t('explore')}">Explore</a><a class="${t('timeline')}">Timeline</a><a class="${t('compare')}">Compare</a><a>Sky View<span class="b">BETA</span></a><a>Learn</a></nav>
+ <div class="hright"><span class="chip"><span class="dot"></span><span class="live mono">LIVE · 14 Nov 2026 · 18:00 UTC</span></span>
+ <span class="chip mono">JPL Horizons · LOLA DEM · NASA Moon Trek</span><button class="btn pri">+ Custom coordinates</button></div></header>`}
+
+// ---------- EXPLORE ----------
+function explore(){
+  const s=SEL.m;
+  const list=SITES.map((x,i)=>`<div class="site ${x===SEL?'sel':''}"><div class="r">${i+1}</div>
+    <div><div class="n">${x.name}</div><div class="c">${x.lat.toFixed(2)}°, ${x.lon.toFixed(1)}°</div>
+    <div class="mbar"><span style="width:${x.m.pSun*60}px;background:var(--sun)"></span><span style="width:${x.m.pEarth*60}px;background:var(--earth)"></span></div></div>
+    <div class="score" style="color:${scoreCol(x.m.score)}">${x.m.score}</div></div>`).join('');
+  return `${header()}<div class="explore">
+  <div class="left">
+   <div class="panel" style="padding:14px 16px">
+    <div class="h" style="margin-bottom:6px">Mission constraints</div>
+    <div class="field" style="display:block"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">Min. continuous sunlight</span><span class="mono" style="font-size:12px;color:var(--sun)">≥ 96 h</span></div><div class="slider"><i style="width:40%"></i><b style="left:40%"></b></div></div>
+    <div class="field" style="display:block"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">Min. solar elevation</span><span class="mono" style="font-size:12px;color:var(--sun)">≥ 0.5°</span></div><div class="slider"><i style="width:22%"></i><b style="left:22%"></b></div></div>
+    <div class="field" style="display:block"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">Max. slope</span><span class="mono" style="font-size:12px;color:var(--sun)">≤ 8°</span></div><div class="slider"><i style="width:30%"></i><b style="left:30%"></b></div></div>
+    <div class="field"><span style="font-size:13px">Require Earth in view (DTE comms)</span><div class="tog"></div></div>
+    <div class="field"><span style="font-size:13px">Panel height <span class="k">2.5 m</span> · Antenna <span class="k">3 m</span></span><span class="k mono">edit</span></div>
+   </div>
+   <div class="panel" style="padding:12px 8px;flex:1;min-height:0;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px 8px"><div class="h">Ranked sites · next 30 days</div><span class="k">score</span></div>
+    ${list}
+    <div style="display:flex;gap:14px;padding:10px 12px 0" class="k"><span><span class="sw" style="display:inline-block;width:8px;height:3px;background:var(--sun);vertical-align:3px"></span> sunlit %</span><span><span style="display:inline-block;width:8px;height:3px;background:var(--earth);vertical-align:3px"></span> Earth in view %</span></div>
+   </div>
+  </div>
+  <div class="center" id="center">
+   <canvas class="stars" id="stars" width="844" height="776"></canvas>
+   <canvas id="globe" width="640" height="640" style="position:absolute;left:20px;top:58px"></canvas>
+   <svg id="gov" width="844" height="776" style="position:absolute;left:0;top:0"></svg>
+   <div class="layers"><span class="on">Suitability</span><span class="on">Past missions</span><span>Temperature</span><span>Slope</span><span>PSRs</span></div>
+   <div class="tools"><span>＋</span><span>－</span><span>⟳</span><span>⛶</span></div>
+   <div class="ovl mono" style="left:22px;top:56px;font-size:11px;color:#ffd98a">☀ SUBSOLAR 1.4°S 68.9°E</div>
+   <div class="ovl mono" style="left:22px;top:74px;font-size:11px;color:#9fd0ff">⊕ SUB-EARTH 4.1°S 3.2°W</div>
+   <div class="inset"><canvas id="polar" width="400" height="400" style="position:absolute;left:0;top:56px"></canvas><svg id="pov" width="400" height="456" style="position:absolute;left:0;top:0"></svg>
+     <div class="t"><div class="h" style="color:var(--text)">South polar region</div><div class="k">84.8°S – 90°S · illumination 30-day avg</div></div></div>
+   <div class="legend"><div class="h" style="font-size:10px">Suitability</div>
+    <div style="gap:0"><span style="width:130px;height:8px;border-radius:4px;background:linear-gradient(90deg,#ff6b5b,#ffb547,#3ddc97)"></span></div>
+    <div class="mono" style="justify-content:space-between;font-size:10px;width:130px"><span>0</span><span>50</span><span>100</span></div>
+    <div><span style="color:#e6e9ee;font-size:12px">◆</span> Apollo / past landers</div>
+    <div><span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--good)"></span> Candidate site</div></div>
+  </div>
+  <div class="right">
+   <div class="panel" style="padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+     <div><div class="h">Selected site</div><div style="font-size:21px;font-weight:600;margin-top:4px">${SEL.name}</div><div class="c mono k" style="margin-top:2px">${Math.abs(SEL.lat).toFixed(2)}°S · ${Math.abs(SEL.lon).toFixed(1)}°${SEL.lon<0?'W':'E'} · elev +1,620 m</div></div>
+     <div style="text-align:center"><svg width="62" height="62"><circle cx="31" cy="31" r="26" fill="none" stroke="#1b232e" stroke-width="6"/><circle cx="31" cy="31" r="26" fill="none" stroke="#3ddc97" stroke-width="6" stroke-linecap="round" stroke-dasharray="${s.score/100*163} 200" transform="rotate(-90 31 31)"/><text x="31" y="37" text-anchor="middle" fill="#e7eaef" font-family="JetBrains Mono" font-size="17" font-weight="600">${s.score}</text></svg></div>
+    </div>
+    <div style="display:flex;gap:6px;margin:12px 0 14px"><span class="pill g">● Power OK</span><span class="pill g">● Earth in view</span><span class="pill s">Low sun 1.3°</span></div>
+    <div class="grid4">
+     <div><div class="k">☀ Sun elevation</div><div class="v" style="color:var(--sun2)">${s.sunEl[0].toFixed(2)}<small>°</small></div></div>
+     <div><div class="k">Time to sunset</div><div class="v">${fmtH(s.toSunset)}</div></div>
+     <div><div class="k">⊕ Earth elevation</div><div class="v" style="color:#9fd0ff">${s.eEl[0].toFixed(2)}<small>°</small></div></div>
+     <div><div class="k">Time to Earthset</div><div class="v">${fmtH(s.toEarthset)}</div></div>
+     <div><div class="k">Longest unbroken sun</div><div class="v">${s.longest}<small>h</small></div></div>
+     <div><div class="k">Sunlit · 30 d</div><div class="v">${Math.round(s.pSun*100)}<small>%</small></div></div>
+    </div>
+   </div>
+   <div class="panel" style="padding:14px 16px;flex:1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div class="h">Local horizon · from 2.5 m</div><span class="k mono">LOLA 20 m/px</span></div>
+    <div style="border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#080b10">${horizonSVG(SEL,346,250,{labels:true,tags:true})}</div>
+    <div class="k" style="margin-top:10px;line-height:1.5">Dots trace the Sun over the next 30 days — <span style="color:var(--sun)">gold</span> = sunlit, <span style="color:#8a7552">brown</span> = blocked by terrain. Dashed blue loop = Earth's libration wobble.</div>
+   </div>
+  </div>
+  <div class="bottom panel" style="padding:12px 18px;display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:start">
+   <div><div class="h">Timeline</div>
+    <div style="display:flex;gap:6px;margin-top:10px"><button class="btn" style="padding:6px 10px">⏮</button><button class="btn pri" style="padding:6px 12px">▶</button><button class="btn" style="padding:6px 10px">⏭</button></div>
+    <div class="k mono" style="margin-top:9px">speed 6 h / s</div>
+    <div class="k mono" style="margin-top:3px;color:var(--text)">+0d 00h · now</div></div>
+   <div style="padding-top:10px">
+    <div style="display:grid;grid-template-columns:110px 1fr;row-gap:6px;align-items:center">
+     <div class="k" style="font-size:11px;line-height:14px">☀ Sunlight<br>⊕ Earth in view<br><span style="color:var(--good)">◉ Ops window</span></div>
+     <div>${bandsSVG([{arr:s.sun,color:'#ffb547'},{arr:s.earth,color:'#4ea8ff'},{arr:s.both,color:'#3ddc97'}],1260,13,5,{cursor:0})}</div>
+     <div></div><div style="margin-top:4px">${dayAxis(1260)}</div>
+    </div>
+   </div>
+  </div>
+ </div>`;
+}
+function afterExplore(){
+  starfield(document.getElementById('stars'),420,3);
+  const R=300,lat0=-58,lon0=8;const g=document.getElementById('globe');renderOrtho(g,R,lat0,lon0,-1.4,68.9,GLOBAL_CR);
+  const ox=20+320,oy=58+320;let svg=`<defs><radialGradient id="glow"><stop offset="0" stop-color="#3ddc97" stop-opacity=".55"/><stop offset="1" stop-color="#3ddc97" stop-opacity="0"/></radialGradient>
+  <radialGradient id="atm"><stop offset=".92" stop-color="#ffb547" stop-opacity="0"/><stop offset="1" stop-color="#ffb547" stop-opacity=".0"/></radialGradient></defs>`;
+  // graticule
+  for(let la=-80;la<=80;la+=20){let d='';let pen=false;for(let lo=-180;lo<=180;lo+=3){const p=projOrtho(la,lo,lat0,lon0);if(p.z>0){d+=(pen?'L':'M')+(ox+p.x*R).toFixed(1)+' '+(oy-p.y*R).toFixed(1);pen=true}else pen=false}svg+=`<path d="${d}" fill="none" stroke="#9fb3c8" stroke-opacity=".10" stroke-width=".8"/>`}
+  for(let lo=-180;lo<180;lo+=30){let d='';let pen=false;for(let la=-90;la<=90;la+=3){const p=projOrtho(la,lo,lat0,lon0);if(p.z>0){d+=(pen?'L':'M')+(ox+p.x*R).toFixed(1)+' '+(oy-p.y*R).toFixed(1);pen=true}else pen=false}svg+=`<path d="${d}" fill="none" stroke="#9fb3c8" stroke-opacity=".10" stroke-width=".8"/>`}
+  // terminator
+  {let d='';let pen=false;const S=v3(-1.4,68.9);for(let a=0;a<=360;a+=2){// points 90deg from sun
+    const lon=68.9+90*Math.cos(a*D2R),lat=0;const u=[-Math.sin(68.9*D2R),Math.cos(68.9*D2R),0],w=[0,0,1];
+    const P=[u[0]*Math.cos(a*D2R)+w[0]*Math.sin(a*D2R),u[1]*Math.cos(a*D2R)+w[1]*Math.sin(a*D2R),Math.sin(a*D2R)];
+    const la=Math.asin(P[2])*R2D,lo=Math.atan2(P[1],P[0])*R2D;const p=projOrtho(la,lo,lat0,lon0);if(p.z>0){d+=(pen?'L':'M')+(ox+p.x*R).toFixed(1)+' '+(oy-p.y*R).toFixed(1);pen=true}else pen=false}
+    svg+=`<path d="${d}" fill="none" stroke="#ffb547" stroke-opacity=".45" stroke-width="1.2" stroke-dasharray="5 5"/>`}
+  const pole=projOrtho(-90,0,lat0,lon0);const px=ox+pole.x*R,py=oy-pole.y*R;
+  // suitability glow bands near pole and some mid-latitudes
+  const hot=[[-89.5,0,1],[-86,0,.8],[-85.5,40,.7],[-88.6,-70,.75],[-84,-30,.4],[-80,60,.3]];
+  for(const[la,lo,s]of hot){const p=projOrtho(la,lo,lat0,lon0);if(p.z>0)svg+=`<circle cx="${ox+p.x*R}" cy="${oy-p.y*R}" r="${18+s*22}" fill="url(#glow)" opacity="${s}"/>`}
+  svg+=`<circle cx="${px}" cy="${py}" r="16" fill="none" stroke="#3ddc97" stroke-width="1.5"/><circle cx="${px}" cy="${py}" r="24" fill="none" stroke="#3ddc97" stroke-opacity=".35"/>`;
+  svg+=`<path d="M${px+16} ${py+8} L ${px+120} ${py+70} L 444 ${776-16-456+60}" fill="none" stroke="#3ddc97" stroke-opacity=".5" stroke-dasharray="3 3"/>`;
+  svg+=`<text x="${px-8}" y="${py-30}" text-anchor="middle" fill="#3ddc97" font-size="12" font-family="Space Grotesk" font-weight="600">6 candidates</text>`;
+  const AP=[['Apollo 11',0.67,23.47],['Apollo 12',-3.01,-23.42],['Apollo 14',-3.65,-17.47],['Apollo 15',26.13,3.63],['Apollo 16',-8.97,15.5],['Apollo 17',20.19,30.77],['Chandrayaan-3',-69.37,32.32],['Luna 24',12.71,62.21]];
+  for(const[n,la,lo]of AP){const p=projOrtho(la,lo,lat0,lon0);if(p.z<=0.05)continue;const x=ox+p.x*R,y=oy-p.y*R;
+    svg+=`<g transform="translate(${x},${y})"><rect x="-4" y="-4" width="8" height="8" transform="rotate(45)" fill="#e7eaef" stroke="#06080c" stroke-width="1.5"/><text x="9" y="4" fill="#e7eaef" font-size="11" font-family="Space Grotesk" style="paint-order:stroke" stroke="#06080c" stroke-width="3">${n}</text></g>`}
+  // earth + sun direction hints
+  svg+=`<g transform="translate(700,92)"><circle r="17" fill="#0b2340" stroke="#4ea8ff" stroke-width="1.5"/><path d="M-17 0 A17 17 0 0 1 17 0" fill="#4ea8ff" opacity=".35"/><text x="0" y="36" text-anchor="middle" fill="#9fd0ff" font-size="11" font-family="JetBrains Mono">EARTH ↙</text></g>`;
+  document.getElementById('gov').innerHTML=svg;
+  // polar inset
+  const degR=5.2,W=400;renderPolar(document.getElementById('polar'),degR,-1.4,68.9,POLAR_CR);
+  let ps=`<defs><radialGradient id="pg"><stop offset="0" stop-color="#3ddc97" stop-opacity=".7"/><stop offset="1" stop-color="#3ddc97" stop-opacity="0"/></radialGradient>
+   <radialGradient id="pw"><stop offset="0" stop-color="#ffb547" stop-opacity=".6"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
+   <radialGradient id="pr"><stop offset="0" stop-color="#ff6b5b" stop-opacity=".55"/><stop offset="1" stop-color="#ff6b5b" stop-opacity="0"/></radialGradient></defs><g transform="translate(0,56)">`;
+  for(let r=1;r<=5;r++){ps+=`<circle cx="200" cy="200" r="${r/degR*200}" fill="none" stroke="#9fb3c8" stroke-opacity=".12"/>`;ps+=`<text x="${203}" y="${200-r/degR*200+11}" fill="#9fb3c8" fill-opacity=".45" font-size="9" font-family="JetBrains Mono">${90-r}°S</text>`}
+  for(let a=0;a<360;a+=45){ps+=`<line x1="200" y1="200" x2="${200+200*Math.sin(a*D2R)}" y2="${200-200*Math.cos(a*D2R)}" stroke="#9fb3c8" stroke-opacity=".08"/>`}
+  const GEO=[['Shackleton',-89.67,129.8],['Haworth',-87.45,-5],['Shoemaker',-88.1,44.9],['Faustini',-87.3,77],['de Gerlache',-88.5,-87],['Sverdrup',-88.3,-152]];
+  for(const[n,la,lo]of GEO){const p=projPolar(la,lo,degR,W);ps+=`<text x="${p.x}" y="${p.y+3}" text-anchor="middle" fill="#cfd6e0" fill-opacity=".55" font-size="10" font-style="italic" font-family="Space Grotesk">${n}</text>`}
+  SITES.forEach((s,i)=>{const p=projPolar(s.lat,s.lon,degR,W);const g=s.m.score>=80?'pg':s.m.score>=60?'pw':'pr';const col=scoreCol(s.m.score);
+    ps+=`<circle cx="${p.x}" cy="${p.y}" r="${16+s.m.pSun*16}" fill="url(#${g})"/>`;
+    ps+=`<circle cx="${p.x}" cy="${p.y}" r="${s===SEL?8:6}" fill="#06080c" stroke="${col}" stroke-width="${s===SEL?3:2}"/>`;
+    if(s===SEL)ps+=`<circle cx="${p.x}" cy="${p.y}" r="14" fill="none" stroke="#fff" stroke-opacity=".8" stroke-dasharray="2 3"/>`;
+    const [ox2,oy2]=s.lo;const lx=p.x+ox2*(Math.abs(ox2)>13?4.2:1),ly=p.y+oy2*(Math.abs(ox2)>13?2.2:1);const right=ox2>0;
+    if(Math.abs(ox2)>13)ps+=`<line x1="${p.x}" y1="${p.y}" x2="${lx}" y2="${ly}" stroke="#fff" stroke-opacity=".55"/>`;
+    ps+=`<text x="${lx+(right?3:-3)}" y="${ly-2}" text-anchor="${right?'start':'end'}" fill="#fff" font-size="11.5" font-weight="600" font-family="Space Grotesk" style="paint-order:stroke" stroke="#000" stroke-width="3">${i+1} · ${s.name.replace(' (Peak)','').replace(' (floor)','')}</text>`;
+    ps+=`<text x="${lx+(right?3:-3)}" y="${ly+11}" text-anchor="${right?'start':'end'}" fill="${col}" font-size="10" font-family="JetBrains Mono" style="paint-order:stroke" stroke="#000" stroke-width="3">${Math.round(s.m.pSun*100)}% lit</text>`});
+  ps+=`<g transform="translate(200,-6)"><text text-anchor="middle" fill="#9fd0ff" font-size="10" font-family="JetBrains Mono">↑ toward Earth (0°)</text></g>`;
+  const sa=68.9;ps+=`<g transform="translate(${200+188*Math.sin(sa*D2R)},${200-188*Math.cos(sa*D2R)})"><circle r="7" fill="#ffb547"/><text x="-10" y="-10" text-anchor="end" fill="#ffd98a" font-size="10" font-family="JetBrains Mono">☀ sun az</text></g>`;
+  ps+=`</g>`;document.getElementById('pov').innerHTML=ps;
+}
+
+// ---------- TIMELINE ----------
+function timeline(){
+  const cur=24*6+14;const s=SEL.m;
+  const rows=SITES.map(x=>`<div style="display:grid;grid-template-columns:200px 1fr 70px;gap:14px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">
+    <div><div style="font-size:13.5px;font-weight:${x===SEL?600:500};color:${x===SEL?'var(--text)':'#c9ced6'}">${x===SEL?'▸ ':''}${x.name}</div><div class="c mono k">${x.lat.toFixed(2)}°, ${x.lon.toFixed(1)}°</div></div>
+    <div>${bandsSVG([{arr:x.m.sun,color:'#ffb547'},{arr:x.m.earth,color:'#4ea8ff'}],880,9,3,{cursor:cur})}</div>
+    <div class="mono" style="text-align:right;color:${scoreCol(x.m.score)};font-weight:600">${x.m.score}</div></div>`).join('');
+  const dt=new Date(START+cur*36e5);
+  return `${header()}<div class="tl">
+   <div class="panel" style="padding:16px 18px;grid-column:1/3;position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+     <div><div class="h">Horizon panorama · ${SEL.name}</div><div class="k" style="margin-top:3px">What a camera 2.5 m above the surface would see, 360° around. Sun path plotted for the next 30 days.</div></div>
+     <div style="display:flex;gap:8px"><span class="pill s">☀ Sun path</span><span class="pill e">⊕ Earth libration loop</span><button class="btn">Open Sky View ↗</button></div></div>
+    <div style="border-radius:10px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(#05070a,#0a0e14)">${horizonSVG(SEL,1538,360,{labels:true,tags:true,big:true,days:true,cursor:cur,e1:9})}</div>
+    <div class="mono k" style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;padding:0 2px"><span>0° (toward Earth's mean direction = 180° here)</span><span>Elevation exaggerated ×12 for readability</span></div>
+   </div>
+   <div class="panel" style="padding:14px 18px;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="h">All sites · 14 Nov – 14 Dec 2026</div>
+     <div style="display:flex;gap:6px"><button class="btn">⏮</button><button class="btn pri">❚❚ Pause</button><button class="btn">⏭</button><button class="btn mono">12 h / s ▾</button></div></div>
+    <div style="display:grid;grid-template-columns:200px 1fr 70px;gap:14px;margin-bottom:4px"><div></div>${dayAxis(880)}<div class="k" style="text-align:right">score</div></div>
+    ${rows}
+    <div class="k" style="display:flex;gap:16px;margin-top:10px"><span><span style="display:inline-block;width:14px;height:6px;background:#ffb547;border-radius:2px"></span> sunlit</span><span><span style="display:inline-block;width:14px;height:6px;background:#4ea8ff;border-radius:2px"></span> Earth in view</span><span>Drag the white cursor or press ▶ to animate the globe, horizon and Sky View together.</span></div>
+   </div>
+   <div class="panel" style="padding:16px">
+    <div class="h">At cursor</div>
+    <div class="mono" style="font-size:22px;margin:6px 0 2px">${dt.getUTCDate()} Nov 2026 · ${String(dt.getUTCHours()).padStart(2,'0')}:00</div><div class="k mono">+6d 14h from now</div>
+    <div class="grid4" style="margin-top:14px">
+     <div><div class="k">☀ Sun elev.</div><div class="v" style="color:var(--sun2)">${s.sunEl[cur].toFixed(2)}°</div></div>
+     <div><div class="k">☀ Sun az.</div><div class="v">${s.sunAz[cur].toFixed(0)}°</div></div>
+     <div><div class="k">⊕ Earth elev.</div><div class="v" style="color:#9fd0ff">${s.eEl[cur].toFixed(2)}°</div></div>
+     <div><div class="k">Power</div><div class="v" style="color:${s.sun[cur]?'var(--good)':'var(--warn)'}">${s.sun[cur]?'ON':'OFF'}</div></div>
+    </div>
+    <div style="margin-top:14px;padding:12px;border-radius:9px;background:#ffb54710;border:1px solid #ffb54740;font-size:12.5px;line-height:1.5"><b style="color:var(--sun2)">Why it changes:</b> at the pole the Sun circles the horizon once every 29.5 days at only ~1.5° up, so a 200 m hill can block it for hours. Earth rocks ±7° up and down every ~27 days, so it sets for about two weeks at a time.</div>
+   </div>
+  </div>`;
+}
+
+// ---------- COMPARE ----------
+function compare(){
+  const byId=i=>SITES.find(x=>x.id===i);const pick=[byId('CR'),byId('SR'),byId('MM')];
+  const custom={name:'Custom pin',lat:-89.2,lon:141,amp:0.75,seed:77,eph:1.1,id:'CU'};custom.m=sim(custom);pick.push(custom);
+  const best=(f,hi=true)=>{const v=pick.map(f);return hi?Math.max(...v):Math.min(...v)};
+  const PROS={CR:['Sunlit 94% of the month on a ridge top','Earth visible more than half the month','Gentle ridge-top slopes'],
+    SR:['High, flat rim next to Shackleton’s cold traps','Good access to permanently shadowed regions'],
+    MM:['Faces Earth — best direct-to-Earth comms','Lots of 3D terrain data (a past Artemis candidate)'],
+    CU:['User-defined spot near Connecting Ridge','Close to science targets'],DG:['Long sunlight on the rim'],NR:['Broad, gentle rim'],HW:['Inside a crater with ice deposits']};
+  const CONS={CR:['Sun only ~1–2° up: panels must be vertical','Narrow ridge leaves little landing margin'],
+    SR:['Steeper slopes on the rim','Earth hidden longer each month'],
+    MM:['Sunlight broken up into shorter windows','Rough terrain, higher slopes'],
+    CU:['Not surveyed at high resolution','Shadowing from the nearby ridge'],DG:['Earth hidden for long stretches'],NR:['Lower sun, more interruptions'],HW:['Crater walls block sun and Earth']};
+  const cols=pick.map(x=>{const m=x.m;const row=(k,v,isBest)=>`<tr class="${isBest?'best':''}"><td class="k" style="font-size:12.5px">${k}</td><td>${v}${isBest?' ★':''}</td></tr>`;
+   return `<div class="panel" style="padding:16px;display:flex;flex-direction:column;gap:12px;${x.id==='CU'?'border-style:dashed;border-color:#a78bfa66':''}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:18px;font-weight:600">${x.name}</div><div class="mono k" style="margin-top:2px">${x.lat.toFixed(2)}°, ${x.lon.toFixed(1)}°</div></div>
+    <svg width="56" height="56"><circle cx="28" cy="28" r="23" fill="none" stroke="#1b232e" stroke-width="5"/><circle cx="28" cy="28" r="23" fill="none" stroke="${scoreCol(m.score).replace('var(--good)','#3ddc97').replace('var(--sun)','#ffb547').replace('var(--warn)','#ff6b5b')}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${m.score/100*144.5} 200" transform="rotate(-90 28 28)"/><text x="28" y="33" text-anchor="middle" fill="#e7eaef" font-family="JetBrains Mono" font-size="15" font-weight="600">${m.score}</text></svg></div>
+    <div style="border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#080b10">${horizonSVG(x,342,150,{})}</div>
+    <table class="m">
+     ${row('Sunlit (30 days)',Math.round(m.pSun*100)+'%',m.pSun===best(y=>y.m.pSun))}
+     ${row('Longest unbroken sun',m.longest+' h',m.longest===best(y=>y.m.longest))}
+     ${row('Earth in view',Math.round(m.pEarth*100)+'%',m.pEarth===best(y=>y.m.pEarth))}
+     ${row('Ops window (sun + Earth)',Math.round(m.pBoth*100)+'%',m.pBoth===best(y=>y.m.pBoth))}
+     ${row('Time to sunset',fmtH(m.toSunset),m.toSunset===best(y=>y.m.toSunset))}
+     ${row('Surface temp. range','−'+(170+((x.seed*7)%40))+' to +'+(20+((x.seed*3)%25))+' °C',false)}
+    </table>
+    <div>${bandsSVG([{arr:m.sun,color:'#ffb547'},{arr:m.earth,color:'#4ea8ff'}],342,7,3)}</div>
+    <div><div class="h" style="font-size:10px;margin-bottom:4px;color:var(--good)">Pros</div><ul class="pc p">${PROS[x.id].map(t=>`<li>${t}</li>`).join('')}</ul></div>
+    <div><div class="h" style="font-size:10px;margin-bottom:4px;color:var(--warn)">Cons</div><ul class="pc c">${CONS[x.id].map(t=>`<li>${t}</li>`).join('')}</ul></div>
+   </div>`}).join('');
+  return `${header()}<div style="padding:12px 12px 0;display:flex;align-items:center;gap:8px"><span class="h" style="margin-right:6px">Comparing 4 sites · landing window 14 Nov – 14 Dec 2026</span>
+   <span class="pill s">sunlight ≥ 96 h</span><span class="pill e">Earth required</span><span class="pill g">slope ≤ 8°</span><span style="margin-left:auto" class="k">★ = best in row</span><button class="btn">Export PDF</button></div>
+   <div class="cmp" style="height:900px">${cols}</div>`;
+}
+
+const app=document.getElementById('app');
+if(VIEW==='timeline'){app.innerHTML=timeline()}
+else if(VIEW==='compare'){app.innerHTML=compare()}
+else{app.innerHTML=explore();afterExplore()}
+document.title='Selene Navigator — '+VIEW;
+window.__done=true;
+</script>
+</body>
+</html>
