@@ -17,7 +17,8 @@ export async function searchLanding(params) {
     throw new Error([body.error ?? `Search failed (HTTP ${response.status})`, body.hint ? `Run: ${body.hint}` : ''].filter(Boolean).join(' '));
   }
   const { header, rasters } = decodeRasters(await response.arrayBuffer());
-  return { ...header, ...rasters };
+  // `kept`: the server had already answered this exact question and sent the same answer again.
+  return { ...header, ...rasters, kept: response.headers.get('x-landing-search') === 'kept' };
 }
 
 /** A time step that keeps a mission to about 340 Sun/Earth checks, and never finer than an hour. */

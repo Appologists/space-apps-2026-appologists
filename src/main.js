@@ -15,6 +15,7 @@ import { wrapLon } from './astro/coords.js';
 import { coverageText, terrainCovers, terrainInfo } from './terrain/client.js';
 import { renderDetail } from './ui/detail.js';
 import { createFinderMode } from './ui/finder-mode.js';
+import { createFlow } from './ui/flow.js';
 import { createSurfaceMode } from './ui/surface-mode.js';
 import { renderTerrainPicker } from './ui/terrain-picker.js';
 import { renderMission, renderRanking, renderWeights } from './ui/panel.js';
@@ -70,6 +71,8 @@ const surface = createSurfaceMode({
   setStatus,
 });
 
+let flow = null; // the mission steps (src/ui/flow.js); created at the end, once everything it drives exists
+
 const finder = createFinderMode({
   app: document.querySelector('.app'),
   getState: () => ({
@@ -81,6 +84,7 @@ const finder = createFinderMode({
   }),
   setStatus,
   onPick: (lat, lon) => setCustomSite(lat, lon),
+  onRoute: (route) => flow?.routeChanged(route),
 });
 
 /** The "Terrain data" picker: which dataset the surface view and the finder use. */
@@ -153,6 +157,9 @@ function rank() {
   drawDetail();
 }
 
+/** The site card shows only on the first step, while "More tools" is open (see styles.css). */
+const cardShown = () => $('moreTools').open && flow?.getStep() === 1;
+
 function drawDetail() {
   renderDetail($('detail'), {
     entry: ranking.find((r) => r.site.id === state.selectedId) ?? null,
@@ -208,12 +215,13 @@ function showViewTime() {
   const day = (state.viewIndex * ctx.stepHours) / 24;
   $('viewTimeText').textContent = `${formatUTC(sample.date)} · day ${day.toFixed(1)} of ${(state.mission.durationHours / 24).toFixed(1)}`;
   surface.timeChanged();
+  flow?.timeChanged();
 }
 
 function setViewIndex(index) {
   state.viewIndex = Math.min(Math.max(index, 0), ctx.series.samples.length - 1);
   showViewTime();
-  drawDetail();
+  if (cardShown()) drawDetail(); // the card is rebuilt on every time step, so not while it is out of sight
 }
 
 // ---- Controls ---------------------------------------------------------------------------------------
@@ -289,5 +297,33 @@ terrainInfo().then((info) => {
   if (top) globe.focus(top.lat, top.lon); // open looking at the best site
 }
 
+// The mission steps take over the left panel and decide which view is on the stage.
+flow = createFlow({
+  app: document.querySelector('.app'),
+  globe,
+  finder,
+  surface,
+  api: {
+    getMission: () => state.mission,
+    setMission: (patch) => {
+      Object.assign(state.mission, patch);
+      if (patch.durationHours) state.mission.stepMinutes = stepMinutesFor(patch.durationHours);
+      state.viewIndex = 0;
+      evaluate();
+      drawMission();
+    },
+    stepHours: () => ctx.stepHours,
+    viewIndex: () => state.viewIndex,
+    setViewIndex,
+    standAt: lookAround,
+    setStatus,
+  },
+});
+// The site card belongs to the ranked list, which now lives under "More tools".
+$('moreTools').addEventListener('toggle', (e) => {
+  document.querySelector('.app').classList.toggle('tools-open', e.target.open);
+  drawDetail();
+});
+
 // Handy in the browser console while developing.
-window.__app = { state, globe, surface, finder, lookAround, get ctx() { return ctx; }, get ranking() { return ranking; } };
+window.__app = { state, globe, surface, finder, lookAround, get flow() { return flow; }, get ctx() { return ctx; }, get ranking() { return ranking; } };

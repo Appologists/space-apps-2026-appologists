@@ -1,0 +1,98 @@
+{
+  "about": "What the mission steps offer: ready-made mission profiles, and the regions each mission is checked against. Every number names a source in `sources`, or says it is our choice.",
+  "sources": {
+    "hls-2024": {
+      "title": "NASA, Artemis Human Landing System Update (Langley Research Center slides, 1 August 2024)",
+      "url": "https://ntrs.nasa.gov/api/citations/20240009596/downloads/ArtemisHLSUpdate_2024.pdf"
+    },
+    "viper-ops": {
+      "title": "NASA, VIPER Lunar Operations",
+      "url": "https://science.nasa.gov/mission/viper/lunar-operations/"
+    },
+    "viper-planning": {
+      "title": "NASA, Overview of Mission Planning for the VIPER Rover (slides, 2022)",
+      "url": "https://www.nasa.gov/wp-content/uploads/2022/05/overview_of_mission_planning_for_the_viper_rover.pdf"
+    },
+    "gracy-lee-2024": {
+      "title": "Gracy and Lee, LPSC 2024, abstract 1695: sites the authors propose inside two of NASA's Artemis III candidate regions",
+      "url": "https://www.hou.usra.edu/meetings/lpsc2024/pdf/1695.pdf"
+    },
+    "artemis-regions-2022": {
+      "title": "NASA, NASA Identifies Candidate Regions for Landing Next Americans on Moon (19 August 2022). Names only: NASA gives no coordinates.",
+      "url": "https://www.nasa.gov/news-release/nasa-identifies-candidate-regions-for-landing-next-americans-on-moon/"
+    },
+    "our-choice": {
+      "title": "Our choice: a starting value for you to change, not a published figure",
+      "url": null
+    }
+  },
+  "profiles": [
+    {
+      "id": "nasa",
+      "name": "Off the shelf: NASA's numbers",
+      "blurb": "A lander held to NASA's Artemis lander limits, carrying a rover with the limits of NASA's VIPER.",
+      "mission": { "start": "2026-11-21T00:00:00Z", "durationHours": 336 },
+      "finder": {
+        "ellipseRadiusM": 100,
+        "maxLandingSlopeDeg": 10,
+        "needSunAtLanding": true,
+        "needEarthAtLanding": true,
+        "maxDarknessHours": 50,
+        "roverMaxSlopeDeg": 15,
+        "roverSpeedMPerHour": 36,
+        "roverRangeKm": 20,
+        "roverNeedsEarthToDrive": true
+      },
+      "facts": [
+        { "text": "Lands within 100 m of its target", "source": "hls-2024" },
+        { "text": "Lands on slopes under 10°", "source": "hls-2024" },
+        { "text": "Rover drives slopes up to 15°", "source": "viper-ops" },
+        { "text": "Rover survives 50 hours of darkness", "source": "viper-ops" },
+        { "text": "Rover averages 36 m an hour, because it waits about nine tenths of the time", "source": "viper-planning" },
+        { "text": "Rover needs Earth in view to drive: it is steered from the ground", "source": "viper-ops" },
+        { "text": "Lands 21 November 2026, 00:00 UTC, for 14 days, in sunlight with Earth in view; rover range 20 km", "source": "our-choice" }
+      ]
+    },
+    {
+      "id": "custom",
+      "name": "Custom mission",
+      "blurb": "Set the lander and the rover yourself.",
+      "mission": { "start": "2026-11-21T00:00:00Z", "durationHours": 336 },
+      "finder": {
+        "ellipseRadiusM": 100,
+        "maxLandingSlopeDeg": 10,
+        "needSunAtLanding": true,
+        "needEarthAtLanding": true,
+        "maxDarknessHours": 50,
+        "roverMaxSlopeDeg": 15,
+        "roverSpeedMPerHour": 200,
+        "roverRangeKm": 20,
+        "roverNeedsEarthToDrive": false
+      },
+      "facts": []
+    }
+  ],
+  "regions": [
+    {
+      "id": "connecting-ridge",
+      "name": "Connecting Ridge",
+      "lat": -89.53432,
+      "lon": -150.05233,
+      "note": "A site proposed inside NASA's candidate region of this name, on the ridge between Shackleton and de Gerlache craters.",
+      "source": "gracy-lee-2024"
+    },
+    {
+      "id": "peak-near-shackleton",
+      "name": "Peak near Shackleton",
+      "lat": -89.01701,
+      "lon": 126.27302,
+      "note": "A site proposed inside NASA's candidate region of this name.",
+      "source": "gracy-lee-2024"
+    },
+    { "id": "shackleton", "site": "shackleton" },
+    { "id": "de-gerlache", "site": "de-gerlache" },
+    { "id": "haworth", "site": "haworth" },
+    { "id": "nobile", "site": "nobile" },
+    { "id": "malapert", "site": "malapert" }
+  ]
+}

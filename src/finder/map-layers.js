@@ -16,6 +16,12 @@ export const MAP_LAYERS = [
   { id: 'reach', label: 'Reach' },
 ];
 
+/**
+ * Not in the list above: the map at one moment of the mission, sunlit ground against ground in shadow.
+ * The drive playback switches to it (see map-view.js setTime). Pass the time step as `extra.step`.
+ */
+export const TIME_LAYER = 'now';
+
 const BACKGROUND = [6, 8, 12];
 const NEVER = [16, 16, 20];
 const NEVER_HEX = '#101014';
@@ -95,6 +101,14 @@ export function layerPixel(layerId, result, index, shade, extra) {
       const v = Math.round(28 + shade * 0.42);
       return [v, v, v];
     }
+    case TIME_LAYER: {
+      // Sunlit ground is a light grey and ground in shadow a dark one, so the pair cannot be mistaken for a
+      // measurement. The relief shading keeps the shape readable in both, as in the surface view (decision H).
+      const step = extra?.step ?? 0;
+      const lit = result.sunMask ? (result.sunMask[step * result.maskStride + (index >> 3)] >> (index & 7)) & 1 : 0;
+      const v = lit ? Math.round(96 + shade * 0.55) : Math.round(12 + shade * 0.1);
+      return lit ? [v, v, Math.round(v * 0.94)] : [v, v, Math.round(v * 1.25)];
+    }
     default:
       return BACKGROUND;
   }
@@ -148,6 +162,16 @@ export function layerLegend(layerId, result, extra) {
         swatches: [{ hex: FAIL_GREY_HEX, label: 'too steep or out of range' }],
       };
     }
+    case TIME_LAYER:
+      return {
+        title: 'Sunlight at the time shown',
+        note: 'Where a solar panel is in sunlight at this moment of the mission, from the terrain and the Sun\'s position. The soft shading only shows the shape of the ground.',
+        stops: [],
+        swatches: [
+          { hex: '#c8c8bd', label: 'in sunlight' },
+          { hex: '#12121a', label: 'in shadow' },
+        ],
+      };
     default:
       return {
         title: 'Landing sites',
