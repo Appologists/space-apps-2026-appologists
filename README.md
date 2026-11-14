@@ -68,7 +68,7 @@ Then choose a south-pole site and press "Look around from here", or double-click
 | `data/catalog.json` | Large datasets: where they come from and how big they are |
 | `tools/` | Command-line helpers: dataset download, Horizons check |
 | `tests/` | Tests, including reference values from JPL Horizons |
-| `docs/` | Plan, decisions, architecture, how-tos |
+| `docs/` | Plan, decisions, architecture, how-tos, UI mockups (`docs/mockups/`) |
 
 ## How to…
 
