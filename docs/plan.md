@@ -18,6 +18,7 @@ The team's working list. Update a row when you start or finish something. "Who" 
 | **Surface view** ("Street View"), 80° S to the pole: stand at a site or any clicked point, look around, real terrain and cast shadows, Sun and Earth with their paths over the mission, eye height | `src/surface/`, `src/ui/surface-mode.js` |
 | Real horizon at the viewed point, and what it does to the mission's sunlight and Earth contact (shown in the surface view only) | `src/terrain/polar-grid.js` |
 | Terrain service: the dev server cuts terrain around any point from the 115 MB LOLA file | `server/` |
+| Surface-view lenses: colour the ground by **elevation** or **slope**, with a legend, height contour lines and distance rings; point at any spot to read its height, slope and distance | `src/surface/lenses.js`, `src/surface/ground-grain.js` |
 
 ## Next: the site-recommendation demo
 
@@ -32,6 +33,8 @@ The team's working list. Update a row when you start or finish something. "Who" 
 | 7 | **Better site list** | CLPS targets, Artemis III candidate regions, other countries' targets, each with a source. Today's south-pole entries are crater centres, not landing sites. | | not started |
 | 8 | **Side-by-side comparison** | Pick two or three sites: numbers and timelines next to each other, pros and cons. | | not started |
 | 9 | **Date comparison** | Same site, different landing dates ("what if we slip two weeks?"). The challenge stresses this. | | not started |
+| 11 | **Lenses over time** | The surface view can already tell, for any moment, which ground is in sunlight (`src/surface/shadows.js`). Run it across a lunar day (about 120 steps, roughly 10 s) and colour the ground by: share of time sunlit (never-lit ground in its own colour), longest unbroken darkness, and share of time with Earth in view. These answer "where can a rover survive and talk?" better than a single moment does. Note the season matters: the Sun's height at the poles swings by about ±1.5° over a year. | | not started |
+| 12 | **Solar panel model** | "Sunlit" is only the first half of power. Add the panel: tracking the Sun, fixed and facing one way, or flat. At the poles a flat panel gets a few percent of what a Sun-facing one does. | | not started |
 | 10 | **Must-haves, not just weights** | "At least 100 h of unbroken sunlight", "Earth in view at landing": sites that fail are filtered out, not just scored lower. | | not started |
 
 ## Later, and stretch

@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { DEG, MOON_RADIUS_KM } from '../astro/coords.js';
 import { createGroundMaterial } from './ground-grain.js';
+import { hexToLinear, lensById, NO_DATA_HEX } from './lenses.js';
 import { buildShadowGrid, litFraction, sampleGrid, sweepShadows } from './shadows.js';
 
 const R = MOON_RADIUS_KM * 1000;
@@ -30,14 +31,14 @@ const COARSE = { halfSizeM: 300_000, cellM: 500 };
 const FINE = { halfSizeM: 12_000, cellM: 30 };
 
 /**
- * Terrain height (scene y) at any horizontal position, read back from the polar mesh's vertices.
- * NaN beyond the last ring.
+ * Makes a function that reads a per-sample quantity at any horizontal position, by interpolating between
+ * the polar grid's samples. `valueAt(ring, spoke)` supplies the samples and `centreValue` the value under
+ * the viewer. The function returns NaN beyond the last ring.
  */
-function makeHeightSampler(patch, positions) {
+function makeFieldSampler(patch, valueAt, centreValue) {
   const { nAz, distances } = patch;
   const nR = distances.length;
   const ringRadius = Float64Array.from(distances, (d) => R * Math.sin(d / R));
-  const yAt = (k, j) => positions[(1 + k * nAz + j) * 3 + 1];
   return (x, z) => {
     const r = Math.hypot(x, z);
     if (r >= ringRadius[nR - 1]) return NaN;
@@ -47,7 +48,10 @@ function makeHeightSampler(patch, positions) {
     const j0 = Math.floor(fj) % nAz;
     const j1 = (j0 + 1) % nAz;
     const tj = fj - Math.floor(fj);
-    if (r <= ringRadius[0]) return (yAt(0, j0) * (1 - tj) + yAt(0, j1) * tj) * (r / ringRadius[0]);
+    if (r <= ringRadius[0]) {
+      const first = valueAt(0, j0) * (1 - tj) + valueAt(0, j1) * tj;
+      return centreValue + (first - centreValue) * (r / ringRadius[0]);
+    }
     let lo = 0;
     let hi = nR - 1;
     while (hi - lo > 1) {
@@ -56,8 +60,8 @@ function makeHeightSampler(patch, positions) {
       else hi = mid;
     }
     const tk = (r - ringRadius[lo]) / (ringRadius[hi] - ringRadius[lo]);
-    const inner = yAt(lo, j0) * (1 - tj) + yAt(lo, j1) * tj;
-    const outer = yAt(hi, j0) * (1 - tj) + yAt(hi, j1) * tj;
+    const inner = valueAt(lo, j0) * (1 - tj) + valueAt(lo, j1) * tj;
+    const outer = valueAt(hi, j0) * (1 - tj) + valueAt(hi, j1) * tj;
     return inner * (1 - tk) + outer * tk;
   };
 }
@@ -79,8 +83,10 @@ const COMPASS = [
  * @param {HTMLElement} options.container  element the canvas fills
  * @param {HTMLElement} options.labelsEl   overlay for compass and Sun/Earth labels
  * @param {(look: {yaw: number, pitch: number, fov: number}) => void} [options.onLook]
+ * @param {(legend: object|null) => void} [options.onLegend]  the active lens's legend changed (null = natural view)
+ * @param {(point: {distanceM: number, bearingDeg: number, elevationM: number, slopeDeg: number}|null, clientX: number, clientY: number) => void} [options.onHover]
  */
-export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
+export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegend, onHover }) {
   // A logarithmic depth buffer keeps both the ground at your feet and mountains 300 km away sharp.
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -154,11 +160,23 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
     geometry.computeVertexNormals();
     const colors = new Float32Array(count * 3);
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // True elevation per vertex, for the lenses' contour lines (the mesh's own y includes curvature, so it won't do).
+    const elevation = new Float32Array(count);
+    elevation[0] = groundHeightM;
+    for (let i = 0; i < heights.length; i++) elevation[i + 1] = Number.isNaN(heights[i]) ? 0 : heights[i];
+    geometry.setAttribute('groundElevation', new THREE.BufferAttribute(elevation, 1));
     const mesh = new THREE.Mesh(geometry, groundMaterial.material);
     mesh.frustumCulled = false;
     scene.add(mesh);
-    const heightAt = makeHeightSampler(patch, positions);
+    const heightAt = makeFieldSampler(patch, (k, j) => positions[(1 + k * nAz + j) * 3 + 1], 0);
     ground = {
+      patch,
+      // Read-outs at any ground position, for the hover tooltip.
+      sample: {
+        height: heightAt, // in the scene's own frame (includes the Moon's curvature)
+        elevation: makeFieldSampler(patch, (k, j) => heights[k * nAz + j], groundHeightM),
+        slope: makeFieldSampler(patch, (k, j) => (patch.slopes ? patch.slopes[k * nAz + j] : NaN), patch.groundSlopeDeg ?? NaN),
+      },
       mesh,
       positions,
       normals: geometry.getAttribute('normal').array,
@@ -168,14 +186,47 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
       coarse: buildShadowGrid(COARSE.halfSizeM, COARSE.cellM, heightAt),
       fine: buildShadowGrid(FINE.halfSizeM, FINE.cellM, heightAt),
     };
-    shadeGround();
+    setLens(lens.id); // repaint for this terrain (also shades the ground)
     placeCamera();
   }
 
-  /** Recolour the ground for the current Sun direction: slope toward the Sun, and cast shadows. */
+  // ---- Lenses: colour the ground by a measured quantity instead of by sunlight ---------------------------
+  let lens = { id: 'natural', colors: null };
+
+  /** @param {string} id one of the ids in src/surface/lenses.js */
+  function setLens(id) {
+    const definition = lensById(id);
+    lens = { id: definition.id, colors: null };
+    let legend = null;
+    if (ground && definition.build) {
+      const built = definition.build(ground.patch);
+      const none = hexToLinear(NO_DATA_HEX);
+      const colors = new Float32Array(ground.positions.length);
+      for (let v = 0, n = colors.length / 3; v < n; v++) {
+        const value = definition.value(ground.patch, v);
+        const c = Number.isNaN(value) ? none : built.color(value);
+        colors[v * 3] = c[0];
+        colors[v * 3 + 1] = c[1];
+        colors[v * 3 + 2] = c[2];
+      }
+      lens.colors = colors;
+      legend = built.legend;
+    }
+    groundMaterial.setLensMode(!!definition.build);
+    shadeGround();
+    onLegend?.(legend);
+    requestRender();
+  }
+
+  /** Recolour the ground: the active lens's colours, or sunlight (slope toward the Sun, and cast shadows). */
   function shadeGround() {
     if (!ground) return;
     const { positions, normals, colors, noData, centreY, coarse, fine } = ground;
+    if (lens.colors) {
+      colors.set(lens.colors); // drawn flat: in a lens, brightness is data, so no light or shadow on top
+      ground.mesh.geometry.getAttribute('color').needsUpdate = true;
+      return;
+    }
     const s = sun.direction;
     sweepShadows(coarse, s);
     sweepShadows(fine, s, (x, z) => sampleGrid(coarse, coarse.M, x, z));
@@ -333,6 +384,58 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
     drag = null;
     canvas.classList.remove('dragging');
   };
+
+  // ---- What is under the pointer? -----------------------------------------------------------------------
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  /** Walk along the line of sight until it goes under the ground, then read the terrain there. */
+  function probe(clientX, clientY) {
+    if (!ground) return null;
+    const rect = canvas.getBoundingClientRect();
+    pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(pointer, camera);
+    const o = raycaster.ray.origin;
+    const d = raycaster.ray.direction;
+    const below = (t) => o.y + d.y * t < ground.sample.height(o.x + d.x * t, o.z + d.z * t);
+    let before = 0;
+    for (let t = 0.5; t < 320_000; t += Math.max(0.5, t * 0.01)) {
+      if (Number.isNaN(ground.sample.height(o.x + d.x * t, o.z + d.z * t))) return null; // ran off the terrain
+      if (below(t)) {
+        let after = t;
+        for (let i = 0; i < 14; i++) {
+          const mid = (before + after) / 2;
+          if (below(mid)) after = mid;
+          else before = mid;
+        }
+        const x = o.x + d.x * after;
+        const z = o.z + d.z * after;
+        return {
+          distanceM: Math.hypot(x, z),
+          bearingDeg: ((Math.atan2(x, -z) / DEG) + 360) % 360,
+          elevationM: ground.sample.elevation(x, z),
+          slopeDeg: ground.sample.slope(x, z),
+        };
+      }
+      before = t;
+    }
+    return null; // looking at the sky
+  }
+  let hoverQueued = null;
+  canvas.addEventListener('pointermove', (e) => {
+    if (!onHover || e.pointerType !== 'mouse') return;
+    if (drag) return onHover(null, 0, 0);
+    const first = !hoverQueued;
+    hoverQueued = { x: e.clientX, y: e.clientY };
+    if (first) {
+      requestAnimationFrame(() => {
+        const { x, y } = hoverQueued;
+        hoverQueued = null;
+        onHover(probe(x, y), x, y);
+      });
+    }
+  });
+  canvas.addEventListener('pointerleave', () => onHover?.(null, 0, 0));
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
   canvas.addEventListener(
@@ -400,5 +503,5 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook }) {
   }
 
   placeCamera();
-  return { setTerrain, setSky, setPaths, setLook, setEyeHeight, getLook: () => ({ ...look }), resize, requestRender };
+  return { setTerrain, setSky, setPaths, setLook, setEyeHeight, setLens, getLens: () => lens.id, probe, getLook: () => ({ ...look }), resize, requestRender };
 }

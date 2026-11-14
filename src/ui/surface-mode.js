@@ -3,6 +3,7 @@
 // mission's sunlight and Earth contact).
 import { altAz, horizonDipDeg, skySeries, visibilityStats } from '../astro/sky.js';
 import { compass, formatHours, formatLatLon } from '../format.js';
+import { LENSES } from '../surface/lenses.js';
 import { createSurfaceView } from '../surface/surface-view.js';
 import { fetchTerrainPatch } from '../terrain/client.js';
 import { clearanceSeries, horizonAt, horizonProfile } from '../terrain/polar-grid.js';
@@ -21,6 +22,52 @@ export function createSurfaceMode({ app, getState, setStatus }) {
   let current = null; // { site, patch, sky, profiles }
   let eyeHeightM = 1.7;
   let request = 0;
+
+  // ---- Lenses: switch, legend and the read-out under the pointer ----------------------------------------
+  let lensId = 'natural';
+  const lensButtons = LENSES.map((lens) =>
+    h('button', { type: 'button', 'aria-pressed': String(lens.id === lensId), onClick: () => chooseLens(lens.id) }, lens.label),
+  );
+  $('lensButtons').append(...lensButtons);
+  function chooseLens(id) {
+    lensId = id;
+    lensButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(LENSES[i].id === id)));
+    view?.setLens(id);
+  }
+  /** Draw the legend the view hands back for the active lens (null for the natural view). */
+  function showLegend(legend) {
+    const el = $('lensLegend');
+    el.hidden = !legend;
+    if (!legend) return;
+    const last = legend.stops.length - 1;
+    const ticks = legend.stops.map((stop, i) => ({ ...stop, at: i / last })).filter((stop) => stop.label);
+    const scale = [
+      h(
+        'div',
+        { class: 'legend-ramp', style: `background: linear-gradient(to right, ${legend.stops.map((s) => s.hex).join(', ')})` },
+        legend.marker ? h('i', { class: 'legend-marker', style: `left: ${(legend.marker.at * 100).toFixed(1)}%` }) : null,
+      ),
+      legend.positioned
+        ? h('div', { class: 'legend-ticks positioned' }, ticks.map((t) => h('span', { style: `left: ${(t.at * 100).toFixed(1)}%` }, t.label)))
+        : h('div', { class: 'legend-ticks' }, ticks.map((t) => h('span', {}, t.label))),
+      legend.marker ? h('div', { class: 'legend-you' }, `White line: ${legend.marker.label.replace('You: ', 'where you stand, ')}`) : null,
+    ];
+    clear(el).append(h('div', { class: 'legend-title' }, legend.title), ...scale.filter(Boolean), h('p', { class: 'legend-note' }, legend.note));
+  }
+  /** Say what the pointer is on: height, slope, and how far away. */
+  function showHover(point, clientX, clientY) {
+    const tip = $('surfaceTip');
+    tip.hidden = !point;
+    if (!point) return;
+    const metres = (m) => `${m < 0 ? '−' : ''}${Math.abs(Math.round(m)).toLocaleString('en-US')} m`;
+    const far = point.distanceM < 1000 ? `${Math.round(point.distanceM)} m` : `${(point.distanceM / 1000).toFixed(point.distanceM < 10_000 ? 1 : 0)} km`;
+    const slope = Number.isNaN(point.slopeDeg) ? '' : ` · slope ${point.slopeDeg.toFixed(0)}°`;
+    const height = Number.isNaN(point.elevationM) ? 'no data' : metres(point.elevationM);
+    tip.textContent = `${height}${slope} · ${far} to the ${compass(point.bearingDeg)}`;
+    const rect = $('surface').getBoundingClientRect();
+    const x = Math.min(clientX - rect.left + 14, rect.width - tip.offsetWidth - 6);
+    tip.style.transform = `translate(${x}px, ${clientY - rect.top + 18}px)`;
+  }
 
   const showHeading = ({ yaw, pitch }) => {
     $('hudHeading').textContent = `Looking ${compass(yaw)} · ${String(Math.round(yaw) % 360).padStart(3, '0')}° · ${pitch >= 0 ? '+' : '−'}${Math.abs(pitch).toFixed(0)}°`;
@@ -41,8 +88,19 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     setStatus(null);
     app.classList.add('surface-open');
     $('surface').hidden = false;
+    $('surfaceTip').hidden = true;
     if (innerWidth <= 900) $('hudDetails').open = false; // on a phone the panel would cover the view
-    view ??= createSurfaceView({ canvas: $('surfaceCanvas'), container: $('surface'), labelsEl: $('surfaceLabels'), onLook: showHeading });
+    if (!view) {
+      view = createSurfaceView({
+        canvas: $('surfaceCanvas'),
+        container: $('surface'),
+        labelsEl: $('surfaceLabels'),
+        onLook: showHeading,
+        onLegend: showLegend,
+        onHover: showHover,
+      });
+      view.setLens(lensId);
+    }
     view.resize();
     view.setEyeHeight(eyeHeightM);
     view.setTerrain(patch);

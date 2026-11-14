@@ -94,6 +94,12 @@ Checks we ran (2026-11-14):
   unbroken stretch 154 days. Same character, not a reproduction: we use 80 m data, the Sun's centre rather
   than any part of its disc, and one year rather than 18.6.
 
+- **Lenses.** Instead of sunlight, the ground can be coloured by elevation or by slope
+  (`src/surface/lenses.js`). Slope is computed by the server from the four terrain pixels around each sample,
+  so it is steepness over 80 m. In a lens the shader also draws height contour lines (every 10 m and 100 m)
+  and rings of equal distance from the viewer. Pointing at the ground walks along the line of sight until it
+  meets the terrain and reads the height, slope and distance there.
+
 The fine grain on the ground is decoration generated in the shader (`src/surface/ground-grain.js`), at scales
 below 80 m only. It is not data.
 

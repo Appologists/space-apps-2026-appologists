@@ -56,6 +56,8 @@ export function localXZ(distanceM, heightM, groundHeightM) {
  * @property {number} nAz             number of spokes; spoke j points to azimuth j * 360 / nAz
  * @property {Float64Array|number[]} distances  ring distances in metres
  * @property {Float32Array} heights   heights in metres, ring by ring: heights[ring * nAz + spoke]; NaN = no data
+ * @property {Float32Array} [slopes]  ground slope in degrees at the same points (measured over one 80 m pixel); NaN = no data
+ * @property {number} [groundSlopeDeg] slope under the viewer
  * @property {number} coverage        share of samples that had data (0–1)
  * @property {string} dataset
  */
@@ -110,25 +112,41 @@ export function terrainVisibility(elevations, azimuths, profile, minClearanceDeg
   return visibilityStats(clearanceSeries(elevations, azimuths, profile), minClearanceDeg, stepHours);
 }
 
-// ---- Wire format: a small JSON header followed by the heights as raw 32-bit floats -----------------
+// ---- Wire format: a small JSON header, the heights as raw 32-bit floats, then slopes as single bytes ----
+
+const SLOPE_STEPS_PER_DEGREE = 3; // slopes travel as one byte each: a third of a degree is plenty
+const NO_SLOPE = 255;
 
 /** @returns {Uint8Array} */
 export function encodePatch(patch) {
-  const { heights, ...header } = patch;
-  const json = new TextEncoder().encode(JSON.stringify({ ...header, distances: Array.from(patch.distances) }));
+  const { heights, slopes, ...header } = patch;
+  const json = new TextEncoder().encode(JSON.stringify({ ...header, distances: Array.from(patch.distances), hasSlopes: !!slopes }));
   const headerBytes = Math.ceil(json.length / 4) * 4; // keep the floats 4-byte aligned
-  const out = new Uint8Array(4 + headerBytes + heights.byteLength);
+  const out = new Uint8Array(4 + headerBytes + heights.byteLength + (slopes ? slopes.length : 0));
   new DataView(out.buffer).setUint32(0, headerBytes, true);
   out.set(json, 4);
   out.fill(0x20, 4 + json.length, 4 + headerBytes); // pad with spaces, which JSON.parse ignores
   out.set(new Uint8Array(heights.buffer, heights.byteOffset, heights.byteLength), 4 + headerBytes);
+  if (slopes) {
+    const start = 4 + headerBytes + heights.byteLength;
+    for (let i = 0; i < slopes.length; i++) {
+      out[start + i] = Number.isNaN(slopes[i]) ? NO_SLOPE : Math.min(Math.round(slopes[i] * SLOPE_STEPS_PER_DEGREE), NO_SLOPE - 1);
+    }
+  }
   return out;
 }
 
 /** @param {ArrayBuffer} buffer  @returns {TerrainPatch} */
 export function decodePatch(buffer) {
   const headerBytes = new DataView(buffer).getUint32(0, true);
-  const header = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 4, headerBytes)));
-  const heights = new Float32Array(buffer.slice(4 + headerBytes));
-  return { ...header, distances: Float64Array.from(header.distances), heights };
+  const { hasSlopes, ...header } = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 4, headerBytes)));
+  const count = header.nAz * header.distances.length;
+  const start = 4 + headerBytes;
+  const heights = new Float32Array(buffer.slice(start, start + count * 4));
+  const patch = { ...header, distances: Float64Array.from(header.distances), heights };
+  if (hasSlopes) {
+    const bytes = new Uint8Array(buffer, start + count * 4, count);
+    patch.slopes = Float32Array.from(bytes, (b) => (b === NO_SLOPE ? NaN : b / SLOPE_STEPS_PER_DEGREE));
+  }
+  return patch;
 }

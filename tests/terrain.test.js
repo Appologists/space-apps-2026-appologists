@@ -13,7 +13,7 @@ import {
   ringDistances,
   terrainVisibility,
 } from '../src/terrain/polar-grid.js';
-import { heightAt, latLonToPixel, openLolaPolar, parseLabel, samplePolarPatch } from '../server/lola-polar.mjs';
+import { heightAt, latLonToPixel, openLolaPolar, parseLabel, samplePolarPatch, slopeAt } from '../server/lola-polar.mjs';
 
 const LABEL = `
     LINES                 = 7600
@@ -60,6 +60,14 @@ describe('LOLA polar grid', () => {
     const dem = { label: small, data };
     expect(heightAt(dem, -90, 0)).toBeCloseTo(150); // between pixel columns 1 and 2
     expect(heightAt(dem, -80, 0)).toBeNaN();
+  });
+  it('measures slope from neighbouring pixels', () => {
+    const small = { ...label, lines: 4, samples: 4, lineOffset: 1.5, sampleOffset: 1.5 };
+    const tilted = { label: small, data: new Int16Array(16).map((_, i) => (i % 4) * 160) }; // 80 m up per 80 m across
+    expect(slopeAt(tilted, -90, 0)).toBeCloseTo(45, 1);
+    const flat = { label: small, data: new Int16Array(16).fill(500) };
+    expect(slopeAt(flat, -90, 0)).toBe(0);
+    expect(slopeAt(flat, -80, 0)).toBeNaN();
   });
 });
 
@@ -109,7 +117,11 @@ describe('polar terrain patch', () => {
   it('survives the trip from server to browser', () => {
     const patch = fakePatch((d, az) => d / 100 + az);
     patch.heights[5] = NaN;
+    patch.slopes = Float32Array.from(patch.heights, (_, i) => (i === 7 ? NaN : (i % 90) / 2)); // 0° to 44.5°
     const back = decodePatch(encodePatch(patch).buffer);
+    expect(back.slopes).toHaveLength(patch.slopes.length);
+    expect(back.slopes[7]).toBeNaN();
+    for (const i of [0, 33, 89, 500]) expect(Math.abs(back.slopes[i] - patch.slopes[i])).toBeLessThan(0.2); // sent as thirds of a degree
     expect(back.nAz).toBe(patch.nAz);
     expect(back.groundHeightM).toBe(0);
     expect(Array.from(back.distances)).toEqual(Array.from(patch.distances));
@@ -185,5 +197,12 @@ describe.skipIf(!haveData)('real LOLA 80 m data', () => {
     expect(patch.coverage).toBeGreaterThan(0.99);
     const profile = horizonProfile(patch, 2);
     expect(Math.min(...profile)).toBeGreaterThan(15); // the Sun never climbs past about 1.6° here
+    // A flat floor and steep walls: the floor under the viewer is gentle, the wall 7 km out is about 30°.
+    expect(patch.groundSlopeDeg).toBeLessThan(5);
+    const wallRing = patch.distances.findIndex((d) => d > 7000);
+    const wall = Array.from(patch.slopes.subarray(wallRing * patch.nAz, (wallRing + 1) * patch.nAz));
+    const mean = wall.reduce((sum, v) => sum + v, 0) / wall.length;
+    expect(mean).toBeGreaterThan(24);
+    expect(mean).toBeLessThan(36);
   });
 });

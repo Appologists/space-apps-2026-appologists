@@ -781,3 +781,94 @@ button.primary:hover {
   font-size: 13px;
   color: var(--dim);
 }
+
+/* Lenses: the switch and the legend sit bottom-left of the surface view, above the time bar. */
+.lenspanel {
+  position: absolute;
+  left: 12px;
+  bottom: 70px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(300px, calc(100% - 24px));
+  pointer-events: none; /* the gaps let drags through to the view; the boxes below take clicks */
+}
+.lensbar,
+.legend {
+  pointer-events: auto;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.lensbuttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.lensbuttons button {
+  padding: 6px 4px;
+  font-size: 13px;
+}
+.legend-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.legend-ramp {
+  position: relative;
+  height: 12px;
+  border-radius: 2px;
+}
+.legend-marker {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  box-shadow: 0 0 0 1px var(--space);
+}
+.legend-ticks {
+  display: flex;
+  justify-content: space-between;
+  font: 12px var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.legend-you {
+  font: 12px var(--font-num);
+  color: var(--ink);
+}
+.legend-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+@media (max-width: 900px) {
+  .lenspanel {
+    bottom: 100px;
+  }
+  .legend-note {
+    display: none;
+  }
+}
+
+.legend-ticks.positioned {
+  position: relative;
+  display: block;
+  height: 15px;
+}
+.legend-ticks.positioned span {
+  position: absolute;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.legend-ticks.positioned span:first-child {
+  transform: none;
+}
+.legend-ticks.positioned span:last-child {
+  transform: translateX(-100%);
+}

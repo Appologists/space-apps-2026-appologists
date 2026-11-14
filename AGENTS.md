@@ -20,6 +20,8 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 - Anything that reads the big files in `data/raw/` while the app runs: `server/` (it runs inside the dev
   server; see `server/terrain-plugin.mjs`). The browser asks it for small pieces.
 - The view from the ground: `src/surface/`. Terrain maths shared by browser and server: `src/terrain/`.
+- A new lens (a way to colour the ground in the surface view): one entry in `src/surface/lenses.js`, which
+  also states the colour rules every lens follows. The switch and legend appear by themselves.
 
 ## Rules
 

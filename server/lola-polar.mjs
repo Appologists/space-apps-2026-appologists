@@ -50,13 +50,9 @@ export function latLonToPixel(label, latDeg, lonDeg) {
   };
 }
 
-/**
- * @param {{label: ReturnType<typeof parseLabel>, data: Int16Array}} dem
- * @returns {number} height in metres relative to the reference sphere, or NaN outside the grid
- */
-export function heightAt(dem, latDeg, lonDeg) {
+/** Height in metres at a fractional pixel position, or NaN outside the grid. */
+function heightAtPixel(dem, x, y) {
   const { label, data } = dem;
-  const { x, y } = latLonToPixel(label, latDeg, lonDeg);
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
   if (x0 < 0 || y0 < 0 || x0 >= label.samples - 1 || y0 >= label.lines - 1) return NaN;
@@ -66,6 +62,53 @@ export function heightAt(dem, latDeg, lonDeg) {
   const top = data[i] * (1 - fx) + data[i + 1] * fx;
   const bottom = data[i + label.samples] * (1 - fx) + data[i + label.samples + 1] * fx;
   return (top * (1 - fy) + bottom * fy) * label.scalingFactor;
+}
+
+/**
+ * @param {{label: ReturnType<typeof parseLabel>, data: Int16Array}} dem
+ * @returns {number} height in metres relative to the reference sphere, or NaN outside the grid
+ */
+export function heightAt(dem, latDeg, lonDeg) {
+  const { x, y } = latLonToPixel(dem.label, latDeg, lonDeg);
+  return heightAtPixel(dem, x, y);
+}
+
+/**
+ * Height and slope from one read of the four pixels around a position.
+ * Writes out[0] = height in metres (NaN outside the grid) and out[1] = slope in degrees.
+ * The slope is that of the surface between those four pixels, so it is measured over one pixel (80 m for
+ * the 80 m data). Rocks, small craters and anything else smaller than that are invisible to it.
+ */
+function sampleCell(dem, x, y, latDeg, out) {
+  const { label, data } = dem;
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  if (x0 < 0 || y0 < 0 || x0 >= label.samples - 1 || y0 >= label.lines - 1) {
+    out[0] = NaN;
+    out[1] = NaN;
+    return out;
+  }
+  const fx = x - x0;
+  const fy = y - y0;
+  const i = y0 * label.samples + x0;
+  const a = data[i];
+  const b = data[i + 1];
+  const c = data[i + label.samples];
+  const d = data[i + label.samples + 1];
+  out[0] = ((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy) * label.scalingFactor;
+  const dx = ((b - a) * (1 - fy) + (d - c) * fy) * label.scalingFactor; // metres of height per pixel, across
+  const dy = ((c - a) * (1 - fx) + (d - b) * fx) * label.scalingFactor; // and down
+  // A pixel is MAP_SCALE metres on the map. On the ground it is slightly less away from the pole,
+  // because a polar stereographic map stretches distances by 2 / (1 + sin|latitude|).
+  const groundPerPixel = (label.scaleM * (1 + Math.sin(Math.abs(latDeg) * DEG))) / 2;
+  out[1] = Math.atan(Math.sqrt(dx * dx + dy * dy) / groundPerPixel) / DEG;
+  return out;
+}
+
+/** Slope of the ground in degrees, measured over one pixel of the grid. NaN outside the grid. */
+export function slopeAt(dem, latDeg, lonDeg) {
+  const { x, y } = latLonToPixel(dem.label, latDeg, lonDeg);
+  return sampleCell(dem, x, y, latDeg, [0, 0])[1];
 }
 
 /** Load a grid into memory (the 80 m file is 115 MB; it loads in a fraction of a second). */
@@ -88,13 +131,18 @@ export function samplePolarPatch(dem, latDeg, lonDeg, { nAz = DEFAULT_AZIMUTHS, 
   const groundHeightM = heightAt(dem, latDeg, lonDeg);
   if (Number.isNaN(groundHeightM)) return null;
   const heights = new Float32Array(distances.length * nAz);
+  const slopes = new Float32Array(distances.length * nAz);
+  const cell = [0, 0]; // reused: [height, slope] of the current sample
   let withData = 0;
   let dataEdgeM = Infinity; // nearest distance at which any spoke runs off the grid
   for (let k = 0; k < distances.length; k++) {
     for (let j = 0; j < nAz; j++) {
       const p = destination(latDeg, lonDeg, (j * 360) / nAz, distances[k]);
-      const h = heightAt(dem, p.lat, p.lon);
+      const pixel = latLonToPixel(dem.label, p.lat, p.lon);
+      sampleCell(dem, pixel.x, pixel.y, p.lat, cell);
+      const h = cell[0];
       heights[k * nAz + j] = h;
+      slopes[k * nAz + j] = cell[1];
       if (Number.isNaN(h)) dataEdgeM = Math.min(dataEdgeM, distances[k]);
       else withData++;
     }
@@ -103,9 +151,11 @@ export function samplePolarPatch(dem, latDeg, lonDeg, { nAz = DEFAULT_AZIMUTHS, 
     lat: latDeg,
     lon: lonDeg,
     groundHeightM,
+    groundSlopeDeg: slopeAt(dem, latDeg, lonDeg),
     nAz,
     distances,
     heights,
+    slopes,
     coverage: withData / heights.length,
     dataEdgeM: Number.isFinite(dataEdgeM) ? dataEdgeM : null,
     dataset: dem.id,

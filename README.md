@@ -10,7 +10,8 @@ matters most; it ranks landing sites and shows where the Sun and Earth are in ea
 time slider, your own points by click or coordinates, and a one-click check against NASA JPL Horizons.
 Within 10° of the south pole you can also **stand on the surface and look around**: real terrain from NASA's
 LOLA instrument, real shadows, the Sun and Earth where they would be, and what the terrain does to the
-mission's sunlight and Earth contact.
+mission's sunlight and Earth contact. Lenses recolour the ground by elevation or by slope, and pointing at
+any spot reads out its height, slope and distance.
 
 **What does not work yet:** the ranking itself still assumes a smooth Moon, so no ridge or crater rim casts
 a shadow in the scores. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
