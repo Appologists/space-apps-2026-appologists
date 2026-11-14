@@ -5,7 +5,7 @@ import { latLonToCell } from '../finder/grid.js';
 import { pathStats, pathTo, reachFrom } from '../finder/route.js';
 import { MAP_LAYERS, createFinderMap } from '../finder/map-view.js';
 import { defaultFinder } from '../finder/score.js';
-import { terrainCovers } from '../terrain/client.js';
+import { coverageText, terrainCovers } from '../terrain/client.js';
 import { formatHours, formatLatLon } from '../format.js';
 import { clear, debounce, h } from './dom.js';
 import { renderFinderForm } from './finder-form.js';
@@ -58,15 +58,15 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
 
   /** Redraw the form. Call when the selected site or the terrain information changes. */
   function drawForm() {
-    const { site, terrain } = getState();
+    const { site, terrain, terrainSource } = getState();
     const hint = !terrain
       ? 'Checking for terrain data…'
       : !terrain.available
         ? `Needs terrain data. Run "${terrain.hint ?? 'npm run data:fetch -- lola-south-80s-80m'}", then reload.`
         : !site
           ? 'The search needs a centre. Select a site near the south pole first.'
-          : !terrainCovers(terrain, site.lat)
-            ? `${site.name} is outside the terrain data, which covers ${Math.abs(terrain.coversSouthOfLat)}° S to the south pole. Select a site near the south pole first.`
+          : !terrainCovers(terrain, site.lat, terrainSource)
+            ? `${site.name} is outside the chosen terrain data, which covers ${coverageText(terrain, terrainSource)}. Select a site inside it, or choose other terrain data.`
             : null;
     renderFinderForm($('finderForm'), { values, centre: site, busy, hint, onChange: (patch) => {
         Object.assign(values, patch);
@@ -74,12 +74,12 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
       },
       onSearch: run,
       // When the only problem is where the search is centred, offer a spot that works.
-      onUseExample: terrain?.available && (!site || !terrainCovers(terrain, site.lat)) ? () => onPick(-89.45, -137.31) : null,
+      onUseExample: terrain?.available && (!site || !terrainCovers(terrain, site.lat, terrainSource)) ? () => onPick(-89.45, -137.31) : null,
     });
   }
 
   async function run() {
-    const { mission, weights, site } = getState();
+    const { mission, weights, site, terrainSource } = getState();
     if (!site || busy) return;
     busy = true;
     drawForm();
@@ -87,6 +87,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     try {
       result = await searchLanding({
         ...values,
+        source: terrainSource,
         center: { lat: site.lat, lon: site.lon },
         start: mission.start.toISOString(),
         durationHours: mission.durationHours,
@@ -207,7 +208,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
       ),
     );
     $('finderNotes').textContent =
-      `Every point within ${params.ellipseRadiusM} m of a site must pass. Checked on ${cellM} m cells of NASA LOLA terrain: hills show, rocks and small craters do not. ` +
+      `Every point within ${params.ellipseRadiusM} m of a site must pass. Checked on ${cellM} m cells; the terrain data is ${result.sourceLabel ?? 'NASA LOLA'} at about ${Math.round(result.terrainPixelM ?? cellM)} m per pixel, so hills show, rocks and small craters do not. ` +
       'The Sun and Earth count as visible when the centre of their disc clears the terrain. Darkness at the very start or end of the mission may be longer than shown. ' +
       'Click the map or a site, then "Look around from here" to stand there.';
   }

@@ -34,7 +34,9 @@ npm run dev
 
 Then open the address it prints (normally http://localhost:5173).
 
-For the surface view, download the south-pole terrain once (115 MB, kept out of git) and reload the page:
+The surface view and the landing-site finder need terrain data, which is kept out of git. The "Terrain data"
+section of the app lists the datasets it can use, which ones you have, and the command to get each. Start
+with the south pole (115 MB), then reload the page:
 
 ```bash
 npm run data:fetch -- lola-south-80s-80m

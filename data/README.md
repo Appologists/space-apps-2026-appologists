@@ -24,6 +24,21 @@ Files land in `data/raw/<id>/`. A download is written to a `.part` file first an
 matches the catalog, so a broken download is never mistaken for a complete one. Anything over 500 MB needs
 `--large`. `npm run data:check` asks the servers whether every file is still there, without downloading.
 
+## Terrain the app can use
+
+`server/terrain-sources.mjs` lists the elevation datasets the app knows how to read. The app's "Terrain data"
+section shows them, marks the ones you have downloaded, and lets you choose one or "Best available".
+
+| Dataset | Covers | Detail | Size |
+| --- | --- | --- | --- |
+| `lola-south-80s-80m` | 80° S to the south pole | 80 m | 115 MB |
+| `ldem-64` | the whole Moon | about 470 m | 1.06 GB (and about 1 GB of memory while the app runs) |
+| `ldem-16` | the whole Moon | about 1.9 km | 66 MB |
+
+"Best available" uses the finest downloaded dataset that covers the spot, and fills in beyond its edges from
+a whole-Moon one, so far horizons are not cut off. `lola-global-512` (whole Moon at about 59 m, 34 GB in 16
+tiles) is in the catalog and can be downloaded, but the app cannot read it yet.
+
 ## Adding a dataset
 
 Add an entry to `data/catalog.json`:

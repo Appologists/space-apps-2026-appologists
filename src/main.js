@@ -12,10 +12,11 @@ import { createGlobe } from './globe/globe.js';
 import { defaultMission, stepMinutesFor } from './mission.js';
 import { createContext, evaluateSites, rankSites } from './scoring/rank.js';
 import { wrapLon } from './astro/coords.js';
-import { terrainCovers, terrainInfo } from './terrain/client.js';
+import { coverageText, terrainCovers, terrainInfo } from './terrain/client.js';
 import { renderDetail } from './ui/detail.js';
 import { createFinderMode } from './ui/finder-mode.js';
 import { createSurfaceMode } from './ui/surface-mode.js';
+import { renderTerrainPicker } from './ui/terrain-picker.js';
 import { renderMission, renderRanking, renderWeights } from './ui/panel.js';
 
 const $ = (id) => document.getElementById(id);
@@ -32,7 +33,8 @@ const state = {
   selectedId: null,
   viewIndex: 0, // which sample of the mission window the globe and the card show
   started: false,
-  terrain: null, // what /api/terrain/info said: is terrain data installed, and what does it cover?
+  terrain: null, // what /api/terrain/info said: which terrain datasets are downloaded, and what they cover
+  terrainSource: 'auto', // the dataset the user chose, or 'auto' for the best available
 };
 let ctx = null;
 let evaluations = [];
@@ -64,7 +66,7 @@ function setStatus(message, hideAfterMs) {
 
 const surface = createSurfaceMode({
   app: document.querySelector('.app'),
-  getState: () => ({ ctx, viewIndex: state.viewIndex }),
+  getState: () => ({ ctx, viewIndex: state.viewIndex, terrainSource: state.terrainSource }),
   setStatus,
 });
 
@@ -74,11 +76,27 @@ const finder = createFinderMode({
     mission: state.mission,
     weights: state.weights,
     terrain: state.terrain,
+    terrainSource: state.terrainSource,
     site: allSites().find((s) => s.id === state.selectedId) ?? null,
   }),
   setStatus,
   onPick: (lat, lon) => setCustomSite(lat, lon),
 });
+
+/** The "Terrain data" picker: which dataset the surface view and the finder use. */
+function drawTerrainPicker() {
+  renderTerrainPicker($('terrainPicker'), {
+    info: state.terrain,
+    selected: state.terrainSource,
+    onSelect: (id) => {
+      state.terrainSource = id;
+      drawTerrainPicker();
+      drawDetail();
+      finder.drawForm();
+      moveSurfaceTo(allSites().find((s) => s.id === state.selectedId)); // if standing on the surface, reload it
+    },
+  });
+}
 
 /** Stand on the surface at a site and look around, if terrain data covers it. */
 async function lookAround(site) {
@@ -87,8 +105,8 @@ async function lookAround(site) {
   if (!info.available) {
     return setStatus(`The surface view needs terrain data. Run "${info.hint ?? 'npm run data:fetch -- lola-south-80s-80m'}", then reload.`, 10_000);
   }
-  if (!terrainCovers(info, site.lat)) {
-    return setStatus(`No terrain data here yet. The surface view covers ${Math.abs(info.coversSouthOfLat)}° S to the south pole.`, 7000);
+  if (!terrainCovers(info, site.lat, state.terrainSource)) {
+    return setStatus(`No terrain data here: the chosen terrain data covers ${coverageText(info, state.terrainSource)}.`, 7000);
   }
   await surface.open(site);
 }
@@ -142,7 +160,12 @@ function drawDetail() {
     viewIndex: state.viewIndex,
     criteria: readyCriteria,
     meta: sitesData,
-    surface: { info: state.terrain, onLookAround: () => lookAround(allSites().find((s) => s.id === state.selectedId)) },
+    surface: {
+      info: state.terrain,
+      covered: terrainCovers(state.terrain, allSites().find((s) => s.id === state.selectedId)?.lat ?? 90, state.terrainSource),
+      coverage: coverageText(state.terrain, state.terrainSource),
+      onLookAround: () => lookAround(allSites().find((s) => s.id === state.selectedId)),
+    },
     onScrub: setViewIndex,
     onClose: () => {
       state.selectedId = null;
@@ -166,7 +189,7 @@ function select(id, { focus = false } = {}) {
 /** Already standing on the surface? Move to the newly chosen site, or go back to the globe if it has no terrain. */
 function moveSurfaceTo(site) {
   if (!surface.isOpen() || !site) return;
-  if (terrainCovers(state.terrain, site.lat)) surface.open(site);
+  if (terrainCovers(state.terrain, site.lat, state.terrainSource)) surface.open(site);
   else surface.close();
 }
 
@@ -254,10 +277,12 @@ $('addPoint').addEventListener('submit', (e) => {
 drawMission();
 evaluate();
 finder.drawForm();
+drawTerrainPicker();
 terrainInfo().then((info) => {
   state.terrain = info;
   drawDetail(); // the site card can now offer "Look around from here"
   finder.drawForm();
+  drawTerrainPicker();
 });
 {
   const top = ranking[0]?.site;

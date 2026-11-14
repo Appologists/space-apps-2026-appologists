@@ -7,6 +7,7 @@
 //   longitude 0° points up the image, 90° E points right (checked against known craters in tests).
 import { readFile } from 'node:fs/promises';
 import { DEFAULT_AZIMUTHS, destination, ringDistances } from '../src/terrain/polar-grid.js';
+import { equirectHeightAt, equirectSample } from './equirect.mjs';
 
 const DEG = Math.PI / 180;
 
@@ -69,8 +70,34 @@ function heightAtPixel(dem, x, y) {
  * @returns {number} height in metres relative to the reference sphere, or NaN outside the grid
  */
 export function heightAt(dem, latDeg, lonDeg) {
+  // Other kinds of terrain (see server/terrain-sources.mjs) share these entry points.
+  if (dem.kind === 'equirect') return equirectHeightAt(dem, latDeg, lonDeg);
+  if (dem.kind === 'composite') {
+    for (const source of dem.sources) {
+      const h = heightAt(source, latDeg, lonDeg);
+      if (!Number.isNaN(h)) return h;
+    }
+    return NaN;
+  }
   const { x, y } = latLonToPixel(dem.label, latDeg, lonDeg);
   return heightAtPixel(dem, x, y);
+}
+
+/**
+ * Height and slope at a point, for any kind of terrain: out[0] = metres (NaN if no data), out[1] = degrees.
+ * A composite takes the first of its sources that has data there (finest first).
+ */
+export function sampleAt(dem, latDeg, lonDeg, out) {
+  if (dem.kind === 'equirect') return equirectSample(dem, latDeg, lonDeg, out);
+  if (dem.kind === 'composite') {
+    for (const source of dem.sources) {
+      sampleAt(source, latDeg, lonDeg, out);
+      if (!Number.isNaN(out[0])) return out;
+    }
+    return out;
+  }
+  const { x, y } = latLonToPixel(dem.label, latDeg, lonDeg);
+  return sampleCell(dem, x, y, latDeg, out);
 }
 
 /**
@@ -107,8 +134,7 @@ function sampleCell(dem, x, y, latDeg, out) {
 
 /** Slope of the ground in degrees, measured over one pixel of the grid. NaN outside the grid. */
 export function slopeAt(dem, latDeg, lonDeg) {
-  const { x, y } = latLonToPixel(dem.label, latDeg, lonDeg);
-  return sampleCell(dem, x, y, latDeg, [0, 0])[1];
+  return sampleAt(dem, latDeg, lonDeg, [0, 0])[1];
 }
 
 /** Load a grid into memory (the 80 m file is 115 MB; it loads in a fraction of a second). */
@@ -117,7 +143,7 @@ export async function openLolaPolar({ imgPath, lblPath, id = 'lola' }) {
   const buffer = await readFile(imgPath);
   if (buffer.length !== label.lines * label.samples * 2) throw new Error(`${imgPath} is ${buffer.length} bytes; the label expects ${label.lines * label.samples * 2}`);
   const aligned = buffer.byteOffset % 2 === 0 ? buffer : Buffer.from(buffer);
-  return { id, label, data: new Int16Array(aligned.buffer, aligned.byteOffset, aligned.length / 2) };
+  return { id, label, pixelM: label.scaleM, data: new Int16Array(aligned.buffer, aligned.byteOffset, aligned.length / 2) };
 }
 
 /** Does the grid cover this point? */
@@ -138,8 +164,7 @@ export function samplePolarPatch(dem, latDeg, lonDeg, { nAz = DEFAULT_AZIMUTHS, 
   for (let k = 0; k < distances.length; k++) {
     for (let j = 0; j < nAz; j++) {
       const p = destination(latDeg, lonDeg, (j * 360) / nAz, distances[k]);
-      const pixel = latLonToPixel(dem.label, p.lat, p.lon);
-      sampleCell(dem, pixel.x, pixel.y, p.lat, cell);
+      sampleAt(dem, p.lat, p.lon, cell);
       const h = cell[0];
       heights[k * nAz + j] = h;
       slopes[k * nAz + j] = cell[1];
@@ -159,6 +184,6 @@ export function samplePolarPatch(dem, latDeg, lonDeg, { nAz = DEFAULT_AZIMUTHS, 
     coverage: withData / heights.length,
     dataEdgeM: Number.isFinite(dataEdgeM) ? dataEdgeM : null,
     dataset: dem.id,
-    pixelM: dem.label.scaleM,
+    pixelM: dem.pixelM ?? dem.label.scaleM,
   };
 }
