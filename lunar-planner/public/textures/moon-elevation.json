@@ -1,0 +1,35 @@
+{
+  "source": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/ldem_4.tif",
+  "reference_radius_km": 1737.4,
+  "pixels_per_degree": 4,
+  "min_km": -8.878499984741211,
+  "max_km": 10.504000663757324,
+  "legend_min_km": -10,
+  "legend_max_km": 11,
+  "sites": {
+    "Apollo 11": {
+      "elevation_km": -1.883000135421753,
+      "method": "Nearest 0.25-degree grid cell; regional context, not precise landing-pad altitude."
+    },
+    "Apollo 12": {
+      "elevation_km": -1.4510000944137573,
+      "method": "Nearest 0.25-degree grid cell; regional context, not precise landing-pad altitude."
+    },
+    "Apollo 14": {
+      "elevation_km": -1.0470000505447388,
+      "method": "Nearest 0.25-degree grid cell; regional context, not precise landing-pad altitude."
+    },
+    "Apollo 15": {
+      "elevation_km": -1.9245001077651978,
+      "method": "Nearest 0.25-degree grid cell; regional context, not precise landing-pad altitude."
+    },
+    "Apollo 16": {
+      "elevation_km": 0.02500000037252903,
+      "method": "Nearest 0.25-degree grid cell; regional context, not precise landing-pad altitude."
+    },
+    "Apollo 17": {
+      "elevation_km": -2.6620001792907715,
+      "method": "Nearest 0.25-degree grid cell; regional context, not precise landing-pad altitude."
+    }
+  }
+}

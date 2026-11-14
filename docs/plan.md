@@ -21,6 +21,7 @@ The team's working list. Update a row when you start or finish something. "Who" 
 | **Reach and route** (stage 2 of the mission wizard): on the finder's map, the ground a rover can reach from a start within its slope limit and range, and the shortest drivable path to a destination with distance, driving time, steepest slope, climb, and the worst darkness and Earth link along the way. Computed in the browser, so changing the rover updates it at once | `src/finder/route.js`, `src/ui/finder-mode.js` |
 | **Landing-site finder** (stage 1 of the mission wizard): give the landing accuracy, slope limit, longest darkness survived and whether Earth and Sun are needed at touchdown; it searches 10–40 km round the selected point (about 10 s) and maps where every point of the landing ellipse passes, lists the best sites, and has layers for sunlight share, longest darkness, Earth link and slope | `server/landing-search.mjs`, `src/finder/`, `src/ui/finder-mode.js` |
 | Surface-view lenses: colour the ground by **elevation** or **slope**, with a legend, height contour lines and distance rings; point at any spot to read its height, slope and distance | `src/surface/lenses.js`, `src/surface/ground-grain.js` |
+| **Flask version, no npm** (`lunar-planner/`): live Horizons ranking with must-have and weights, CesiumJS surface on LOLA terrain with the Moon Trek photo, heatmaps (elevation, slope, temperature estimate), Earth and Sun views, missions and quiz | `lunar-planner/` |
 
 ## Next: the site-recommendation demo
 

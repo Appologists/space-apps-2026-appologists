@@ -69,6 +69,7 @@ Then choose a south-pole site and press "Look around from here", or double-click
 | `data/sites.json` | The curated sites, each with its source |
 | `data/catalog.json` | Large datasets: where they come from and how big they are |
 | `tools/` | Command-line helpers: dataset download, Horizons check |
+| `lunar-planner/` | A second front end that runs with Python only (Flask): see its README |
 | `tests/` | Tests, including reference values from JPL Horizons |
 | `docs/` | Plan, decisions, architecture, how-tos, UI mockups (`docs/mockups/`) |
 
