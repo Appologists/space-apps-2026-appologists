@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Lunar Site Planner: set up (first time) and start. Run from this folder: ./start.sh
+set -e
+cd "$(dirname "$0")"
+if [ ! -d .venv ]; then
+    echo "Creating Python environment (.venv)..."
+    python3 -m venv .venv
+fi
+PY=.venv/bin/python
+echo "Installing packages..."
+"$PY" -m pip install --quiet --disable-pip-version-check -r requirements.txt
+if [ ! -f lunar_keys.json ]; then
+    cp lunar_keys.example.json lunar_keys.json
+    echo "Made lunar_keys.json. Add your Cesium ion token and Google Maps key there (optional)."
+fi
+if [ ! -f data/ldem_16.npy ]; then
+    echo "Downloading NASA LOLA terrain once (66 MB)..."
+    "$PY" build_terrain.py
+fi
+( sleep 2; (command -v xdg-open >/dev/null && xdg-open http://127.0.0.1:8002) || (command -v open >/dev/null && open http://127.0.0.1:8002) || true ) &
+"$PY" lunar_server.py

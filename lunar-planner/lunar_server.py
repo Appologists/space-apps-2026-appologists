@@ -156,7 +156,7 @@ def run_summary(flags, times, step_h):
     )
 
 
-def analyze(sun, earth, step_minutes, sun_min_el, earth_min_el, panel_m, antenna_m, required_h):
+def analyze(sun, earth, step_minutes, sun_min_el, earth_min_el, panel_m, antenna_m, required_h, lat=None, lon=None):
     step_h = step_minutes / 60.0
     sun_dip = horizon_dip_deg(panel_m)
     earth_dip = horizon_dip_deg(antenna_m)
@@ -165,6 +165,11 @@ def analyze(sun, earth, step_minutes, sun_min_el, earth_min_el, panel_m, antenna
         sun_ok = s['elevation_deg'] > sun_min_el - sun_dip
         earth_ok = e['elevation_deg'] > earth_min_el - earth_dip
         flux = SOLAR_CONSTANT_W_M2 / (s['range_au'] ** 2) if sun_ok else 0.0
+        model_k = surface_temp_k(s['elevation_deg'], s['range_au'])
+        measured = None
+        if lat is not None and diviner() is not None:
+            ss = subsolar_lon(lat, lon, s['azimuth_deg'], s['elevation_deg'])
+            measured = float(diviner_temp(lat, lon, ss))
         samples.append(dict(
             t=s['time_utc'],
             sun_az=round(s['azimuth_deg'], 4), sun_el=round(s['elevation_deg'], 4),
@@ -172,7 +177,8 @@ def analyze(sun, earth, step_minutes, sun_min_el, earth_min_el, panel_m, antenna
             earth_az=round(e['azimuth_deg'], 4), earth_el=round(e['elevation_deg'], 4),
             earth_km=round(e['range_au'] * AU_KM, 1),
             sun_ok=sun_ok, earth_ok=earth_ok, both_ok=sun_ok and earth_ok,
-            temp_k=round(surface_temp_k(s['elevation_deg'], s['range_au']), 1),
+            temp_k=round(measured if measured is not None else model_k, 1),
+            temp_model_k=round(model_k, 1),
             flux_w_m2=round(flux, 1),
         ))
     times = [x['t'] for x in samples]
@@ -191,6 +197,8 @@ def analyze(sun, earth, step_minutes, sun_min_el, earth_min_el, panel_m, antenna
         mean_sun_au=round(sum(x['sun_au'] for x in samples) / len(samples), 6),
         mean_earth_km=round(sum(x['earth_km'] for x in samples) / len(samples), 0),
         meets_requirement=both['longest_h'] >= required_h,
+        temp_source=('NASA LRO Diviner measured (0.5 deg map, by Sun position)' if diviner() is not None
+                     else 'our estimate (radiative equilibrium)'),
     )
     constraints = dict(
         sun_min_elevation_deg=sun_min_el, earth_min_elevation_deg=earth_min_el,
@@ -295,6 +303,32 @@ def heightmap():
                     headers={'Cache-Control': 'public, max-age=86400'})
 
 
+@app.get('/api/point')
+def point():
+    """Elevation and slope at one spot from LOLA ldem_16 (slope over about 2 km, from neighbouring pixels)."""
+    try:
+        lat = number('lat', None, -90, 90)
+        lon = number('lon', None, -180, 360)
+    except (TypeError, ValueError):
+        return jsonify(error='Check lat and lon.'), 400
+    try:
+        grid = dem()
+    except FileNotFoundError as exc:
+        return jsonify(error=str(exc)), 404
+    rows, cols = grid.shape
+    ppd = cols / 360.0
+    x = int(((lon + 180.0) % 360.0) * ppd) % cols
+    y = min(rows - 2, max(1, int((90.0 - lat) * ppd)))
+    h = float(grid[y, x])
+    east_km = 2 * MOON_RADIUS_KM * math.cos(math.radians(lat)) * math.radians(1 / ppd)
+    north_km = 2 * MOON_RADIUS_KM * math.radians(1 / ppd)
+    dzdx = (float(grid[y, (x + 1) % cols]) - float(grid[y, (x - 1) % cols])) / max(east_km, 1e-3)
+    dzdy = (float(grid[y - 1, x]) - float(grid[y + 1, x])) / north_km
+    slope = math.degrees(math.atan(math.hypot(dzdx, dzdy)))
+    return jsonify(elevation_km=round(h, 3), slope_deg=round(slope, 2), baseline_km=round(north_km, 2),
+                   source='NASA LRO LOLA ldem_16')
+
+
 @app.get('/api/terrain')
 def terrain():
     try:
@@ -356,6 +390,291 @@ def epic():
     return jsonify(data)
 
 
+# ---------------- NASA LRO Diviner measured temperatures ----------------
+DIV_PATH = ROOT / 'derived' / 'diviner_tbol.npz'
+_div = {}
+
+
+def diviner():
+    """24 global maps (subsolar longitude 0, 15, ... 345 E) of bolometric temperature, kelvin, 0.5 deg."""
+    import numpy as np
+    if 'maps' not in _div:
+        if not DIV_PATH.exists():
+            _div['maps'] = None
+        else:
+            d = np.load(DIV_PATH)
+            _div['maps'] = d['maps'].astype(np.float32) * float(d['step']) + float(d['offset'])
+    return _div['maps']
+
+
+def diviner_temp(lat, lon, sslon):
+    """Measured temperature at a place for a given subsolar longitude (bilinear in space, linear in sun position)."""
+    import numpy as np
+    maps = diviner()
+    if maps is None:
+        return None
+    lat = np.asarray(lat, float)
+    lon = np.asarray(lon, float)
+    fy = np.clip((89.75 - lat) / 0.5, 0, 359.0)
+    fx = ((lon + 179.75) / 0.5) % 720
+    y0 = np.floor(np.minimum(fy, 358.999)).astype(int)
+    x0 = np.floor(fx).astype(int) % 720
+    x1 = (x0 + 1) % 720
+    ay = fy - y0
+    ax = fx - np.floor(fx)
+    s = (np.asarray(sslon, float) % 360) / 15.0
+    i0 = np.floor(s).astype(int) % 24
+    i1 = (i0 + 1) % 24
+    w = s - np.floor(s)
+
+    def at(i):
+        m = maps[i, y0, x0] * (1 - ax) * (1 - ay) + maps[i, y0, x1] * ax * (1 - ay)
+        return m + maps[i, y0 + 1, x0] * (1 - ax) * ay + maps[i, y0 + 1, x1] * ax * ay
+
+    return at(i0) * (1 - w) + at(i1) * w
+
+
+def subsolar_lon(lat, lon, az_deg, el_deg):
+    """Subsolar longitude (deg E) from the Sun's direction at a site."""
+    e, n, u = enu(lat, lon)
+    a, l = math.radians(az_deg), math.radians(el_deg)
+    v = [e[k] * math.sin(a) * math.cos(l) + n[k] * math.cos(a) * math.cos(l) + u[k] * math.sin(l) for k in range(3)]
+    return math.degrees(math.atan2(v[1], v[0])) % 360
+
+
+TEMP_STOPS = [(40, (25, 35, 90)), (130, (50, 120, 190)), (220, (230, 220, 190)), (310, (235, 150, 80)), (400, (200, 60, 50))]
+
+
+def temp_rgb(k):
+    import numpy as np
+    k = np.clip(k, TEMP_STOPS[0][0], TEMP_STOPS[-1][0])
+    out = np.zeros(k.shape + (3,), np.float32)
+    for (t0, c0), (t1, c1) in zip(TEMP_STOPS[:-1], TEMP_STOPS[1:]):
+        m = (k >= t0) & (k <= t1)
+        f = ((k - t0) / (t1 - t0))[..., None]
+        out[m] = (np.array(c0) * (1 - f) + np.array(c1) * f)[m]
+    return out.astype(np.uint8)
+
+
+_div_png = {}
+
+
+@app.get('/api/diviner/map')
+def diviner_map():
+    """Temperature map as a PNG: kind=now (needs sslon), max, min (of the 24 snapshots)."""
+    import io
+    import numpy as np
+    from flask import Response
+    from PIL import Image
+    maps = diviner()
+    if maps is None:
+        return jsonify(error='Diviner data missing. Run build_diviner.py.'), 404
+    kind = request.args.get('kind', 'now')
+    if kind == 'now':
+        sslon = round(float(request.args.get('sslon', 0))) % 360
+        key = ('now', sslon)
+        if key not in _div_png:
+            s = sslon / 15.0
+            i0 = int(math.floor(s)) % 24
+            w = s - math.floor(s)
+            grid = maps[i0] * (1 - w) + maps[(i0 + 1) % 24] * w
+            _div_png[key] = grid
+        grid = _div_png[key]
+    elif kind in ('max', 'min'):
+        grid = maps.max(axis=0) if kind == 'max' else maps.min(axis=0)
+    else:
+        return jsonify(error='kind must be now, max or min'), 400
+    buf = io.BytesIO()
+    Image.fromarray(temp_rgb(grid)).save(buf, 'PNG')
+    if len(_div_png) > 400:
+        _div_png.clear()
+    return Response(buf.getvalue(), mimetype='image/png', headers={'Cache-Control': 'public, max-age=86400'})
+
+
+@app.get('/api/diviner/point')
+def diviner_point():
+    """Measured temperature through a lunar day at one place: 24 values, one per 15 deg of Sun position."""
+    try:
+        lat = number('lat', None, -90, 90)
+        lon = number('lon', None, -180, 360)
+    except (TypeError, ValueError):
+        return jsonify(error='Check lat and lon.'), 400
+    if diviner() is None:
+        return jsonify(error='Diviner data missing.'), 404
+    lon = ((lon + 180) % 360) - 180
+    curve = [round(float(diviner_temp(lat, lon, s)), 1) for s in range(0, 360, 15)]
+    # Local solar time for each snapshot: noon when the Sun is over this longitude.
+    local = [round(((12 + (lon - s) / 15.0) % 24), 2) for s in range(0, 360, 15)]
+    return jsonify(subsolar_lon=list(range(0, 360, 15)), local_time_h=local, temp_k=curve,
+                   min_k=min(curve), max_k=max(curve),
+                   source='NASA LRO Diviner bolometric temperature snapshots, 0.5 deg grid (Williams et al. 2017)')
+
+
+SP_PATH = ROOT / 'public' / 'south-pole' / 'sites.json'
+_sp = {}
+
+
+def sp_data():
+    """South-pole sites made by build_south_pole.py (cached until the file changes)."""
+    import json
+    if not SP_PATH.exists():
+        return None
+    mtime = SP_PATH.stat().st_mtime
+    if _sp.get('mtime') != mtime:
+        _sp.update(mtime=mtime, data=json.loads(SP_PATH.read_text()))
+    return _sp['data']
+
+
+def enu(lat, lon):
+    """East, north, up unit vectors (Moon-fixed, x to 0N 0E, z north)."""
+    p, l = math.radians(lat), math.radians(lon)
+    east = (-math.sin(l), math.cos(l), 0.0)
+    north = (-math.sin(p) * math.cos(l), -math.sin(p) * math.sin(l), math.cos(p))
+    up = (math.cos(p) * math.cos(l), math.cos(p) * math.sin(l), math.sin(p))
+    return east, north, up
+
+
+@app.get('/api/southpole')
+def southpole():
+    """Score every south-pole site with its real terrain horizon.
+
+    One Horizons query near the pole gives the Sun and Earth directions; they are rotated to each site
+    (sites are within about 200 km, so the error is under 0.03 degrees). A body counts as visible when
+    its centre is above the terrain horizon at its azimuth.
+    """
+    import numpy as np
+    data = sp_data()
+    if data is None:
+        return jsonify(error='South-pole data missing. Run build_south_pole.py.'), 404
+    try:
+        start_day = request.args.get('start', datetime.now(timezone.utc).strftime('%Y-%m-%d'))
+        start = datetime.strptime(start_day, '%Y-%m-%d')
+        days = int(number('days', 7, 1, 15))
+        need_h = number('need_h', 24, 0, 400)
+    except (TypeError, ValueError):
+        return jsonify(error='Check start (YYYY-MM-DD) and days.'), 400
+    ref_lat, ref_lon = -89.9, 0.0
+    try:
+        sun, earth, step = ephemeris(ref_lat, ref_lon, start.strftime('%Y-%m-%d'), days)
+    except (requests.RequestException, ValueError, HorizonsError) as exc:
+        return jsonify(error='NASA Horizons request failed: ' + str(exc)), 502
+    e0, n0, u0 = (np.array(v) for v in enu(ref_lat, ref_lon))
+
+    def vectors(rows):
+        az = np.radians([r['azimuth_deg'] for r in rows])
+        el = np.radians([r['elevation_deg'] for r in rows])
+        loc = np.stack([np.sin(az) * np.cos(el), np.cos(az) * np.cos(el), np.sin(el)], axis=1)
+        return loc[:, :1] * e0 + loc[:, 1:2] * n0 + loc[:, 2:] * u0
+
+    sun_v = vectors(sun)
+    earth_v = vectors(earth)
+    sun_au = np.array([r['range_au'] for r in sun])
+    times = [r['time_utc'] for r in sun]
+    step_h = step / 60.0
+    hours = len(times) * step_h
+    results = []
+    for s in data['sites']:
+        e, n, u = (np.array(v) for v in enu(s['lat'], s['lon']))
+        hz = np.array(s['horizon'])
+
+        def local(v):
+            az = (np.degrees(np.arctan2(v @ e, v @ n)) + 360) % 360
+            el = np.degrees(np.arcsin(np.clip(v @ u, -1, 1)))
+            return az, el
+
+        def horizon_at(az):
+            f = az / (360.0 / len(hz))
+            i0 = np.floor(f).astype(int) % len(hz)
+            i1 = (i0 + 1) % len(hz)
+            w = f - np.floor(f)
+            return hz[i0] * (1 - w) + hz[i1] * w
+
+        saz, sel = local(sun_v)
+        eaz, eel = local(earth_v)
+        sun_ok = sel > horizon_at(saz)
+        earth_ok = eel > horizon_at(eaz)
+        both = sun_ok & earth_ok
+        # Ground normal from the 5 m heights: tilt toward the downhill direction.
+        t, d = math.radians(s.get('tilt_deg', 0.0)), math.radians(s.get('downhill_deg', 0.0))
+        normal = math.sin(t) * math.sin(d) * e + math.sin(t) * math.cos(d) * n + math.cos(t) * u
+        cos_i = np.clip(sun_v @ normal, 0, 1)
+        temps = np.array([surface_temp_k(90 - math.degrees(math.acos(ci)) if ok and ci > 0 else -1, au)
+                          for ci, ok, au in zip(cos_i, sun_ok, sun_au)])
+        tl = times
+        sslon = (np.degrees(np.arctan2(sun_v[:, 1], sun_v[:, 0])) + 360) % 360
+        meas = diviner_temp(np.full(len(sslon), s['lat']), np.full(len(sslon), s['lon']), sslon)
+        summ = dict(
+            sun=run_summary(list(sun_ok), tl, step_h),
+            earth=run_summary(list(earth_ok), tl, step_h),
+            both=run_summary(list(both), tl, step_h),
+            temp_min_k=round(float(temps.min()), 1),
+            temp_max_k=round(float(temps.max()), 1),
+            temp_mean_k=round(float(temps.mean()), 1),
+            temp_landing_k=round(float(temps[0]), 1),
+            sun_el_max=round(float(sel.max()), 2),
+        )
+        if meas is not None:
+            summ.update(div_min_k=round(float(meas.min()), 1), div_max_k=round(float(meas.max()), 1),
+                        div_mean_k=round(float(meas.mean()), 1), div_landing_k=round(float(meas[0]), 1))
+        summ['meets_requirement'] = summ['both']['longest_h'] >= need_h
+        parts = {
+            'sunlight': 0.7 * summ['sun']['longest_h'] / hours + 0.3 * summ['sun']['total_h'] / hours,
+            'earth': 0.5 * summ['earth']['longest_h'] / hours + 0.5 * summ['earth']['total_h'] / hours,
+            'both': summ['both']['longest_h'] / hours,
+            'safety': s.get('frac_safe'),
+        }
+        weights = {'sunlight': 0.3, 'earth': 0.2, 'both': 0.3, 'safety': 0.2}
+        used = {k: w for k, w in weights.items() if parts[k] is not None}
+        score = round(100 * sum(parts[k] * w for k, w in used.items()) / sum(used.values()))
+        results.append(dict(
+            id=s['id'], score=score, safety_known=parts['safety'] is not None, summary=summ,
+            sun_bits=''.join('1' if v else '0' for v in sun_ok),
+            earth_bits=''.join('1' if v else '0' for v in earth_ok),
+            temps=[int(round(v)) for v in temps],
+            temps_diviner=[int(round(v)) for v in meas] if meas is not None else None,
+            sun_az=[round(float(v), 2) for v in saz], sun_el=[round(float(v), 2) for v in sel],
+            earth_az=[round(float(v), 2) for v in eaz], earth_el=[round(float(v), 2) for v in eel],
+        ))
+    results.sort(key=lambda r: (r['summary']['meets_requirement'], r['score']), reverse=True)
+    return jsonify(
+        window=dict(start=start.strftime('%Y-%m-%d'), days=days, step_minutes=step, times=times),
+        reference='NASA/JPL Horizons at 89.9 S 0 E, rotated to each site',
+        model=('Sun and Earth centres against each site\'s terrain horizon (5 m LOLA tiles plus regional LOLA). '
+               'Measured temperature: NASA LRO Diviner, 0.5 deg (about 15 km) cells. '
+               'Ground estimate: radiative equilibrium on the tilted 5 m ground, 100 K floor in shadow.'),
+        results=results,
+    )
+
+
+@app.get('/api/status')
+def status():
+    """What is installed, so the page only asks for things that exist (no 404s)."""
+    import json
+    keys = {}
+    if KEYS_PATH.exists():
+        try:
+            keys = json.loads(KEYS_PATH.read_text(encoding='utf-8-sig'))
+        except ValueError:
+            keys = {}
+    usable = lambda v: bool(v) and not str(v).startswith('paste ')
+    return jsonify(
+        terrain=DEM_PATH.exists(),
+        elevation_grid=(ROOT / 'public' / 'textures' / 'moon-elevation-grid.bin').exists(),
+        cesium=usable(keys.get('cesium_ion_token')),
+        google=usable(keys.get('google_maps_key')),
+        diviner=DIV_PATH.exists(),
+        composite=(ROOT / 'public' / 'diviner' / 'composite.webp').exists(),
+    )
+
+
+@app.get('/textures/moon-hd.jpg')
+def moon_hd():
+    """The team repo's 4k LROC colour map when this folder sits in the repo; otherwise the 2k one."""
+    from flask import send_file
+    hd = ROOT.parent / 'public' / 'textures' / 'moon_lroc_color_4k.jpg'
+    return send_file(hd if hd.exists() else ROOT / 'public' / 'textures' / 'moon.jpg', mimetype='image/jpeg')
+
+
 @app.get('/data/sites.json')
 def sites():
     """Use the team repo's curated site list when this folder sits inside the repo."""
@@ -401,7 +720,7 @@ def site():
     except (requests.RequestException, ValueError, HorizonsError) as exc:
         return jsonify(error='NASA Horizons request failed: ' + str(exc)), 502
     samples, summary, constraints = analyze(
-        sun, earth, step, sun_min_el, earth_min_el, panel_m, antenna_m, required_h)
+        sun, earth, step, sun_min_el, earth_min_el, panel_m, antenna_m, required_h, lat, lon)
     return jsonify(
         source='NASA/JPL Horizons (observer on the Moon, CENTER coord@301)',
         site=dict(lat=lat, lon=lon),
