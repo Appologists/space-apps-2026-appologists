@@ -39,8 +39,8 @@ export function terrainApi({ root = process.cwd() } = {}) {
     });
 
   /** The terrain for a request, or null after answering with the reason it cannot be served. */
-  async function terrainFor(res, lat, sourceId) {
-    const found = await store.demFor(lat, sourceId || 'auto');
+  async function terrainFor(res, lat, lon, sourceId) {
+    const found = await store.demFor(lat, sourceId || 'auto', lon);
     if (found.dem) return found;
     if (found.missing) json(res, 404, { error: `Terrain data "${found.missing.label}" is not downloaded yet.`, hint: found.missing.fetch });
     else json(res, 404, { error: `No terrain data at this point: "${found.outside.label}" covers ${found.outside.coverage}.` });
@@ -58,22 +58,25 @@ export function terrainApi({ root = process.cwd() } = {}) {
         const lat = parseFloat(url.searchParams.get('lat'));
         const lon = parseFloat(url.searchParams.get('lon'));
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return json(res, 400, { error: 'lat and lon are required' });
-        const found = await terrainFor(res, lat, url.searchParams.get('source'));
+        const found = await terrainFor(res, lat, lon, url.searchParams.get('source'));
         if (!found) return undefined;
         const patch = samplePolarPatch(found.dem, lat, lon);
         if (!patch) return json(res, 404, { error: `No terrain data at this point: "${found.source.label}" covers ${found.source.coverage}.` });
-        return binary(res, encodePatch({ ...patch, sourceLabel: found.source.label }));
+        // With "best available", far rings are read from coarser data; the app's notes say so.
+        const sourceNote = found.dem.detailVaries ? 'Ground far from you is read from coarser data, in step with how sparsely it is sampled.' : undefined;
+        return binary(res, encodePatch({ ...patch, sourceLabel: found.source.label, sourceNote }));
       }
       if (url.pathname === '/landing-search' && req.method === 'POST') {
         const params = JSON.parse(await readBody(req));
         if (!Number.isFinite(params?.center?.lat) || !Number.isFinite(params?.center?.lon) || !params.start || !(params.durationHours > 0)) {
           return json(res, 400, { error: 'center, start and durationHours are required' });
         }
-        const found = await terrainFor(res, params.center.lat, params.source);
+        const found = await terrainFor(res, params.center.lat, params.center.lon, params.source);
         if (!found) return undefined;
         const result = searchLanding(found.dem, params);
         if (!result) return json(res, 404, { error: `No terrain data at the centre of the search: "${found.source.label}" covers ${found.source.coverage}.` });
         result.header.sourceLabel = found.source.label;
+        if (found.dem.detailVaries) result.header.sourceNote = 'Mountains beyond the search area, which can block a low Sun, are read from coarser data (500 m cells).';
         return binary(res, encodeRasters(result.header, result.rasters));
       }
       return next();

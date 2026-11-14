@@ -32,12 +32,20 @@ section shows them, marks the ones you have downloaded, and lets you choose one 
 | Dataset | Covers | Detail | Size |
 | --- | --- | --- | --- |
 | `lola-south-80s-80m` | 80° S to the south pole | 80 m | 115 MB |
+| `lola-global-512` | the whole Moon, in 16 tiles | about 59 m | 34 GB on disk; under 300 MB of memory, because it is read a piece at a time |
 | `ldem-64` | the whole Moon | about 470 m | 1.06 GB (and about 1 GB of memory while the app runs) |
 | `ldem-16` | the whole Moon | about 1.9 km | 66 MB |
 
-"Best available" uses the finest downloaded dataset that covers the spot, and fills in beyond its edges from
-a whole-Moon one, so far horizons are not cut off. `lola-global-512` (whole Moon at about 59 m, 34 GB in 16
-tiles) is in the catalog and can be downloaded, but the app cannot read it yet.
+"Best available" uses the finest downloaded data near the spot and coarser data for ground far away, where
+the view or the search samples it sparsely anyway (the rule is in `server/composite.mjs`). The south-pole grid
+stays first wherever it covers. Far horizons are never cut off while a whole-Moon dataset is downloaded.
+
+`lola-global-512` is sixteen tiles of 2.1 GB (90° of longitude by 45° of latitude each). It works with
+whatever tiles are complete: the app says how many are here, places in the missing tiles simply have no 59 m
+data, and tiles that finish downloading are picked up without a restart. Get it with
+`npm run data:fetch -- lola-global-512 --large` (finished tiles are skipped if you run it again), and check
+what you have against the other datasets with `npm run check:tiles`. Chosen by itself instead of "Best
+available" it also reads 59 m data for far horizons, which takes seconds and about 100 MB of reading per view.
 
 ## Adding a dataset
 

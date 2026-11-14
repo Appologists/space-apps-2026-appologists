@@ -7,6 +7,8 @@
 //   longitude 0° points up the image, 90° E points right (checked against known craters in tests).
 import { readFile } from 'node:fs/promises';
 import { DEFAULT_AZIMUTHS, destination, ringDistances } from '../src/terrain/polar-grid.js';
+import { sourcesFor } from './composite.mjs';
+import { tilesHeightAt, tilesSample } from './equirect-tiles.mjs';
 import { equirectHeightAt, equirectSample } from './equirect.mjs';
 
 const DEG = Math.PI / 180;
@@ -67,14 +69,18 @@ function heightAtPixel(dem, x, y) {
 
 /**
  * @param {{label: ReturnType<typeof parseLabel>, data: Int16Array}} dem
+ * @param {number} [wantM] how fine the terrain needs to be here, in metres per pixel. Only "best available"
+ *   terrain (a composite) uses it, to read coarser data where that is enough; omit for the finest there is.
  * @returns {number} height in metres relative to the reference sphere, or NaN outside the grid
  */
-export function heightAt(dem, latDeg, lonDeg) {
+export function heightAt(dem, latDeg, lonDeg, wantM) {
   // Other kinds of terrain (see server/terrain-sources.mjs) share these entry points.
   if (dem.kind === 'equirect') return equirectHeightAt(dem, latDeg, lonDeg);
+  if (dem.kind === 'equirect-tiles') return tilesHeightAt(dem, latDeg, lonDeg);
   if (dem.kind === 'composite') {
-    for (const source of dem.sources) {
-      const h = heightAt(source, latDeg, lonDeg);
+    const sources = sourcesFor(dem, wantM);
+    for (let i = 0; i < sources.length; i++) {
+      const h = heightAt(sources[i], latDeg, lonDeg);
       if (!Number.isNaN(h)) return h;
     }
     return NaN;
@@ -85,13 +91,16 @@ export function heightAt(dem, latDeg, lonDeg) {
 
 /**
  * Height and slope at a point, for any kind of terrain: out[0] = metres (NaN if no data), out[1] = degrees.
- * A composite takes the first of its sources that has data there (finest first).
+ * A composite takes the first of its datasets that has data there, in the order server/composite.mjs gives
+ * for `wantM` (see heightAt). The slope is measured over one pixel of whichever dataset answered.
  */
-export function sampleAt(dem, latDeg, lonDeg, out) {
+export function sampleAt(dem, latDeg, lonDeg, out, wantM) {
   if (dem.kind === 'equirect') return equirectSample(dem, latDeg, lonDeg, out);
+  if (dem.kind === 'equirect-tiles') return tilesSample(dem, latDeg, lonDeg, out);
   if (dem.kind === 'composite') {
-    for (const source of dem.sources) {
-      sampleAt(source, latDeg, lonDeg, out);
+    const sources = sourcesFor(dem, wantM);
+    for (let i = 0; i < sources.length; i++) {
+      sampleAt(sources[i], latDeg, lonDeg, out);
       if (!Number.isNaN(out[0])) return out;
     }
     return out;
@@ -133,8 +142,8 @@ function sampleCell(dem, x, y, latDeg, out) {
 }
 
 /** Slope of the ground in degrees, measured over one pixel of the grid. NaN outside the grid. */
-export function slopeAt(dem, latDeg, lonDeg) {
-  return sampleAt(dem, latDeg, lonDeg, [0, 0])[1];
+export function slopeAt(dem, latDeg, lonDeg, wantM) {
+  return sampleAt(dem, latDeg, lonDeg, [0, 0], wantM)[1];
 }
 
 /** Load a grid into memory (the 80 m file is 115 MB; it loads in a fraction of a second). */
@@ -151,6 +160,8 @@ export const covers = (dem, latDeg, lonDeg) => !Number.isNaN(heightAt(dem, latDe
 
 /**
  * Sample the terrain around a point on the polar grid described in src/terrain/polar-grid.js.
+ * Each ring asks for terrain about as fine as the gap to the next ring, so "best available" terrain reads
+ * its finest data near the viewer and coarser data far away.
  * @returns {import('../src/terrain/polar-grid.js').TerrainPatch|null} null if the point is outside the grid
  */
 export function samplePolarPatch(dem, latDeg, lonDeg, { nAz = DEFAULT_AZIMUTHS, distances = ringDistances() } = {}) {
@@ -162,9 +173,10 @@ export function samplePolarPatch(dem, latDeg, lonDeg, { nAz = DEFAULT_AZIMUTHS, 
   let withData = 0;
   let dataEdgeM = Infinity; // nearest distance at which any spoke runs off the grid
   for (let k = 0; k < distances.length; k++) {
+    const wantM = k + 1 < distances.length ? distances[k + 1] - distances[k] : k > 0 ? distances[k] - distances[k - 1] : 0;
     for (let j = 0; j < nAz; j++) {
       const p = destination(latDeg, lonDeg, (j * 360) / nAz, distances[k]);
-      sampleAt(dem, p.lat, p.lon, cell);
+      sampleAt(dem, p.lat, p.lon, cell, wantM);
       const h = cell[0];
       heights[k * nAz + j] = h;
       slopes[k * nAz + j] = cell[1];

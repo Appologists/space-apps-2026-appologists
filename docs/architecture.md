@@ -103,8 +103,40 @@ Checks we ran (2026-11-14):
 The fine grain on the ground is decoration generated in the shader (`src/surface/ground-grain.js`), at scales
 below 80 m only. It is not data.
 
-What is missing: real detail finer than 80 m, light bounced into shadow, any terrain north of 80° S (if the data
-ends within 300 km of the viewer, the ground beyond is drawn flat and blue-grey, and the app says so).
+What is missing: real detail finer than the data (80 m at the south pole, 59 m elsewhere with
+`lola-global-512`), light bounced into shadow. Where no downloaded dataset has data within 300 km of the
+viewer, the ground beyond is drawn flat and blue-grey, and the app says so.
+
+### Which dataset answers a sample
+
+```
+ server/terrain-sources.mjs   the list of datasets, which are downloaded, and "best available" for a spot
+        │ opens each with its reader, once
+        ├─ server/lola-polar.mjs      south-pole grid, in memory (115 MB)
+        ├─ server/equirect.mjs        whole-Moon float TIFFs, in memory (66 MB, 1 GB)
+        └─ server/equirect-tiles.mjs  whole Moon at 59 m, sixteen 2.1 GB tiles, read from disk on demand
+ server/composite.mjs         "best available": picks among them for each sample
+ heightAt / sampleAt (server/lola-polar.mjs)   the two entry points everything else calls
+```
+
+- **The tiled reader.** The sixteen tiles are treated as one grid of 184,320 by 92,160 pixels, cut into
+  blocks of 1024 by 128 pixels (256 kB). A block is read the first time a sample falls in it and kept in a
+  cache capped at 1024 blocks (268 MB); when the cache is full, the quarter used longest ago is dropped. Only
+  complete tiles are opened (the size must match, so a `.part` download is ignored), a missing tile gives no
+  data, and the folder is looked at again every 15 s for tiles that have arrived.
+- **How fine.** `heightAt(dem, lat, lon, wantM)` and `sampleAt(dem, lat, lon, out, wantM)` take the detail the
+  caller needs, in metres per pixel. Only "best available" uses it: regional grids first where they cover,
+  then the coarsest whole-Moon dataset that is still that fine, then finer ones, then coarser ones. The
+  surface view's rings ask for the gap to the next ring; the finder's two grids ask for their cell size.
+  Choosing one dataset in the picker bypasses all this and reads that dataset everywhere.
+- **What it costs.** At Apollo 11 with every dataset downloaded, a surface view reads 23 blocks (6 MB) of
+  59 m data and the rest from memory. With the 59 m data chosen by itself the same view reads 382 blocks
+  (100 MB) and takes about 3 s the first time.
+
+Check we ran (2026-11-14, `npm run check:tiles`): on the five tiles downloaded so far, 3,000 points per tile
+against the 470 m whole-Moon map gave correlations of 0.9998 to 1.0000, mean differences under 1.2 m and a
+spread of 14–17 m (the two maps differ in detail, not in place). The same check against the 80 m south-pole
+grid between 80° and 88° S is written but has not run: it needs the `90s_45s` tiles.
 
 ## The landing-site finder
 
