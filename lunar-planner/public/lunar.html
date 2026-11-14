@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Apologistics &middot; Lunar Site Planner</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/lunar.css">
+    <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="app">
+<header>
+    <div class="brand">
+        <span class="mark">&#9790;</span>
+        <div><h1>Apologistics</h1><p>Find the right place and time to land on the Moon</p></div>
+    </div>
+    <nav>
+        <button id="mode-globe" class="active">Moon</button>
+        <button id="mode-surface">Surface</button>
+        <button id="mode-street">Heatmaps</button>
+        <button id="mode-rank">Compare</button>
+        <button id="mode-missions">Missions</button>
+    </nav>
+    <div class="player" title="Your mission rank">
+        <div class="player-top"><strong id="rank-title">Cadet</strong><span id="level">Level 1</span></div>
+        <div class="xpbar"><i id="xpfill"></i></div>
+        <small id="xptext">0 XP</small>
+    </div>
+</header>
+
+<aside class="left">
+    <section>
+        <h3>Site</h3>
+        <select id="preset" aria-label="Preset sites"></select>
+        <div class="coord">
+            <label for="lat">Latitude</label>
+            <div class="inrow">
+                <input id="lat" type="number" step="0.0001" min="0" max="90" value="0.6742">
+                <select id="ns" aria-label="North or south"><option>N</option><option>S</option></select>
+            </div>
+        </div>
+        <div class="coord">
+            <label for="lon">Longitude</label>
+            <div class="inrow">
+                <input id="lon" type="number" step="0.0001" min="0" max="180" value="23.4731">
+                <select id="ew" aria-label="East or west"><option>E</option><option>W</option></select>
+            </div>
+        </div>
+        <p id="dms" class="quiet"></p>
+        <label for="name">Name</label>
+        <input id="name" type="text" maxlength="40" value="Apollo 11">
+        <div class="buttons">
+            <button id="goto">Show</button>
+            <button id="add" class="accent">Add site</button>
+        </div>
+    </section>
+
+    <section>
+        <h3>When</h3>
+        <div class="pair">
+            <div><label for="start">Start (UTC)</label><input id="start" type="date"></div>
+            <div><label for="days">Days</label><input id="days" type="number" min="1" max="15" step="1" value="7"></div>
+        </div>
+    </section>
+
+    <section>
+        <h3>Mission needs</h3>
+        <label for="need">Unbroken Sun + Earth, hours</label>
+        <input id="need" type="number" min="0" max="400" step="1" value="24">
+        <div class="pair">
+            <div><label for="sunmin">Min Sun angle</label><input id="sunmin" type="number" min="-5" max="45" step="0.5" value="0"></div>
+            <div><label for="earthmin">Min Earth angle</label><input id="earthmin" type="number" min="-5" max="45" step="0.5" value="0"></div>
+        </div>
+        <div class="trio">
+            <div><label for="panel">Panel m</label><input id="panel" type="number" min="0" max="100" step="0.1" value="1.5"></div>
+            <div><label for="antenna">Antenna m</label><input id="antenna" type="number" min="0" max="100" step="0.1" value="2"></div>
+            <div><label for="camera">Eye m</label><input id="camera" type="number" min="0" max="100" step="0.1" value="1.7"></div>
+        </div>
+        <label>What matters most</label>
+        <div class="weights">
+            <span>Sunlight</span><input id="w-sun" type="range" min="0" max="3" step="0.5" value="1"><b id="w-sun-v">1</b>
+            <span>Earth contact</span><input id="w-earth" type="range" min="0" max="3" step="0.5" value="1"><b id="w-earth-v">1</b>
+            <span>Both at once</span><input id="w-both" type="range" min="0" max="3" step="0.5" value="2"><b id="w-both-v">2</b>
+        </div>
+        <button id="analyze" class="accent wide">Analyze and rank</button>
+    </section>
+
+    <section>
+        <h3>Candidates</h3>
+        <ul id="candidates"></ul>
+    </section>
+</aside>
+
+<main id="view">
+    <div id="cesium" hidden></div>
+    <div id="toolbar">
+        <div id="globe-tools">
+            <button id="fit">Moon, Earth &amp; Sun</button>
+            <button id="closeup">Site close-up</button>
+            <button id="grid" class="active">Lat/Lon grid</button>
+            <span class="sep"></span>
+            <button id="map-photo" class="active">Photo</button>
+            <button id="map-elev">Elevation</button>
+            <button id="map-temp">Temperature</button>
+        </div>
+        <div id="surface-tools" hidden>
+            <button id="sf-trek" class="active">NASA LOLA terrain + Trek photo</button>
+            <button id="sf-3d">Cesium Moon 3D</button>
+            <span class="sep"></span>
+            <button id="sf-sun">Face Sun</button>
+            <button id="sf-earth">Face Earth</button>
+            <button id="sf-up">Bird's-eye</button>
+            <button id="sf-elev">Elevation colors</button>
+            <button id="sf-shadow">Real sunlight: off</button>
+        </div>
+        <div id="street-tools" hidden>
+            <button id="look-sun">Face Sun</button>
+            <button id="look-earth">Face Earth</button>
+            <span class="sep"></span>
+            <button id="st-photo" class="active">Surface</button>
+            <button id="st-elev">Elevation</button>
+            <button id="st-temp">Temperature</button>
+            <button id="st-slope">Slope</button>
+            <span class="sep"></span>
+            <button id="st-exag">Relief &times;1</button>
+        </div>
+    </div>
+    <div id="legend" hidden>
+        <div class="bar"></div>
+        <div class="ticks"><span id="leg-min"></span><span id="leg-title"></span><span id="leg-max"></span></div>
+    </div>
+    <div id="readout" hidden></div>
+    <div id="cursor"></div>
+    <div id="hint"></div>
+
+    <section id="earthview" class="panel-view" hidden>
+        <div class="pv-head">
+            <div><h2>Earth</h2><p class="quiet" id="earth-where">Street View</p></div>
+            <div class="pv-buttons">
+                <button data-place="28.5729,-80.6490,Kennedy Space Center">Kennedy</button>
+                <button data-place="29.5519,-95.0970,Johnson Space Center">Johnson</button>
+                <button data-place="34.2013,-118.1714,Jet Propulsion Laboratory">JPL</button>
+                <button data-place="38.9955,-76.8521,Goddard Space Flight Center">Goddard</button>
+                <button class="close" data-close>Back to Moon</button>
+            </div>
+        </div>
+        <div class="pv-body">
+            <div id="gsv"></div>
+            <div class="pv-side">
+                <figure>
+                    <img id="epic-img" alt="Latest NASA EPIC image of Earth">
+                    <figcaption id="epic-cap">Loading NASA EPIC image&hellip;</figcaption>
+                </figure>
+                <div class="factcard" id="earth-fact"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="sunview" class="panel-view" hidden>
+        <div class="pv-head">
+            <div><h2>The Sun, right now</h2><p class="quiet">Latest images from NASA's Solar Dynamics Observatory</p></div>
+            <div class="pv-buttons">
+                <button data-sdo="0171" class="active">171 &Aring; corona</button>
+                <button data-sdo="0304">304 &Aring; chromosphere</button>
+                <button data-sdo="0193">193 &Aring; hot corona</button>
+                <button data-sdo="HMIIC">Visible sunspots</button>
+                <button class="close" data-close>Back to Moon</button>
+            </div>
+        </div>
+        <div class="pv-body">
+            <div class="sdo-wrap"><img id="sdo-img" alt="Latest NASA SDO image of the Sun"></div>
+            <div class="pv-side">
+                <div class="factcard" id="sun-fact"></div>
+                <p class="quiet" id="sdo-cap"></p>
+            </div>
+        </div>
+    </section>
+
+    <section id="rank" class="panel-view" hidden>
+        <div class="rank-head">
+            <div>
+                <h2>Candidate ranking</h2>
+                <p class="quiet" id="rank-note">Sites with the longest unbroken time with both sunlight and a view of Earth rank first.</p>
+            </div>
+            <button id="csv">Download CSV</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th><th>Site</th><th>Score</th><th>Unbroken Sun + Earth</th><th>Best window (UTC)</th>
+                        <th>Sunlit</th><th>Earth in view</th><th>Energy kWh/m&sup2;</th><th>Temp. K</th><th>Need met</th><th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody id="rank-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="missions" class="panel-view" hidden>
+        <div class="rank-head">
+            <div>
+                <h2>Missions</h2>
+                <p class="quiet">Complete missions to earn XP and move up from Cadet to Flight Director.</p>
+            </div>
+            <button id="reset-xp">Start over</button>
+        </div>
+        <div id="mission-list"></div>
+    </section>
+
+    <div id="fact" hidden>
+        <div class="fact-top"><span id="fact-body-name">NASA fact</span><button id="fact-close" aria-label="Close">&times;</button></div>
+        <p id="fact-text"></p>
+        <div class="fact-foot"><a id="fact-src" target="_blank" rel="noopener">NASA source</a><button id="fact-next">Next fact</button></div>
+    </div>
+    <div id="toasts"></div>
+    <div id="spot" hidden>
+        <div class="fact-top"><span>Chosen spot</span><button id="spot-close" aria-label="Close">&times;</button></div>
+        <b id="spot-where"></b>
+        <small id="spot-elev"></small>
+        <div class="spot-buttons">
+            <button id="spot-look" class="accent">Look around here</button>
+            <button id="spot-add">Add site</button>
+        </div>
+    </div>
+</main>
+
+<aside class="right">
+    <h2 id="site-name">&mdash;</h2>
+    <p id="site-coords" class="quiet"></p>
+    <p id="site-meta" class="quiet"></p>
+    <p id="plain" class="plain" aria-live="polite"></p>
+    <div class="metrics">
+        <div class="metric sun"><span>Sun</span><strong id="sun-el">&mdash;</strong><small id="sun-state"></small></div>
+        <div class="metric earth"><span>Earth</span><strong id="earth-el">&mdash;</strong><small id="earth-state"></small></div>
+        <div class="metric temp"><span>Surface temperature</span><strong id="temp">&mdash;</strong><small id="power"></small></div>
+    </div>
+    <h3>This window</h3>
+    <dl id="summary"></dl>
+    <p id="status" role="status"></p>
+    <p class="credits">Data: <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">NASA/JPL Horizons</a> &middot; <a href="https://svs.gsfc.nasa.gov/4720/" target="_blank" rel="noopener">LRO LOLA</a> &middot; <a href="https://trek.nasa.gov/moon/" target="_blank" rel="noopener">Moon Trek</a> &middot; <a href="https://sdo.gsfc.nasa.gov/" target="_blank" rel="noopener">SDO</a> &middot; <a href="https://epic.gsfc.nasa.gov/" target="_blank" rel="noopener">EPIC</a></p>
+</aside>
+
+<footer>
+    <div class="row">
+        <button id="play" disabled>&#9654; Play</button>
+        <strong id="clock">&mdash;</strong>
+        <span class="key"><i class="k-sun"></i>Sun <i class="k-earth"></i>Earth <i class="k-both"></i>Both</span>
+    </div>
+    <canvas id="strip" aria-label="Sun and Earth availability over time"></canvas>
+    <input id="timeline" aria-label="Time" type="range" min="0" max="1" step="1" value="0" disabled>
+</footer>
+</div>
+
+<script type="module" src="/lunar.js"></script>
+</body>
+</html>
