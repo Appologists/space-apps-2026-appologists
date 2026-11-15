@@ -13,7 +13,7 @@ import { MOON_RADIUS_KM } from '../src/astro/coords.js';
 import { ephemerisSeries } from '../src/astro/ephemeris.js';
 import { altAz } from '../src/astro/sky.js';
 import { cellOffset, offsetToLatLon, searchGrid } from '../src/finder/grid.js';
-import { FAIL, cellScore, defaultFinder, pickSites } from '../src/finder/score.js';
+import { FAIL, defaultFinder, pickSites, roomToMiss } from '../src/finder/score.js';
 import { buildShadowGrid, sampleGrid, sweepShadows } from '../src/surface/shadows.js';
 import { heightAt, sampleAt } from './lola-polar.mjs';
 
@@ -33,7 +33,7 @@ function direction(azimuthDeg, elevationDeg) {
 /** Bump when lightMaps() changes what it computes: maps stored by tools/precompute-light.mjs are then ignored. */
 export const LIGHT_VERSION = 1;
 
-const withDefaults = (params) => ({ stepMinutes: 60, panelHeightM: 2, antennaHeightM: 2, weights: { sunlight: 1, earthComms: 0.7 }, ...defaultFinder(), ...params });
+const withDefaults = (params) => ({ stepMinutes: 60, panelHeightM: 2, antennaHeightM: 2, ...defaultFinder(), ...params });
 
 /**
  * The expensive part of a search: for every time step of `series`, which cells see the Sun (from panel height)
@@ -228,7 +228,9 @@ export function searchLanding(dem, params, { storedLight = null } = {}) {
   }
   const fail = new Uint8Array(count);
   const ellipseSlope = new Float32Array(count).fill(NaN);
-  const score = new Float32Array(count).fill(NaN);
+  // Room to miss: how far each cell is from the nearest ground that fails a check on its own (score.js).
+  const room = roomToMiss(pointFail, n, cellM);
+  for (let c = 0; c < count; c++) if (!valid[c]) room[c] = NaN;
   const counts = { evaluated: 0, passing: 0, slope: 0, noSun: 0, dark: 0, noEarth: 0 };
   for (let row = 0; row < n; row++) {
     for (let col = 0; col < n; col++) {
@@ -256,7 +258,6 @@ export function searchLanding(dem, params, { storedLight = null } = {}) {
       counts.evaluated++;
       if (bits === 0) {
         counts.passing++;
-        score[c] = cellScore(longestLitH[c], windowHours, earthFraction[c], p.weights);
       } else {
         if (bits & FAIL.SLOPE) counts.slope++;
         if (bits & FAIL.NO_SUN_AT_LANDING) counts.noSun++;
@@ -266,8 +267,8 @@ export function searchLanding(dem, params, { storedLight = null } = {}) {
     }
   }
 
-  // ---- The best sites, spaced apart ---------------------------------------------------------------------------
-  const picked = pickSites({ n, cellM, score, ellipseSlope }, { count: 10, minSeparationM: Math.max(2 * p.ellipseRadiusM, 1000) });
+  // ---- The sites with the most room to miss, spaced apart ---------------------------------------------------------------------------
+  const picked = pickSites({ n, cellM, fail, room, longestDarkH, ellipseSlope }, { count: 10, minSeparationM: Math.max(2 * p.ellipseRadiusM, 1000) });
   const sites = picked.map(({ row, col, index }, i) => {
     const { east, north } = cellOffset(grid, row, col);
     const at = offsetToLatLon(center, east, north);
@@ -277,7 +278,7 @@ export function searchLanding(dem, params, { storedLight = null } = {}) {
       lon: at.lon,
       row,
       col,
-      score: score[index],
+      roomM: room[index],
       sunFraction: sunFraction[index],
       longestLitH: longestLitH[index],
       longestDarkH: longestDarkH[index],
@@ -307,6 +308,6 @@ export function searchLanding(dem, params, { storedLight = null } = {}) {
       dataset: dem.id ?? 'lola',
       terrainPixelM: dem.pixelM ?? dem.label?.scaleM ?? null,
     },
-    rasters: { elevation, slope, ellipseSlope, sunFraction, longestLitH, longestDarkH, earthFraction, fail, score, sunMask, earthMask },
+    rasters: { elevation, slope, ellipseSlope, sunFraction, longestLitH, longestDarkH, earthFraction, fail, room, sunMask, earthMask },
   };
 }

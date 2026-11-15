@@ -7,7 +7,6 @@
 // A search the server has not kept takes 10 to 20 seconds; one it has kept takes well under a second.
 // Changing the landing date or a landing limit in the app asks new questions, which this does not cover.
 import { readFileSync } from 'node:fs';
-import { defaultWeights } from '../src/criteria/index.js';
 import { searchQuestion } from '../src/finder/client.js';
 import { defaultFinder } from '../src/finder/score.js';
 import { defaultMission } from '../src/mission.js';
@@ -34,7 +33,7 @@ for (const profile of missions.profiles) {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(searchQuestion({ center: region, values, mission, weights: defaultWeights() })),
+        body: JSON.stringify(searchQuestion({ center: region, values, mission })),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? `HTTP ${response.status}`);
       const bytes = (await response.arrayBuffer()).byteLength;

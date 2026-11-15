@@ -19,17 +19,16 @@
  * @property {number} maxDarknessHours             longest unbroken darkness the rover survives
  * @property {boolean} needSunAtLanding
  * @property {boolean} needEarthAtLanding
- * @property {{sunlight: number, earthComms: number}} weights  same weights as the ranked list
  */
 
 /**
  * @typedef {Object} FoundSite
- * @property {number} rank            1 = best
+ * @property {number} rank            1 = the most room to miss
  * @property {number} lat
  * @property {number} lon
  * @property {number} row
  * @property {number} col
- * @property {number} score           0–1
+ * @property {number} roomM           room to miss: metres to the nearest ground that fails a check (score.js roomToMiss)
  * @property {number} sunFraction     share of the mission with the panel in sunlight
  * @property {number} longestLitH     longest unbroken sunlight, hours
  * @property {number} longestDarkH    longest unbroken darkness, hours
@@ -51,7 +50,7 @@
  * @property {number} steps
  * @property {number} windowHours
  * @property {FinderParams} params      what was asked, with defaults filled in
- * @property {FoundSite[]} sites        best passing sites, spaced apart
+ * @property {FoundSite[]} sites        the passing sites with the most room to miss, spaced apart
  * @property {{evaluated: number, passing: number, slope: number, noSun: number, dark: number, noEarth: number}} counts
  *           cells inside the search circle: evaluated, passing, and failing each check (a cell can fail several)
  * @property {number} computeMs
@@ -65,7 +64,8 @@
  * @property {Float32Array} longestDarkH  hours
  * @property {Float32Array} earthFraction 0–1
  * @property {Uint8Array}   fail          0 = passes; otherwise a sum of the FAIL bits in ./score.js
- * @property {Float32Array} score         0–1 where fail is 0, NaN elsewhere
+ * @property {Float32Array} room          room to miss, metres: distance to the nearest cell that fails a check on its own;
+ *                                        0 where the cell itself fails, NaN = no data. Ranking uses it only where fail is 0
  * Per time step (each `steps * maskStride` bytes; `maskStride` = ceil(n * n / 8) is in the header):
  * @property {Uint8Array}   sunMask       one bit per cell per step: 1 = the panel there is sunlit in that step
  * @property {Uint8Array}   earthMask     one bit per cell per step: 1 = Earth is in view from there

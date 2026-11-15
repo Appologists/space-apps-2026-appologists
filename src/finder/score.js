@@ -1,5 +1,5 @@
-// The landing-site finder's rules: why a cell fails, how a passing cell is scored, and how the best
-// sites are chosen. Shared by the server and the browser: no Node or browser APIs.
+// The landing-site finder's rules: why a cell fails, how much room to miss a passing cell has, and how the
+// best sites are chosen. Shared by the server and the browser: no Node or browser APIs.
 
 /** Reasons a cell fails. A cell's `fail` value is the sum of the ones that apply; 0 means it passes. */
 export const FAIL = Object.freeze({ SLOPE: 1, NO_SUN_AT_LANDING: 2, DARK_TOO_LONG: 4, NO_EARTH_AT_LANDING: 8, OUTSIDE: 16 });
@@ -33,25 +33,76 @@ export function defaultFinder() {
 }
 
 /**
- * Score of a cell that passes every check, 0–1. Same idea and weights as the ranked list:
- * unbroken sunlight as a share of the mission, and the share of time with Earth in view.
+ * Room to miss, the measure passing ground is ranked by (Daniel, 2026-11-14; it replaces a 0–1 score): for every
+ * cell, the distance in metres from its centre to the centre of the nearest cell that fails a check on its own
+ * (too steep, no Sun or no Earth at touchdown, dark for too long) or has no terrain data. It is the landing
+ * accuracy at which that spot would stop passing, so it needs no weights. Ground beyond the raster's edge counts
+ * as failing, because nothing is known about it. Measured between cell centres, so it moves in steps of about a
+ * cell, and it knows nothing of hazards smaller than a cell.
+ * Exact distances by Felzenszwalb and Huttenlocher's two-pass method (Theory of Computing 8, 2012), so the time
+ * grows only with the number of cells.
+ * @param {Uint8Array} pointFail  n * n; non-zero where the cell itself fails
+ * @returns {Float32Array} n * n, metres; 0 where the cell itself fails
  */
-export function cellScore(longestLitH, windowHours, earthFraction, weights) {
-  const wSun = Math.max(weights?.sunlight ?? 1, 0);
-  const wEarth = Math.max(weights?.earthComms ?? 0, 0);
-  if (wSun + wEarth === 0) return 0;
-  return (wSun * Math.min(longestLitH / windowHours, 1) + wEarth * earthFraction) / (wSun + wEarth);
+export function roomToMiss(pointFail, n, cellM) {
+  const FAR = 1e12;
+  const squared = new Float64Array(n * n);
+  const f = new Float64Array(n);
+  const d = new Float64Array(n);
+  const v = new Int32Array(n);
+  const z = new Float64Array(n + 1);
+  // One line of the transform: d[q] = min over p of (q - p)^2 + f[p].
+  const line = () => {
+    let k = 0;
+    v[0] = 0;
+    z[0] = -Infinity;
+    z[1] = Infinity;
+    for (let q = 1; q < n; q++) {
+      let s;
+      for (;;) {
+        const p = v[k];
+        s = (f[q] + q * q - (f[p] + p * p)) / (2 * q - 2 * p);
+        if (s > z[k]) break;
+        k--;
+      }
+      k++;
+      v[k] = q;
+      z[k] = s;
+      z[k + 1] = Infinity;
+    }
+    k = 0;
+    for (let q = 0; q < n; q++) {
+      while (z[k + 1] < q) k++;
+      d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+    }
+  };
+  for (let col = 0; col < n; col++) {
+    for (let row = 0; row < n; row++) f[row] = pointFail[row * n + col] ? 0 : FAR;
+    line();
+    for (let row = 0; row < n; row++) squared[row * n + col] = d[row];
+  }
+  const room = new Float32Array(n * n);
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) f[col] = squared[row * n + col];
+    line();
+    for (let col = 0; col < n; col++) {
+      const toEdge = Math.min(row + 1, col + 1, n - row, n - col); // the nearest cell beyond the raster
+      room[row * n + col] = Math.min(Math.sqrt(d[col]), toEdge) * cellM;
+    }
+  }
+  return room;
 }
 
 /**
- * The best-scoring cells, kept at least `minSeparationM` apart so the list is not ten neighbours.
- * Ties go to the gentler landing ellipse.
+ * The passing cells with the most room to miss, kept at least `minSeparationM` apart so the list is not ten
+ * neighbours. Ties go to the shorter longest darkness, then to the gentler landing area (our choice of order).
+ * @param {{n: number, cellM: number, fail: Uint8Array, room: Float32Array, longestDarkH: Float32Array, ellipseSlope: Float32Array}} rasters
  * @returns {{row: number, col: number, index: number}[]}
  */
-export function pickSites({ n, cellM, score, ellipseSlope }, { count = 10, minSeparationM = 1000 } = {}) {
+export function pickSites({ n, cellM, fail, room, longestDarkH, ellipseSlope }, { count = 10, minSeparationM = 1000 } = {}) {
   const candidates = [];
-  for (let i = 0; i < score.length; i++) if (!Number.isNaN(score[i])) candidates.push(i);
-  candidates.sort((a, b) => score[b] - score[a] || ellipseSlope[a] - ellipseSlope[b] || a - b);
+  for (let i = 0; i < fail.length; i++) if (fail[i] === 0) candidates.push(i);
+  candidates.sort((a, b) => room[b] - room[a] || longestDarkH[a] - longestDarkH[b] || ellipseSlope[a] - ellipseSlope[b] || a - b);
   const minCellsSquared = (minSeparationM / cellM) ** 2;
   const picked = [];
   for (const index of candidates) {

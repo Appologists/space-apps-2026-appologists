@@ -29,11 +29,10 @@ export async function searchLanding(params) {
  * @param {{lat: number, lon: number, searchRadiusKm?: number}} q.center  a region may bring its own search radius
  * @param {Object} q.values     the finder's values (score.js defaultFinder)
  * @param {{start: Date, durationHours: number, panelHeightM: number, antennaHeightM: number}} q.mission
- * @param {Object<string, number>} q.weights
  * @param {string} [q.source]   terrain dataset id, or 'auto'
  * @returns {import('./types.js').FinderParams}
  */
-export function searchQuestion({ center, values, mission, weights, source = 'auto' }) {
+export function searchQuestion({ center, values, mission, source = 'auto' }) {
   const landing = Object.fromEntries(Object.entries(values).filter(([key]) => !key.startsWith('rover')));
   return {
     ...landing,
@@ -45,7 +44,6 @@ export function searchQuestion({ center, values, mission, weights, source = 'aut
     stepMinutes: finderStepMinutes(mission.durationHours),
     panelHeightM: mission.panelHeightM,
     antennaHeightM: mission.antennaHeightM,
-    weights: { sunlight: weights.sunlight ?? 1, earthComms: weights.earthComms ?? 0 },
   };
 }
 
