@@ -17,7 +17,9 @@
     "check:landing": "node tools/check-landing-search.mjs",
     "check:tiles": "node tools/check-tiles.mjs",
     "demo:warm": "node tools/warm-demo.mjs",
-    "dev:quest": "sh tools/quest-cert.sh && vite --config vite.quest.config.js --port 5443 --strictPort"
+    "dev:quest": "sh tools/quest-cert.sh && vite --config vite.quest.config.js --port 5443 --strictPort",
+    "export:static": "node tools/export-static.mjs",
+    "build:site": "vite build && rm -rf dist/learn && cp -R education dist/learn"
   },
   "engines": {
     "node": ">=22.12"

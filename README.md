@@ -25,6 +25,22 @@ drivable **route** to a destination.
 **What does not work yet:** the ranking itself still assumes a smooth Moon, so no ridge or crater rim casts
 a shadow in the scores. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
 
+## The website (no server)
+
+The hosted site is the same app reading saved answers instead of the server: the ready-made missions'
+searches and the street view terrain at their landing spots. With the app running (`npm run dev`):
+
+```bash
+npm run export:static
+npm run build:site
+```
+
+Then upload the `dist` folder to Netlify (drag it onto the site's Deploys page). Missions with other settings
+say they are not saved on the website; they work when the app runs on a computer.
+
+To try VR on a Meta Quest without hosting: `npm run dev:quest`, then open the address it prints in the
+Quest's Browser (same Wi-Fi; tap "Advanced" > "Proceed" on the certificate warning).
+
 ## Start
 
 You need [Node.js](https://nodejs.org/) 22.12 or newer (`node --version` to check).
