@@ -75,7 +75,7 @@ const GROUPS = [
 const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
 // How close the globe comes on step 2. Daniel (2026-11-14) asked for it further out, so the view shows which part
 // of the Moon this is; in its narrower pane that needs the Moon's curved edge in view, which is about 2.5 (our choice).
-const REGION_ZOOM = 1.35; // the combined app (ui/shell.js) shows the whole Moon here, with the region's map popped out beside it
+const REGION_ZOOM = 1.1; // the combined app (ui/shell.js) shows the whole Moon here, with the region's map popped out beside it
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
 /**
@@ -167,7 +167,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         // The globe and the region's map share the stage (styles.css): where on the Moon, and where it can land.
         if (result) finder.open();
         const region = REGIONS.find((r) => r.id === regionId);
-        if (region) globe.focus(region.lat, region.lon, REGION_ZOOM);
+        if (region) focusRegion(region);
         else globe.view('southClose');
       } else if (result) finder.open();
       const map = finder.getMap();
@@ -501,6 +501,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
   }
 
   // ---- 2 Regions ----------------------------------------------------------------------------------------
+  /** The whole Moon seen at an angle, the south pole low in the view, turned so the region faces you (ui/shell.js pops its map out beside it). */
+  const focusRegion = (region) => globe.focus(-58, region.lon, REGION_ZOOM);
+
   const passingKm2 = (result) => (result.counts.passing * result.cellM * result.cellM) / 1e6;
 
   /** Search every region for the mission as it stands now. Does nothing if that search is done or under way. */
@@ -546,7 +549,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     regionId = id;
     const region = REGIONS.find((r) => r.id === id);
     if (step === 2 || step === 3) finder.showResult(result, region.name, { startAt: result.sites[0] ?? null });
-    if (step === 2) globe.focus(region.lat, region.lon, REGION_ZOOM);
+    if (step === 2) focusRegion(region);
     drawRegions();
     drawNav();
     save();

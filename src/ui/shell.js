@@ -99,6 +99,7 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
       h('div', { class: 'eyebrow' }, 'Your mission'),
       h('div', { class: 'mission-name' }, lander.title),
       h('div', { class: 'mission-sub' }, `lands ${day} · ${formatDuration(m.durationHours)} · slopes under ${v.maxLandingSlopeDeg}°`),
+      h('button', { type: 'button', class: 'primary change', onClick: () => openSurvey() }, 'Change mission'),
       h(
         'details',
         { class: 'more' },
@@ -129,7 +130,9 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   function openSurvey() {
     const m = getMission();
     const v = finder.values;
-    answer.start = new Date(m.start);
+    // before the first search, start from the ready-made mission's own date (data/missions.json), not the app's default "now"
+    const preset = missions.profiles.find((p) => p.id === 'nasa');
+    answer.start = flow.getStep() >= 2 ? new Date(m.start) : new Date(preset.mission.start);
     answer.hours = m.durationHours;
     answer.lander = v.roverSpeedMPerHour === 36 && v.roverNeedsEarthToDrive ? 'nasa' : flow.getStep() >= 2 ? 'custom' : 'nasa';
     answer.musts = new Set(MUSTS.filter((x) => v[x.key]).map((x) => x.key));
@@ -279,6 +282,16 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   function closeStreet() {
     $('svWrap').hidden = true;
     app.classList.remove('street-open');
+  }
+
+  // ---- layout of the Moon tab: the regions list moves into its own card on the right; the globe loses its grid --
+  {
+    const section = $('regions').closest('section');
+    const card = h('div', { class: 'regions-card panel-card', id: 'regionsCard' });
+    $('stage').append(card);
+    card.append(section);
+    section.querySelector('.step-title').textContent = 'Best regions';
+    globe.setOption('grid', false);
   }
 
   // ---- start ------------------------------------------------------------------------------------------------
