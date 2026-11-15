@@ -4,7 +4,18 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Body, GeoMoon, GeoVector, Illumination, MoonPhase } from 'astronomy-engine';
-import { BADGES, FACTS, QUIZ, SOURCES } from './content.js';
+import { BADGES, FACTS, QUIZ as OUR_QUIZ, SOURCES } from './content.js';
+import { QUIZ as EXPLORER_QUIZ } from '/lunar-game.js';
+import { createDots } from './dots.js';
+
+// The quiz: the explorer's own questions (/classic, lunar-game.js) plus ours, without repeats.
+const QUIZ = [...OUR_QUIZ];
+for (const item of EXPLORER_QUIZ) {
+    const key = item.q.toLowerCase().replace(/[^a-z]/g, '').slice(0, 40);
+    if (!QUIZ.some(x => x.q.toLowerCase().replace(/[^a-z]/g, '').slice(0, 40) === key)) {
+        QUIZ.push({...item, src: item.src || 'team'});
+    }
+}
 
 const $ = id => document.getElementById(id);
 const DEG = Math.PI / 180;
@@ -228,7 +239,7 @@ function buildMoon() {
     // A light over the viewer's left shoulder, so relief reads clearly from any side.
     const sun = new THREE.DirectionalLight(0xffffff, 2.6);
     scene.add(sun);
-    loadTexture('/textures/moon_lroc_color_4k.jpg').then(t => {
+    loadTexture('/textures/moon-hd.jpg').then(t => {
         mat.map = t;
         mat.needsUpdate = true;
     }).catch(() => {});
@@ -321,51 +332,134 @@ async function selectSite(s) {
     } catch (e) {
         // No Diviner data: the card says so.
     }
+    // Where the Sun and Earth are in this site's sky right now: JPL Horizons, the same service the explorer uses.
+    try {
+        const r = await fetch(`/api/site?lat=${s.lat}&lon=${s.lon}&days=1`);
+        if (r.ok && selectedSite === s) {
+            const j = await r.json();
+            const now = Date.now();
+            s.sky = j.samples.reduce((best, x) => (Math.abs(new Date(x.t) - now) < Math.abs(new Date(best.t) - now) ? x : best));
+            renderInfo();
+        }
+    } catch (e) {
+        // Horizons unreachable: the card leaves the sky out.
+    }
+}
+
+/** A small sky chart: centre = straight up, edge = horizon, north at the top. */
+function skyCompass(x) {
+    const c = h('canvas', {class: 'skydial', width: 220, height: 220});
+    const g = c.getContext('2d');
+    const R = 92;
+    g.translate(110, 110);
+    g.strokeStyle = '#2e2e2e';
+    g.lineWidth = 2;
+    for (const r of [R, R * 2 / 3, R / 3]) {
+        g.beginPath();
+        g.arc(0, 0, r, 0, Math.PI * 2);
+        g.stroke();
+    }
+    g.fillStyle = '#6e6e6e';
+    g.font = '18px Geist Mono, monospace';
+    g.textAlign = 'center';
+    g.fillText('N', 0, -R - 6);
+    const dot = (az, el, color, label) => {
+        const up = el >= 0;
+        const r = up ? R * (1 - el / 90) : R;
+        const a = (az - 90) * DEG;
+        const px = r * Math.cos(a);
+        const py = r * Math.sin(a);
+        g.fillStyle = color;
+        g.strokeStyle = color;
+        g.lineWidth = 3;
+        g.beginPath();
+        g.arc(px, py, 11, 0, Math.PI * 2);
+        if (up) {
+            g.fill();
+        } else {
+            g.stroke();
+        }
+        g.fillStyle = '#ededed';
+        g.fillText(label, px, py + (py > 60 ? -18 : 32));
+    };
+    dot(x.sun_az, x.sun_el, '#f5c96b', 'Sun');
+    dot(x.earth_az, x.earth_el, '#5aa8ff', 'Earth');
+    return c;
 }
 
 function sparkline(values, highlight) {
-    const c = h('canvas', {class: 'spark', width: 600, height: 180});
+    const c = h('canvas', {class: 'spark', width: 640, height: 200});
     const g = c.getContext('2d');
-    const lo = 0;
-    const hi = 420;
     const W = c.width;
     const H = c.height;
-    g.strokeStyle = '#1f1f1f';
-    g.lineWidth = 1;
-    g.font = '20px Geist Mono, monospace';
-    g.fillStyle = '#6e6e6e';
-    for (const k of [100, 200, 300, 400]) {
-        const y = H - ((k - lo) / (hi - lo)) * H;
-        g.beginPath();
-        g.moveTo(0, y);
-        g.lineTo(W, y);
-        g.stroke();
-        g.fillText(`${k} K`, 4, y - 4);
+    const top = 24;
+    const bottom = 34;
+    const lo = 0;
+    const hi = 420;
+    const pts = values.map(v => [v.t, v.k]).sort((p, q) => p[0] - q[0]);
+    const X = t => (t / 24) * W;
+    const Y = k => top + (1 - (k - lo) / (hi - lo)) * (H - top - bottom);
+    // Area under the curve, then the curve.
+    const area = g.createLinearGradient(0, top, 0, H - bottom);
+    area.addColorStop(0, 'rgba(245,201,107,0.35)');
+    area.addColorStop(1, 'rgba(245,201,107,0)');
+    g.beginPath();
+    g.moveTo(X(pts[0][0]), H - bottom);
+    for (const [t, k] of pts) {
+        g.lineTo(X(t), Y(k));
     }
-    // Plot by local time (0-24 h), so noon sits in the middle.
-    const pts = values.map(v => [v.t, v.k]).sort((a, b) => a[0] - b[0]);
-    g.strokeStyle = '#f5c96b';
-    g.lineWidth = 3;
+    g.lineTo(X(pts[pts.length - 1][0]), H - bottom);
+    g.closePath();
+    g.fillStyle = area;
+    g.fill();
     g.beginPath();
     pts.forEach(([t, k], i) => {
-        const x = (t / 24) * W;
-        const y = H - ((k - lo) / (hi - lo)) * H;
         if (i === 0) {
-            g.moveTo(x, y);
+            g.moveTo(X(t), Y(k));
         } else {
-            g.lineTo(x, y);
+            g.lineTo(X(t), Y(k));
         }
     });
+    g.strokeStyle = '#f5c96b';
+    g.lineWidth = 3;
     g.stroke();
-    if (highlight) {
-        const x = (highlight.t / 24) * W;
-        const y = H - ((highlight.k - lo) / (hi - lo)) * H;
-        g.fillStyle = '#45d483';
+    // Time ticks.
+    g.font = '20px Geist Mono, monospace';
+    g.fillStyle = '#6e6e6e';
+    g.textAlign = 'center';
+    for (const [t, label] of [[0, 'midnight'], [6, '06:00'], [12, 'noon'], [18, '18:00'], [24, 'midnight']]) {
+        g.fillText(label, Math.min(W - 44, Math.max(44, X(t))), H - 6);
+    }
+    // Label only the lowest and highest points.
+    const mark = (t, k, color, text, above) => {
+        g.fillStyle = color;
         g.beginPath();
-        g.arc(x, y, 8, 0, Math.PI * 2);
+        g.arc(X(t), Y(k), 6, 0, Math.PI * 2);
         g.fill();
+        g.fillStyle = '#ededed';
+        g.textAlign = 'center';
+        g.fillText(text, Math.min(W - 40, Math.max(40, X(t))), above ? Y(k) - 12 : Y(k) - 12);
+    };
+    const coldest = pts.reduce((m, p) => (p[1] < m[1] ? p : m));
+    const hottest = pts.reduce((m, p) => (p[1] > m[1] ? p : m));
+    if (highlight) {
+        mark(highlight.t, highlight.k, '#45d483', `${Math.round(highlight.k)} K`, true);
+    } else {
+        mark(coldest[0], coldest[1], '#5aa8ff', `${Math.round(coldest[1])} K`, true);
+        mark(hottest[0], hottest[1], '#f5c96b', `${Math.round(hottest[1])} K`, true);
     }
     return c;
+}
+
+const SHORT_SOURCE = {'nssdc-apollo': 'NASA NSSDCA', wikipedia: 'Wikipedia (IAU names)'};
+
+function sourcesLine(links) {
+    return h('p', {class: 'src'}, 'Sources: ', links.map(([label, url], i) => [i ? ' \u00b7 ' : '', h('a', {href: url, target: '_blank', rel: 'noopener'}, label)]).flat());
+}
+
+function tempTiles(lowK, highK) {
+    const tile = (label, k, cls) => h('div', {class: `tile ${cls}`}, h('span', {}, label), h('b', {class: 'px'}, `${Math.round(k)} K`), h('small', {}, `${Math.round(k - 273.15)} \u00b0C`));
+    return h('div', {class: 'tiles'}, tile('Night', lowK, 'cold'), tile('Noon', highK, 'hot'));
 }
 
 function moonInfo() {
@@ -373,41 +467,47 @@ function moonInfo() {
     if (!s) {
         return [
             h('h3', {class: 'px'}, 'THE MOON'),
-            h('p', {class: 'sub'}, `${sites.length} landing sites · select a marker`),
-            h('div', {class: 'live'}, h('b', {}, 'DATA'), 'Colour: LRO LROC mosaic (NASA SVS). ',
-                worlds.moon.relief ? 'Relief: LOLA heights, drawn 4× taller than real.' : 'Relief: run build_terrain.py to add LOLA heights.'),
-            h('dl', {class: 'kv'},
-                h('dt', {}, 'Apollo landings'), h('dd', {}, 'white'),
-                h('dt', {}, 'Robotic landers'), h('dd', {}, 'violet'),
-                h('dt', {}, 'South-pole features'), h('dd', {}, 'teal')),
-            factList('moon', 3),
+            h('p', {class: 'sub'}, `${sites.length} landing sites \u00b7 select a marker`),
+            h('ul', {class: 'legend-list'},
+                h('li', {}, h('i', {class: 'dot apollo'}), 'Apollo landings'),
+                h('li', {}, h('i', {class: 'dot robotic'}), 'Robotic landers'),
+                h('li', {}, h('i', {class: 'dot south-pole'}), 'South-pole features')),
+            factList('moon', 1),
+            sourcesLine([['LRO LROC map', 'https://svs.gsfc.nasa.gov/4720/'], ['LOLA heights', SOURCES.lola.url], ['NASA Moon facts', SOURCES.moonFacts.url]]),
         ];
     }
     const src = siteSources[s.source];
     const d = s.diviner;
+    const kind = s.category === 'south-pole' ? 'South-pole feature' : s.category === 'apollo' ? 'Apollo landing' : 'Robotic lander';
     const kids = [
         h('h3', {class: 'px'}, s.name.toUpperCase()),
-        h('p', {class: 'sub'}, `${fmtLat(s.lat)}, ${fmtLon(s.lon)} · ${s.category === 'south-pole' ? 'south-pole feature' : s.category}${s.agency ? ' · ' + s.agency : ''}${s.year ? ' · ' + s.year : ''}`),
+        h('p', {class: 'sub'}, [kind, s.agency, s.year].filter(Boolean).join(' \u00b7 ')),
+        h('p', {class: 'coords'}, `${fmtLat(s.lat)}, ${fmtLon(s.lon)}`),
     ];
     if (d) {
-        const curve = d.local_time_h.map((t, i) => ({t, k: d.temp_k[i]}));
+        const swing = Math.round(d.max_k - d.min_k);
         kids.push(
-            h('div', {class: 'live'}, h('b', {}, 'MEASURED TEMPERATURE · LRO DIVINER'),
-                `${Math.round(d.min_k)} K at night to ${Math.round(d.max_k)} K at noon (${Math.round(d.min_k - 273.15)} to ${Math.round(d.max_k - 273.15)} °C).`),
-            sparkline(curve),
-            h('p', {class: 'src'}, 'Temperature through one lunar day, by local time (0 h = midnight, 12 h = noon). ', d.source),
+            tempTiles(d.min_k, d.max_k),
+            sparkline(d.local_time_h.map((t, i) => ({t, k: d.temp_k[i]}))),
+            h('p', {class: 'takeaway'}, `${swing} K swing. No air holds the heat.`),
         );
     } else {
-        kids.push(h('div', {class: 'live'}, h('b', {}, 'MEASURED TEMPERATURE'), 'Loading LRO Diviner data…'));
+        kids.push(h('p', {class: 'takeaway'}, 'Loading the measured temperature\u2026'));
     }
-    kids.push(h('p', {class: 'src'}, 'Coordinates: ', src ? h('a', {href: src.url, target: '_blank', rel: 'noopener'}, src.title) : s.source));
-    kids.push(h('button', {class: 'btn', onclick: () => {
+    if (s.sky) {
+        kids.push(h('div', {class: 'sky-now'}, skyCompass(s.sky), h('div', {},
+            h('span', {class: 'tag'}, 'SKY NOW'),
+            h('p', {}, s.sky.sun_el > 0 ? 'Sun up' : 'Sun down', ' \u00b7 ', s.sky.earth_el > 0 ? 'Earth up' : 'Earth down'),
+            h('small', {}, 'Filled = above the horizon'))));
+    }
+    kids.push(sourcesLine([['LRO Diviner', SOURCES.diviner.url], ['JPL Horizons', SOURCES.horizons.url], [SHORT_SOURCE[s.source] || s.source, src ? src.url : '#']]));
+    kids.push(h('button', {class: 'link-btn', onclick: () => {
         selectedSite = null;
         for (const p of worlds.moon.pins) {
             p.el.classList.remove('sel');
         }
         renderInfo();
-    }}, 'All sites'));
+    }}, '\u2190 All sites'));
     return kids;
 }
 
@@ -445,13 +545,12 @@ function earthInfo() {
     const m = w.meta;
     return [
         h('h3', {class: 'px'}, 'EARTH, TODAY'),
-        h('p', {class: 'sub'}, m && m.date_utc ? `Photographed ${m.date_utc} UTC by EPIC on DSCOVR` : 'Latest EPIC image'),
-        w.error ? h('div', {class: 'live'}, h('b', {}, 'NOT AVAILABLE'), w.error) : h('div', {class: 'live'}, h('b', {}, 'LIVE · NASA EPIC'),
-            m && m.centroid && m.centroid.lat !== undefined ? `Centred on ${fmtLat(m.centroid.lat)}, ${fmtLon(m.centroid.lon)}. ` : '',
-            'DSCOVR orbits about 1.5 million km away, between Earth and the Sun, so it always sees the full sunlit side. The far half of this globe is dark because no camera sees it from there.'),
-        m && m.caption ? h('p', {class: 'src'}, `NASA caption: ${m.caption}`) : null,
-        factList('earth', 3),
-        sourceLink('epic'),
+        h('p', {class: 'sub'}, m && m.date_utc ? `${m.date_utc} UTC \u00b7 NASA EPIC` : 'NASA EPIC'),
+        w.error ? h('p', {class: 'takeaway'}, w.error) : h('p', {class: 'takeaway'},
+            'From 1.5 million km, toward the Sun.',
+            m && m.centroid && m.centroid.lat !== undefined ? ` Centred on ${fmtLat(m.centroid.lat)}, ${fmtLon(m.centroid.lon)}.` : ''),
+        factList('earth', 1),
+        sourcesLine([['NASA EPIC', SOURCES.epic.url], ['NASA Earth facts', SOURCES.earthFacts.url]]),
     ];
 }
 
@@ -505,12 +604,11 @@ function sunInfo() {
     const ch = SDO.find(c => c.id === w.channel);
     return [
         h('h3', {class: 'px'}, 'THE SUN, TODAY'),
-        h('p', {class: 'sub'}, 'Latest images from NASA\'s Solar Dynamics Observatory'),
+        h('p', {class: 'sub'}, 'NASA Solar Dynamics Observatory'),
         h('div', {class: 'chips'}, SDO.map(c => h('button', {class: c.id === w.channel ? 'on' : '', onclick: () => setSdo(w, c.id)}, c.label))),
-        w.error ? h('div', {class: 'live'}, h('b', {}, 'NOT AVAILABLE'), w.error) : h('div', {class: 'live'}, h('b', {}, `LIVE · ${ch.label}`), ch.text),
-        h('p', {class: 'src'}, 'SDO sees only the side facing Earth. The far half of this globe repeats that image, dimmed.'),
-        factList('sun', 3),
-        sourceLink('sdo'),
+        h('p', {class: 'takeaway'}, w.error || ch.text),
+        factList('sun', 1),
+        sourcesLine([['NASA SDO', SOURCES.sdo.url], ['NASA Sun facts', SOURCES.sunFacts.url]]),
     ];
 }
 
@@ -528,7 +626,7 @@ function buildSystem() {
     const earth = new THREE.Mesh(new THREE.SphereGeometry(0.42, 64, 32), earthMat);
     scene.add(earth);
     const moonMat = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 1});
-    loadTexture('/textures/moon_lroc_color_4k.jpg').then(t => {
+    loadTexture('/textures/moon-hd.jpg').then(t => {
         moonMat.map = t;
         moonMat.needsUpdate = true;
     }).catch(() => {});
@@ -648,7 +746,7 @@ function systemInfo() {
             renderInfo();
             $('days')?.focus();
         }}),
-        h('p', {class: 'src'}, 'The dashed line points to the Sun. The Moon\'s lit half always faces it; the phase is how much of that half we see from Earth.'),
+        h('p', {class: 'takeaway'}, 'Half the Moon is always lit. The phase is how much of that half faces us.'),
         h('button', {class: 'btn', disabled: c && c.busy ? 'disabled' : null, onclick: () => checkHorizons(w)}, c && c.busy ? 'Asking JPL Horizons…' : 'Check with JPL Horizons'),
         c && c.error ? h('p', {class: 'why'}, c.error) : null,
         c && c.horizons !== undefined ? h('dl', {class: 'kv', style: 'margin-top:14px'},
@@ -662,7 +760,7 @@ function systemInfo() {
 // ---------- Shared ----------
 function factList(body, n) {
     const list = shuffle(FACTS.filter(f => f.body === body)).slice(0, n);
-    return h('ul', {}, list.map(f => h('li', {}, f.text, h('br'), sourceLink(f.src))));
+    return h('ul', {class: 'facts'}, list.map(f => h('li', {}, f.text)));
 }
 
 const BUILD = {moon: buildMoon, earth: buildEarth, sun: buildSun, system: buildSystem};
@@ -752,43 +850,22 @@ function frame() {
     renderer.render(world.scene, camera);
 }
 
-// ================= Fact deck =================
-let filter = 'all';
-
-function renderDeck() {
-    const list = FACTS.map((f, i) => ({...f, i})).filter(f => filter === 'all' || f.body === filter);
-    $('deck').replaceChildren(...list.map(f => {
-        const card = h('button', {class: `card ${f.body}${me.read[f.i] ? ' read' : ''}`, 'aria-label': `Fact ${f.i + 1} about the ${f.body}`},
-            h('div', {class: 'in'},
-                h('div', {class: 'face front'}, h('span', {class: 'tag'}, f.body.toUpperCase()), h('span', {class: 'px'}, `FACT ${String(f.i + 1).padStart(2, '0')}`)),
-                h('div', {class: 'face back'}, h('p', {}, f.text), sourceLink(f.src))));
-        card.addEventListener('click', e => {
-            if (e.target.closest('a')) {
-                return;
-            }
-            card.classList.toggle('flip');
-            if (!me.read[f.i]) {
-                me.read[f.i] = true;
-                card.classList.add('read');
-                addXp(5);
-                if (Object.keys(me.read).length >= 10) {
-                    award('reader');
-                }
-            }
-        });
-        return card;
-    }));
-}
-
-for (const b of document.querySelectorAll('[data-filter]')) {
-    b.addEventListener('click', () => {
-        filter = b.dataset.filter;
-        for (const x of document.querySelectorAll('[data-filter]')) {
-            x.classList.toggle('on', x === b);
+// ================= Facts in 3D =================
+const dots = createDots($('dots'), (scene, i, n) => {
+    $('dot-big').textContent = scene.big;
+    $('dot-line').textContent = scene.line;
+    $('dot-src').href = scene.src;
+    $('dot-steps').replaceChildren(...Array.from({length: n}, (_, k) => h('i', {class: k === i ? 'on' : ''})));
+    if (!me.read[scene.id]) {
+        me.read[scene.id] = true;
+        addXp(5);
+        if (Object.keys(me.read).length >= 5) {
+            award('reader');
         }
-        renderDeck();
-    });
-}
+    }
+});
+$('dot-prev').onclick = () => dots.prev();
+$('dot-next').onclick = () => dots.next();
 
 // ================= Exercises =================
 const arena = $('arena');
@@ -1022,11 +1099,36 @@ for (const b of document.querySelectorAll('[data-start]')) {
     b.addEventListener('click', () => (b.dataset.start === 'quiz' ? startQuiz() : startHotCold()));
 }
 
+// ================= Scroll: reveal sections, mark the current one in the top bar =================
+const revealer = new IntersectionObserver(entries => {
+    for (const e of entries) {
+        if (e.isIntersecting) {
+            e.target.classList.add('in');
+            revealer.unobserve(e.target);
+        }
+    }
+}, {rootMargin: '0px 0px -8% 0px'});
+for (const el of document.querySelectorAll('[data-reveal]')) {
+    revealer.observe(el);
+}
+const navLinks = [...document.querySelectorAll('.top nav a')];
+const sectionSpy = new IntersectionObserver(entries => {
+    for (const e of entries) {
+        if (e.isIntersecting) {
+            for (const a of navLinks) {
+                a.classList.toggle('on', a.getAttribute('href') === `#${e.target.id}`);
+            }
+        }
+    }
+}, {rootMargin: '-45% 0px -50% 0px'});
+for (const id of ['hero', 'lab', 'facts', 'play', 'board']) {
+    sectionSpy.observe(document.getElementById(id));
+}
+
 // ================= Start =================
 $('stat-q').textContent = QUIZ.length;
 renderMe();
 renderBadges();
-renderDeck();
 showBoard('quiz');
 countPlayers();
 resize();
