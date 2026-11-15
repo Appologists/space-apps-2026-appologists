@@ -71,7 +71,10 @@ export function createHeap(capacity = 4096) {
   };
 }
 
-/** @returns {{ n, cellM, start: number, rangeM, maxSlopeDeg, dist: Float32Array, prev: Int32Array }} */
+/**
+ * @returns {{ n, cellM, start: number, rangeM, maxSlopeDeg, dist: Float32Array, prev: Int32Array, farthestM: number }}
+ *   rangeM may be Infinity (no limit); farthestM is the longest drive to any reachable cell.
+ */
 export function reachFrom(result, start, { maxSlopeDeg, rangeM }) {
   const { n, cellM, elevation } = result;
   const size = n * n;
@@ -112,7 +115,9 @@ export function reachFrom(result, start, { maxSlopeDeg, rangeM }) {
       }
     }
   }
-  return { n, cellM, start: s, rangeM, maxSlopeDeg, dist: Float32Array.from(d), prev };
+  let farthestM = 0;
+  for (let i = 0; i < size; i++) if (d[i] < Infinity && d[i] > farthestM) farthestM = d[i];
+  return { n, cellM, start: s, rangeM, maxSlopeDeg, dist: Float32Array.from(d), prev, farthestM };
 }
 
 /** @returns {number[]|null} cell indices from the start to the target inclusive, or null if not reachable */

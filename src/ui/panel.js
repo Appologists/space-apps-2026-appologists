@@ -1,6 +1,6 @@
 // Left panel: mission inputs, weights and the ranked list. Pure rendering: it draws what it is given and
 // reports changes through callbacks. State lives in main.js.
-import { DURATIONS } from '../mission.js';
+import { DURATIONS, formatDuration } from '../mission.js';
 import { formatLatLon } from '../format.js';
 import { clear, debounce, h } from './dom.js';
 
@@ -54,7 +54,10 @@ export function renderMission(el, mission, onChange) {
       h(
         'select',
         { id: 'missionDuration', onChange: (e) => onChange({ durationHours: parseFloat(e.target.value) }) },
-        DURATIONS.map((d) => h('option', { value: String(d.hours), selected: d.hours === mission.durationHours }, d.label)),
+        // A length set on the mission steps' slider may not be in the list: show it as an option of its own.
+        (DURATIONS.some((d) => d.hours === mission.durationHours) ? DURATIONS : [...DURATIONS, { hours: mission.durationHours, label: formatDuration(mission.durationHours) }]).map((d) =>
+          h('option', { value: String(d.hours), selected: d.hours === mission.durationHours }, d.label),
+        ),
       ),
     ),
     number('panelHeight', 'Solar panel height (m)', 'panelHeightM', { min: '0', max: '100' }),

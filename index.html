@@ -10,6 +10,8 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
     />
+    <!-- Linked here, not imported from main.js, so the page is laid out before the app's script has loaded. -->
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <div class="app">
@@ -20,7 +22,7 @@
         </header>
 
         <div class="flow-body" id="flowBody">
-          <section data-steps="1">
+          <section data-steps="1" id="missionSection">
             <h2 class="step-title">Plan a mission</h2>
             <div id="profiles" class="profiles"></div>
             <div id="setup" class="setup"></div>
@@ -40,8 +42,6 @@
 
           <section data-steps="3">
             <h2 class="step-title">Start and drive</h2>
-            <p class="lede">The rover starts at the best landing site (the white ring). Tap the map to add up to five places to visit: it drives only in sunlight and on slopes it can manage.</p>
-            <div class="eyebrow">A tap on the map sets the rover's</div>
             <div class="lensbuttons two" id="finderClickMode"></div>
             <button type="button" id="suggestDrive">Suggest a drive</button>
             <div class="finder-dests" id="finderDests"></div>
@@ -59,6 +59,7 @@
             <details class="explain">
               <summary>What these results leave out</summary>
               <p class="caveats" id="finderNotes"></p>
+              <p class="caveats" id="planNotes"></p>
             </details>
           </section>
 
@@ -130,10 +131,6 @@
                 </section>
               </div>
             </details>
-            <footer class="sources">
-              Sun and Earth positions: Astronomy Engine, checked against NASA JPL Horizons. Terrain: NASA LRO LOLA. Moon map:
-              NASA LRO/LROC (CGI Moon Kit). Coordinates: mean-Earth / polar-axis frame, east-positive longitude. Times are UTC.
-            </footer>
           </section>
         </div>
 

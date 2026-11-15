@@ -40,31 +40,20 @@ function drawStrip(canvas, drive, stops, stepHours) {
   }
 }
 
-export function renderSchedule(el, { result, plan, text, departHours, onDepart, onFindLatest }) {
+// The "leave no earlier than" box and "Find the latest time to leave" were taken off the demo page
+// (Daniel, 2026-11-14): the rover leaves at landing. latestDeparture() in planner.js still does the work.
+export function renderSchedule(el, { result, plan, text }) {
   el.replaceChildren();
   if (!plan) {
     el.append(h('p', { class: 'schedule-hint' }, 'Add a destination to plan a drive.'));
     return;
   }
-  const input = h('input', {
-    id: 'scheduleDepart',
-    type: 'number',
-    min: 0,
-    max: result.windowHours,
-    step: result.stepHours,
-    value: departHours,
-    onChange: (e) => {
-      const v = Number(e.target.value);
-      if (Number.isFinite(v)) onDepart?.(Math.min(result.windowHours, Math.max(0, v)));
-    },
-  });
   const sw = (colour, label) => h('span', { class: 'schedule-key' }, h('i', { style: `background:${colour}` }), label);
   el.append(
-    h('div', { class: 'schedule-row' },
-      h('label', { for: 'scheduleDepart' }, 'Leave no earlier than (hours after landing)', input),
-      h('button', { id: 'scheduleBest', type: 'button', disabled: !plan.ok, onClick: () => onFindLatest?.() }, 'Find the latest time to leave')),
-    h('p', { id: 'scheduleText', class: 'schedule-text' }, text.headline),
-    text.lines?.length ? h('ul', { id: 'scheduleLines', class: 'schedule-lines' }, text.lines.map((line) => h('li', {}, line))) : null,
+    ...[
+      h('p', { id: 'scheduleText', class: 'schedule-text' }, text.headline),
+      text.lines?.length ? h('ul', { id: 'scheduleLines', class: 'schedule-lines' }, text.lines.map((line) => h('li', {}, line))) : null,
+    ].filter(Boolean), // append() would write a null out as the word "null"
   );
   if (plan.drive) {
     const canvas = h('canvas', { id: 'scheduleStrip', class: 'schedule-strip' });
@@ -86,5 +75,5 @@ export function renderSchedule(el, { result, plan, text, departHours, onDepart, 
     );
     drawStrip(canvas, plan.drive, plan.stops ?? [], result.stepHours);
   }
-  if (text.notes) el.append(h('p', { id: 'scheduleNotes', class: 'caveats' }, text.notes));
+  // "How this is worked out" (text.notes) is shown under "What these results leave out" instead (finder-mode.js).
 }

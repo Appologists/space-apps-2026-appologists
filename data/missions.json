@@ -31,6 +31,24 @@
       "id": "nasa",
       "name": "Pre-set",
       "blurb": "Artemis lander carrying VIPER rover",
+      "pictures": [
+        {
+          "src": "images/starship-hls.jpg",
+          "alt": "Artist's concept of SpaceX's Starship lander for Artemis on the Moon",
+          "credit": "NASA, artist's concept (Wikimedia Commons, public domain)",
+          "url": "https://commons.wikimedia.org/wiki/File:HLS_Starship_rendering.jpg",
+          "width": 30,
+          "position": "50% 30%"
+        },
+        {
+          "src": "images/viper.jpg",
+          "alt": "Artist's concept of NASA's VIPER rover on the Moon",
+          "credit": "NASA Ames / Daniel Rutter, artist's concept (Wikimedia Commons, public domain)",
+          "url": "https://commons.wikimedia.org/wiki/File:Viper-ACD20-0047.jpg",
+          "width": 70,
+          "position": "45% 60%"
+        }
+      ],
       "mission": { "start": "2026-11-21T00:00:00Z", "durationHours": 336 },
       "finder": {
         "ellipseRadiusM": 100,
@@ -40,7 +58,7 @@
         "maxDarknessHours": 50,
         "roverMaxSlopeDeg": 15,
         "roverSpeedMPerHour": 36,
-        "roverRangeKm": 20,
+        "roverRangeKm": 0,
         "roverNeedsEarthToDrive": true
       },
       "facts": [
@@ -50,13 +68,22 @@
         { "text": "Rover survives 50 hours of darkness", "source": "viper-ops" },
         { "text": "Rover averages 36 m an hour, because it waits about nine tenths of the time", "source": "viper-planning" },
         { "text": "Rover needs Earth in view to drive: it is steered from the ground", "source": "viper-ops" },
-        { "text": "Lands 21 November 2026, 00:00 UTC, for 14 days, in sunlight with Earth in view; rover range 20 km", "source": "our-choice" }
+        { "text": "Lands 21 November 2026, 00:00 UTC, for 14 days, in sunlight with Earth in view", "source": "our-choice" }
       ]
     },
     {
       "id": "custom",
       "name": "Custom mission",
       "blurb": "Set the lander and the rover yourself.",
+      "pictures": [
+        {
+          "src": "images/janky-rover.svg",
+          "alt": "A joke drawing of a home-made rover: a cardboard box on mismatched wheels, held together with duct tape",
+          "credit": "Our drawing",
+          "width": 100,
+          "position": "50% 60%"
+        }
+      ],
       "mission": { "start": "2026-11-21T00:00:00Z", "durationHours": 336 },
       "finder": {
         "ellipseRadiusM": 100,
@@ -66,7 +93,7 @@
         "maxDarknessHours": 50,
         "roverMaxSlopeDeg": 15,
         "roverSpeedMPerHour": 200,
-        "roverRangeKm": 20,
+        "roverRangeKm": 0,
         "roverNeedsEarthToDrive": false
       },
       "facts": []

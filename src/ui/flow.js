@@ -16,7 +16,7 @@ import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
 import { STATE } from '../finder/schedule.js';
 import { formatHours, formatUTC } from '../format.js';
-import { LUNAR_DAY_HOURS } from '../mission.js';
+import { DURATION_MARKS, formatDuration, positionOf, tidyDuration } from '../mission.js';
 import { clear, h } from './dom.js';
 import { decodeFlow, encodeFlow } from './flow-state.js';
 
@@ -40,20 +40,36 @@ const REGIONS = missions.regions.map((region) => {
 });
 
 // The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
-const DAY = 24;
-const CHOICES = [
-  { on: 'mission', key: 'durationHours', label: 'Duration', options: [[7 * DAY, '7 days'], [14 * DAY, '14 days'], [LUNAR_DAY_HOURS, '29.5 days']], format: (v) => formatHours(v) },
-  { group: 'Lander' },
-  { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']], format: (v) => `${v} m` },
-  { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°` },
-  { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
-  { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
-  { group: 'Rover' },
-  { on: 'finder', key: 'maxDarknessHours', label: 'Darkness it survives', hint: 'Unbroken hours without sunlight', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h` },
-  { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Steepest slope it drives', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°` },
-  { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', hint: 'Metres an hour, stops included', options: [[36, '36'], [200, '200'], [720, '720']], format: (v) => `${v}` },
-  { on: 'finder', key: 'roverRangeKm', label: 'Range', options: [[5, '5 km'], [10, '10 km'], [20, '20 km']], format: (v) => `${v} km` },
-  { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']] },
+const yes = (when) => (v) => (v ? when[0] : when[1]);
+const GROUPS = [
+  {
+    id: 'mission',
+    title: 'Mission',
+    date: true, // the landing date comes first, with its own row
+    choices: [
+      { on: 'mission', key: 'durationHours', label: 'Duration', slider: true, summary: (v) => `for ${formatDuration(v)}` },
+    ],
+  },
+  {
+    id: 'lander',
+    title: 'Lander',
+    choices: [
+      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']], format: (v) => `${v} m`, summary: (v) => `within ${v} m` },
+      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['Earth in view', null]) },
+      { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['in sunlight', null]) },
+    ],
+  },
+  {
+    id: 'rover',
+    title: 'Rover',
+    choices: [
+      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, summary: (v) => `survives ${v} h dark` },
+      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, summary: (v) => `${v} m/hr` },
+      { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['needs Earth to drive', null]) },
+    ],
+  },
 ];
 
 const STATE_WORDS = {
@@ -87,6 +103,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
   let route = null; // the finder's latest { result, start, targets, plan }
   let track = null; // where the rover is at any hour of the plan (playback.js)
   // One clock for the map and the surface view: hours after landing. `fromHere` stops an echo when this file moves the app's time slider.
+  const openGroups = new Set(); // which groups of the custom form are open; all start closed
   let searchFirst = null; // a region to search before the others (the one a saved address was showing)
   let restoring = false; // while a saved address is being acted on, nothing is written back to it
   const clock = { hours: 0, playing: false, frame: 0, rate: 0, showTime: false, freeLook: false, yaw: null, fromHere: false, sunAt: 0 };
@@ -250,9 +267,22 @@ export function createFlow({ app, globe, finder, surface, api }) {
 
   const same = (a, b) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 1e-6 : a === b);
 
+  const valueOf = (def) => (def.on === 'mission' ? api.getMission()[def.key] : finder.values[def.key]);
+
+  /** One group of the custom form: a header that shows the current values, and its questions when open. */
+  function groupBlock(group) {
+    const date = (d) => `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}, ${d.toISOString().slice(11, 16)} UTC`;
+    const said = [group.date ? date(api.getMission().start) : null, ...group.choices.map((def) => def.summary(valueOf(def)))].filter(Boolean);
+    return h(
+      'details',
+      { class: 'group', open: openGroups.has(group.id), onToggle: (e) => (e.target.open ? openGroups.add(group.id) : openGroups.delete(group.id)) },
+      h('summary', {}, h('span', { class: 'group-title' }, group.title), h('span', { class: 'group-summary' }, said.join(' · '))),
+      h('div', { class: 'group-body' }, group.date ? dateRow() : null, ...group.choices.map((def) => (def.slider ? durationRow(def) : choiceRow(def)))),
+    );
+  }
+
   function choiceRow(def) {
-    if (def.group) return h('div', { class: 'eyebrow' }, def.group);
-    const current = def.on === 'mission' ? api.getMission()[def.key] : finder.values[def.key];
+    const current = valueOf(def);
     // A value set elsewhere (the exact-number boxes under "More tools") gets a button of its own.
     const options = def.options.some(([value]) => same(value, current)) ? def.options : [...def.options, [current, def.format ? def.format(current) : String(current)]];
     const set = (value) => {
@@ -276,51 +306,179 @@ export function createFlow({ app, globe, finder, surface, api }) {
     );
   }
 
-  function dateRow() {
-    const mission = api.getMission();
-    const shift = (days) => {
-      api.setMission({ start: new Date(mission.start.getTime() + days * 86_400_000) });
+  /**
+   * Mission length: a slider from 1 hour to 1 year with the clean lengths evenly spaced under it as big buttons
+   * (the scale is in src/mission.js). Dragging shows the length; letting go applies it.
+   */
+  function durationRow(def) {
+    const current = valueOf(def);
+    const SCALE = 1000;
+    const readout = h('span', { class: 'duration-value' }, formatDuration(current));
+    const set = (hours) => {
+      if (same(hours, valueOf(def))) return;
+      api.setMission({ durationHours: hours });
       drawSetup();
       save();
     };
+    const marks = DURATION_MARKS.map((mark, i) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'duration-mark',
+          style: `left: ${((100 * i) / (DURATION_MARKS.length - 1)).toFixed(3)}%`,
+          'aria-pressed': String(same(mark.hours, current)),
+          'aria-label': formatDuration(mark.hours),
+          onClick: () => set(mark.hours),
+        },
+        mark.label,
+      ),
+    );
+    const slider = h('input', {
+      type: 'range',
+      class: 'duration-slider',
+      min: '0',
+      max: String(SCALE),
+      step: '1',
+      value: String(Math.round(positionOf(current) * SCALE)),
+      'aria-label': 'Duration',
+      'aria-valuetext': formatDuration(current),
+      onInput: (e) => {
+        const hours = tidyDuration(Number(e.target.value) / SCALE);
+        readout.textContent = formatDuration(hours);
+        e.target.setAttribute('aria-valuetext', formatDuration(hours));
+        marks.forEach((button, i) => button.setAttribute('aria-pressed', String(same(DURATION_MARKS[i].hours, hours))));
+        // Near a clean length the thumb jumps onto it, so it is easy to hit.
+        if (DURATION_MARKS.some((mark) => same(mark.hours, hours))) e.target.value = String(Math.round(positionOf(hours) * SCALE));
+      },
+      onChange: (e) => set(tidyDuration(Number(e.target.value) / SCALE)),
+    });
     return h(
       'div',
       { class: 'choice' },
-      h('label', { class: 'choice-label', htmlFor: 'setupStart' }, 'Landing date and time (UTC)'),
-      h('input', {
-        id: 'setupStart',
-        class: 'big',
-        type: 'datetime-local',
-        step: '3600',
-        value: mission.start.toISOString().slice(0, 16),
-        onChange: (e) => {
-          const date = new Date(`${e.target.value}Z`);
-          if (Number.isNaN(date.getTime())) return;
-          api.setMission({ start: date });
-          drawSetup();
-          save();
-        },
-      }),
+      h('div', { class: 'choice-label duration-label' }, def.label, readout),
+      h('div', { class: 'duration' }, slider, h('div', { class: 'duration-marks' }, marks)),
+    );
+  }
+
+  /** The landing time: big in the middle, with steps of a week, a day and an hour back on the left and forward on the right. */
+  function dateRow() {
+    const mission = api.getMission();
+    const move = (hours) => {
+      api.setMission({ start: new Date(mission.start.getTime() + hours * 3_600_000) });
+      drawSetup();
+      save();
+    };
+    const STEPS = [
+      [24 * 7, 'week'],
+      [24, 'day'],
+      [1, 'hour'],
+    ];
+    const side = (sign) =>
       h(
         'div',
-        { class: 'choice-options', role: 'group', 'aria-label': 'Move the landing date' },
-        h('button', { type: 'button', onClick: () => shift(-14) }, '2 weeks earlier'),
-        h('button', { type: 'button', onClick: () => shift(14) }, '2 weeks later'),
+        { class: 'date-steps', role: 'group', 'aria-label': sign < 0 ? 'Earlier' : 'Later' },
+        STEPS.map(([hours, unit]) =>
+          h('button', { type: 'button', 'aria-label': `One ${unit} ${sign < 0 ? 'earlier' : 'later'}`, onClick: () => move(sign * hours) }, `${sign < 0 ? '−' : '+'}1 ${unit}`),
+        ),
+      );
+    // The date box itself is hidden: tapping the big date opens its picker, for a jump of more than a few weeks.
+    const input = h('input', {
+      id: 'setupStart',
+      class: 'date-input',
+      type: 'datetime-local',
+      step: '3600',
+      tabIndex: -1,
+      'aria-hidden': 'true',
+      value: mission.start.toISOString().slice(0, 16),
+      onChange: (e) => {
+        const date = new Date(`${e.target.value}Z`);
+        if (Number.isNaN(date.getTime())) return;
+        api.setMission({ start: date });
+        drawSetup();
+        save();
+      },
+    });
+    const day = mission.start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    return h(
+      'div',
+      { class: 'choice' },
+      h('div', { class: 'choice-label' }, 'Landing datetime'),
+      h(
+        'div',
+        { class: 'date-row' },
+        side(-1),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'date-now',
+            title: 'Choose a date',
+            onClick: () => {
+              try {
+                input.showPicker();
+              } catch {
+                input.focus();
+              }
+            },
+          },
+          h('span', { class: 'date-day' }, day),
+          h('span', { class: 'date-time' }, `${mission.start.toISOString().slice(11, 16)} UTC`),
+          input,
+        ),
+        side(1),
       ),
     );
   }
 
+
+  // The mission cards are built once and then only updated, so the change to the compact row can slide.
+  const profileButtons = missions.profiles.map((profile) =>
+    h(
+      'button',
+      { type: 'button', class: 'profile', 'data-profile': profile.id, onClick: () => chooseProfile(profile.id) },
+      profile.pictures?.length
+        ? h(
+            'span',
+            { class: 'profile-pictures' },
+            profile.pictures.map((picture) =>
+              h('img', {
+                src: /^https?:/.test(picture.src) ? picture.src : `${import.meta.env.BASE_URL}${picture.src}`,
+                alt: picture.alt,
+                title: picture.credit,
+                style: `flex: ${picture.width ?? 100} 1 0; object-position: ${picture.position ?? '50% 50%'}`,
+              }),
+            ),
+          )
+        : null,
+      h('strong', {}, profile.name),
+      h('span', { class: 'profile-blurb' }, profile.blurb),
+      h('span', { class: 'profile-back', 'aria-hidden': 'true' }, '← Back'),
+    ),
+  );
+  $('profiles').append(...profileButtons);
+
+  /** A tap on a mission card. With the custom form open, the other card is a "Back" to the choice of mission. */
+  function chooseProfile(id) {
+    if (id === profileId) return; // already chosen: keep whatever has been set
+    if (profileId === 'custom') {
+      profileId = null;
+      drawSetup();
+      drawNav();
+      save();
+      return;
+    }
+    useProfile(id);
+  }
+
   function drawSetup() {
-    clear($('profiles')).append(
-      ...missions.profiles.map((profile) =>
-        h(
-          'button',
-          { type: 'button', class: 'profile', 'aria-pressed': String(profile.id === profileId), onClick: () => useProfile(profile.id) },
-          h('strong', {}, profile.name),
-          h('span', {}, profile.blurb),
-        ),
-      ),
-    );
+    const compact = profileId === 'custom';
+    missions.profiles.forEach((profile, i) => {
+      profileButtons[i].setAttribute('aria-pressed', String(profile.id === profileId));
+      profileButtons[i].setAttribute('aria-label', compact && profile.id !== profileId ? 'Back to the choice of mission' : profile.name);
+    });
+    // With the custom form open, the title goes and the cards shrink to one slim row, leaving the room to the form.
+    $('missionSection').classList.toggle('compact', compact);
     const el = clear($('setup'));
     if (!profileId) return;
     const profile = missions.profiles.find((p) => p.id === profileId);
@@ -329,21 +487,14 @@ export function createFlow({ app, globe, finder, surface, api }) {
         h(
           'ul',
           { class: 'facts' },
-          profile.facts.map((fact) => {
-            const source = missions.sources[fact.source];
-            return h(
-              'li',
-              {},
-              `${fact.text} `,
-              source.url ? h('a', { href: source.url, target: '_blank', rel: 'noopener', title: source.title }, 'source') : h('span', { class: 'tag', title: source.title }, 'our choice'),
-            );
-          }),
+          // Each number's source stays in data/missions.json and shows on hover; the demo page shows no links.
+          profile.facts.map((fact) => h('li', { title: missions.sources[fact.source].title }, fact.text)),
         ),
-        h('button', { type: 'button', onClick: () => { profileId = 'custom'; drawSetup(); save(); } }, 'Change these numbers'),
+        h('button', { type: 'button', onClick: () => { profileId = 'custom'; drawSetup(); save(); } }, 'Edit'),
       );
       return;
     }
-    el.append(h('div', { class: 'eyebrow' }, 'Mission'), dateRow(), ...CHOICES.map(choiceRow));
+    el.append(...GROUPS.map(groupBlock));
   }
 
   // ---- 2 Regions ----------------------------------------------------------------------------------------
@@ -418,7 +569,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const passing = done.filter((entry) => entry.result.sites.length).length;
     $('regionsLede').textContent =
       `Each region is searched for 10 km around the point named, on real terrain, for a landing on ${formatUTC(mission.start)} and ${formatHours(mission.durationHours)} on the Moon. ` +
-      (scan.done ? `${passing} of ${REGIONS.length} can take this mission.` : `${done.length} of ${REGIONS.length} searched so far.`);
+      (scan.done ? `${passing} of ${REGIONS.length} can take this mission.` : `${done.length} of ${REGIONS.length} searched so far.`) +
+      // A long mission is checked in longer steps (src/finder/client.js), which can miss short darkness.
+      (done[0] && done[0].result.stepHours > 1
+        ? ` Over a mission this long, sunlight is checked every ${formatHours(done[0].result.stepHours)}, so darkness shorter than that can be missed.`
+        : '');
     // Once every region is in, the ones that pass come first, most room first.
     const rank = (region) => {
       const result = scan.results.get(region.id)?.result;
@@ -447,12 +602,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
             h('strong', {}, region.name),
             h('span', { class: `verdict ${kind}` }, text),
           ),
-          h(
-            'small',
-            { class: 'region-note' },
-            region.note ? `${region.note} ` : '',
-            region.source?.url ? h('a', { href: region.source.url, target: '_blank', rel: 'noopener', title: region.source.title }, 'Where the point comes from') : null,
-          ),
+          region.note ? h('small', { class: 'region-note', title: region.source?.title ?? '' }, region.note) : null,
         );
       }),
     );
@@ -576,15 +726,17 @@ export function createFlow({ app, globe, finder, surface, api }) {
     }
     clockText = h('p', { class: 'clock-text' });
     el.append(
+      ...[
       h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
       clockText,
-      h(
-        'p',
-        { class: 'caveats' },
-        step === 5
-          ? 'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.'
-          : 'While it plays, the map shows which ground is in sunlight at that hour. The rover is amber in sunlight and blue in the dark.',
-      ),
+      step === 5
+        ? h(
+            'p',
+            { class: 'caveats' },
+            'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.',
+          )
+        : null,
+    ].filter(Boolean), // append() would write a null out as the word "null"
     );
     updateClockText();
   }
