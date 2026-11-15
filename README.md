@@ -49,6 +49,14 @@ npm run data:fetch -- lola-south-80s-80m
 
 Then choose a south-pole site and press "Look around from here", or double-click the Moon near the south pole.
 
+For the sharpest street view (5 m ground at the four regions the finder favours: Connecting ridge, Shackleton rim,
+Peak near Shackleton, Malapert), also get NASA Goddard's 5 m maps (387 MB). Without them the street view uses
+the 80 m data and says so.
+
+```bash
+npm run data:fetch -- pgda-lola-5mpp
+```
+
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Runs the app with live reload |
