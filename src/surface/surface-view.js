@@ -17,6 +17,39 @@ import { buildShadowGrid, litFraction, sampleGrid, sweepShadows } from './shadow
 
 const R = MOON_RADIUS_KM * 1000;
 const SKY_DISTANCE = 5_000_000; // how far away the Sun, Earth and their paths are drawn (beyond all terrain)
+
+/**
+ * A star field for the sky (Daniel, 2026-11-15), so this view's sky matches the street view's. Decoration only:
+ * the stars are placed at random, with the street view's recipe (3200 stars, same seed, brightness and tints),
+ * not at real star positions, and they do not turn with the Moon. Nothing is measured against them.
+ */
+function makeStars() {
+  let seed = 77;
+  const random = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const count = 3200;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const far = SKY_DISTANCE * 1.5; // behind the Sun and Earth, inside the camera's far limit
+  for (let k = 0; k < count; k++) {
+    const up = random() * 2 - 1;
+    const around = random() * Math.PI * 2;
+    const flat = Math.sqrt(1 - up * up);
+    positions.set([flat * Math.cos(around) * far, up * far, flat * Math.sin(around) * far], k * 3);
+    const brightness = 0.35 + Math.pow(random(), 3) * 0.9;
+    const tint = random();
+    colors.set([brightness * (tint > 0.8 ? 0.8 : 1), brightness * 0.95, brightness * (tint < 0.2 ? 0.8 : 1.05)], k * 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  // Fixed size on screen, hidden by the terrain like the Sun and Earth, and never writing depth.
+  return new THREE.Points(geometry, new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false }));
+}
 export const SUN_RADIUS_KM = 695_700;
 export const EARTH_RADIUS_KM = 6371;
 
@@ -289,7 +322,7 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegen
   // The sky moves with the camera, so the Sun and Earth keep their directions when the viewpoint drives away
   // from the middle of the terrain (see setPosition).
   const skyGroup = new THREE.Group();
-  skyGroup.add(sunDisc, sunHalo, earthBall);
+  skyGroup.add(sunDisc, sunHalo, earthBall, makeStars());
   scene.add(skyGroup, sunLight, new THREE.AmbientLight(0xffffff, 0.06));
 
   const pathMaterial = (color) => new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 });
