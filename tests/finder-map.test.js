@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SLOPE_BANDS } from '../src/finder/slope-bands.js';
 import { FAIL } from '../src/finder/score.js';
-import { ALL_LAYER, ALL_SCALE, MAP_LAYERS, allPictures, allPixel, composeAll, describeCell, hillshade, layerLegend, layerPixel } from '../src/finder/map-layers.js';
+import { ALL_LAYER, ALL_SCALE, MAP_LAYERS, allPictures, allPixel, composeAll, describeCell, hillshade, layerLegend, layerPixel, roomRange } from '../src/finder/map-layers.js';
 import { SLOPE_MAX_DEG } from '../src/surface/lenses.js';
 
 const n = 8;
@@ -15,7 +15,7 @@ function fakeResult() {
     center: { lat: -89, lon: 0 },
     radiusKm: 0.4,
     windowHours: 100,
-    params: { maxDarknessHours: 50 },
+    params: { maxDarknessHours: 50, ellipseRadiusM: 100 },
     sites: [],
     elevation: fill(0),
     slope: fill(5),
@@ -25,7 +25,7 @@ function fakeResult() {
     longestDarkH: fill(20),
     earthFraction: fill(0.5),
     fail: new Uint8Array(size),
-    score: fill(0.5),
+    room: fill(300),
   };
 }
 
@@ -70,14 +70,14 @@ describe('layerPixel', () => {
     expect(layerPixel('reach', r, 0, 128)).toEqual(notChecked);
     for (const id of ['sun', 'dark', 'earth', 'slope']) expect(layerPixel(id, r, 0, 128)).toEqual(layerPixel(id, r, 2, 128));
   });
-  it('draws failing result cells grey and passing cells blue, lighter for higher scores', () => {
+  it('draws failing result cells grey and passing cells blue, lighter for more room to miss', () => {
     const r = fakeResult();
     r.fail[0] = FAIL.SLOPE;
     const [gr, gg, gb] = layerPixel('result', r, 0, 128);
     expect(gr).toBe(gg);
     expect(gg).toBe(gb);
-    r.score[1] = 0.1;
-    r.score[2] = 0.9;
+    r.room[1] = 120;
+    r.room[2] = 280;
     const low = layerPixel('result', r, 1, 0);
     const high = layerPixel('result', r, 2, 0);
     expect(low[2]).toBeGreaterThan(low[0]);
@@ -208,8 +208,8 @@ describe('the one map (All)', () => {
 
   it('leaves ground under 10 degrees a plain grey, lighter in sunlight than in shadow', () => {
     for (const shade of [0, 120, 255]) {
-      const lit = allPixel(1, shade, 5, false);
-      const dark = allPixel(0, shade, 5, false);
+      const lit = allPixel(1, shade, 5);
+      const dark = allPixel(0, shade, 5);
       expect(lit[0]).toBe(lit[1]);
       expect(dark[0]).toBe(dark[1]);
       expect(brightness(lit)).toBeGreaterThan(brightness(dark) + 50);
@@ -221,13 +221,13 @@ describe('the one map (All)', () => {
       const deg = band.maxDeg === Infinity ? 40 : band.maxDeg - 1;
       const rgb = [1, 3, 5].map((i) => parseInt(band.hex.slice(i, i + 2), 16));
       for (const light of [0, 1]) {
-        const got = allPixel(light, 255, deg, false);
+        const got = allPixel(light, 255, deg);
         // The same hue as the band: the channels keep the band's proportions (to rounding).
         const k = got[0] / rgb[0];
         expect(Math.abs(got[1] - rgb[1] * k)).toBeLessThanOrEqual(1);
         expect(Math.abs(got[2] - rgb[2] * k)).toBeLessThanOrEqual(1);
       }
-      expect(allPixel(1, 255, deg, false)).toEqual(rgb); // full strength on the brightest relief
+      expect(allPixel(1, 255, deg)).toEqual(rgb); // full strength on the brightest relief
     }
   });
 
@@ -236,8 +236,7 @@ describe('the one map (All)', () => {
     let lightestDark = 0;
     for (const deg of [0, 9.9, 12, 17, 30]) {
       for (const shade of [0, 128, 255]) {
-        for (const landing of [false, true]) {
-          if (landing && deg >= 10) continue; // landing ground is never that steep
+        for (const landing of [null, 0, 0.5, 1]) { // not landing ground, then the least to the most room to miss
           darkestLit = Math.min(darkestLit, brightness(allPixel(1, shade, deg, landing)));
           lightestDark = Math.max(lightestDark, brightness(allPixel(0, shade, deg, landing)));
         }
@@ -246,14 +245,17 @@ describe('the one map (All)', () => {
     expect(darkestLit).toBeGreaterThan(lightestDark);
   });
 
-  it('washes landing ground blue', () => {
-    const plain = allPixel(1, 150, 3, false);
-    const landing = allPixel(1, 150, 3, true);
-    expect(landing[2] - landing[0]).toBeGreaterThan(plain[2] - plain[0] + 40);
+  it('draws landing ground blue, lighter where it has more room to miss, and flat', () => {
+    const plain = allPixel(1, 150, 3);
+    const little = allPixel(1, 150, 3, 0);
+    const much = allPixel(1, 150, 3, 1);
+    expect(little[2] - little[0]).toBeGreaterThan(plain[2] - plain[0] + 40);
+    expect(brightness(much)).toBeGreaterThan(brightness(little) + 40);
+    expect(allPixel(1, 0, 3, 0.5)).toEqual(allPixel(1, 255, 3, 0.5)); // the relief does not change it
   });
 
   it('treats a slope with no value as plain ground', () => {
-    expect(allPixel(1, 150, NaN, false)).toEqual(allPixel(1, 150, 0, false));
+    expect(allPixel(1, 150, NaN)).toEqual(allPixel(1, 150, 0));
   });
 
   function resultWithOneLandingCell() {
@@ -314,5 +316,29 @@ describe('the one map (All)', () => {
     expect(legend.swatches.map((s) => s.label)).toEqual(['in sunlight', 'in shadow', 'slope 10–15°', 'slope 15–20°', 'slope over 20°', 'landing ground']);
     for (const s of legend.swatches) expect(s.hex).toMatch(/^#[0-9a-f]{6}$/);
     expect(legend.note).toMatch(/smoothed/);
+  });
+});
+
+describe('room to miss on the map', () => {
+  it('runs the blues from the landing accuracy to the most room any passing cell has', () => {
+    const r = fakeResult();
+    r.fail.fill(FAIL.SLOPE);
+    r.room.fill(900); // failing ground does not set the range
+    r.fail[1] = 0;
+    r.room[1] = 150;
+    r.fail[2] = 0;
+    r.room[2] = 420;
+    expect(roomRange(r)).toEqual({ lo: 100, hi: 420 });
+    const legend = layerLegend('result', r);
+    expect(legend.stops[0].label).toBe('100 m room to miss');
+    expect(legend.stops.at(-1).label).toBe('420 m');
+    expect(legend.note).toMatch(/smaller than a cell/);
+  });
+  it('says the room to miss of passing ground in the hover line', () => {
+    const r = fakeResult();
+    r.room[9] = 263.4;
+    expect(describeCell(r, 1, 1)).toMatch(/passes every check, room to miss 263 m/);
+    r.fail[9] = FAIL.SLOPE;
+    expect(describeCell(r, 1, 1)).not.toMatch(/room to miss/);
   });
 });

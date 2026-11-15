@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cellOffset, cellToLatLon, latLonToCell, searchGrid } from '../src/finder/grid.js';
-import { FAIL, cellScore, describeFail, pickSites } from '../src/finder/score.js';
+import { FAIL, describeFail, pickSites, roomToMiss } from '../src/finder/score.js';
 import { decodeRasters, encodeRasters } from '../src/finder/wire.js';
 import { searchLanding } from '../server/landing-search.mjs';
 
@@ -48,7 +48,7 @@ describe('finder wire format', () => {
   });
 });
 
-describe('finder score', () => {
+describe('finder rules: failing, room to miss, choosing sites', () => {
   it('describes failures', () => {
     expect(describeFail(0)).toEqual([]);
     expect(describeFail(FAIL.SLOPE)).toHaveLength(1);
@@ -57,32 +57,70 @@ describe('finder score', () => {
     expect(describeFail(FAIL.SLOPE + FAIL.DARK_TOO_LONG)).toHaveLength(2);
     expect(describeFail(31)).toHaveLength(5);
   });
-  it('scores extremes and weights', () => {
-    const w = { sunlight: 1, earthComms: 0.7 };
-    expect(cellScore(100, 100, 1, w)).toBeCloseTo(1);
-    expect(cellScore(0, 100, 0, w)).toBe(0);
-    expect(cellScore(50, 100, 0, { sunlight: 1, earthComms: 0 })).toBeCloseTo(0.5);
-    expect(cellScore(0, 100, 1, { sunlight: 1, earthComms: 1 })).toBeCloseTo(0.5);
-    expect(cellScore(0, 100, 1, { sunlight: 0, earthComms: 0 })).toBe(0);
-    expect(cellScore(200, 100, 0, { sunlight: 1, earthComms: 0 })).toBe(1); // capped
+  it('measures room to miss as the distance to the nearest failing cell', () => {
+    const n = 7;
+    const fail = new Uint8Array(n * n);
+    fail[3 * n + 3] = 1; // one failing cell in the middle
+    const room = roomToMiss(fail, n, 80);
+    expect(room[3 * n + 3]).toBe(0);
+    expect(room[3 * n + 4]).toBeCloseTo(80);
+    expect(room[2 * n + 2]).toBeCloseTo(80 * Math.SQRT2);
+    expect(room[3 * n + 5]).toBeCloseTo(160);
+    // Nothing is known beyond the raster, so its edge counts as failing ground one cell out.
+    expect(room[0]).toBeCloseTo(80);
+    expect(room[1 * n + 6]).toBeCloseTo(80);
+    expect(room[5 * n + 1]).toBeCloseTo(160);
   });
-  it('picks sites in score order, spaced apart, ties to the gentler ellipse', () => {
+  it('gives no room where everything fails, and only the edge where nothing does', () => {
+    const n = 5;
+    expect(Array.from(roomToMiss(new Uint8Array(n * n).fill(1), n, 100))).toEqual(new Array(n * n).fill(0));
+    const open = roomToMiss(new Uint8Array(n * n), n, 100);
+    expect(open[2 * n + 2]).toBeCloseTo(300);
+    expect(open[0]).toBeCloseTo(100);
+  });
+  it('agrees with a search of every pair of cells on random maps', () => {
+    let seed = 7;
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    for (const n of [1, 2, 9, 16]) {
+      for (let trial = 0; trial < 20; trial++) {
+        const fail = new Uint8Array(n * n);
+        for (let i = 0; i < n * n; i++) fail[i] = random() < 0.15 ? 1 : 0;
+        const room = roomToMiss(fail, n, 80);
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            let best = Math.min(r + 1, c + 1, n - r, n - c);
+            for (let r2 = 0; r2 < n; r2++) for (let c2 = 0; c2 < n; c2++) if (fail[r2 * n + c2]) best = Math.min(best, Math.hypot(r - r2, c - c2));
+            expect(room[r * n + c]).toBeCloseTo(best * 80, 3);
+          }
+        }
+      }
+    }
+  });
+  it('picks the passing sites with the most room, spaced apart, ties to less darkness and then the gentler ground', () => {
     const n = 10;
     const cellM = 100;
-    const score = new Float32Array(n * n).fill(NaN);
+    const fail = new Uint8Array(n * n).fill(FAIL.SLOPE);
+    const room = new Float32Array(n * n).fill(900); // failing cells' room is never looked at
+    const longestDarkH = new Float32Array(n * n).fill(10);
     const ellipseSlope = new Float32Array(n * n).fill(5);
     const at = (r, c) => r * n + c;
-    score[at(0, 0)] = 0.9;
-    score[at(0, 1)] = 0.8; // 100 m from the best: too close
-    score[at(0, 5)] = 0.7;
-    score[at(5, 5)] = 0.5;
-    score[at(9, 9)] = 0.5;
-    ellipseSlope[at(9, 9)] = 1; // same score as (5,5), gentler
-    const sites = pickSites({ n, cellM, score, ellipseSlope }, { count: 10, minSeparationM: 300 });
-    expect(sites.map((s) => s.index)).toEqual([at(0, 0), at(0, 5), at(9, 9), at(5, 5)]);
+    const pass = (r, c, roomM) => {
+      fail[at(r, c)] = 0;
+      room[at(r, c)] = roomM;
+    };
+    pass(0, 0, 400);
+    pass(0, 1, 390); // 100 m from the roomiest: too close
+    pass(0, 5, 300);
+    pass(5, 5, 200);
+    pass(9, 9, 200);
+    pass(9, 0, 200);
+    longestDarkH[at(9, 9)] = 2; // as much room as the other two, less darkness
+    ellipseSlope[at(9, 0)] = 1; // as much room and darkness as (5,5), gentler
+    const sites = pickSites({ n, cellM, fail, room, longestDarkH, ellipseSlope }, { count: 10, minSeparationM: 300 });
+    expect(sites.map((s) => s.index)).toEqual([at(0, 0), at(0, 5), at(9, 9), at(9, 0), at(5, 5)]);
     for (let i = 0; i < sites.length; i++)
       for (let j = i + 1; j < sites.length; j++) expect(Math.hypot(sites[i].row - sites[j].row, sites[i].col - sites[j].col) * cellM).toBeGreaterThanOrEqual(300);
-    expect(pickSites({ n, cellM, score, ellipseSlope }, { count: 2, minSeparationM: 300 })).toHaveLength(2);
+    expect(pickSites({ n, cellM, fail, room, longestDarkH, ellipseSlope }, { count: 2, minSeparationM: 300 })).toHaveLength(2);
   });
 });
 
@@ -107,8 +145,23 @@ describe('searchLanding on a perfectly smooth Moon', () => {
   it('fills every raster', () => {
     expect(result).not.toBeNull();
     const { header, rasters } = result;
-    for (const name of ['elevation', 'slope', 'ellipseSlope', 'sunFraction', 'longestLitH', 'longestDarkH', 'earthFraction', 'fail', 'score'])
+    for (const name of ['elevation', 'slope', 'ellipseSlope', 'sunFraction', 'longestLitH', 'longestDarkH', 'earthFraction', 'fail', 'room'])
       expect(rasters[name]).toHaveLength(header.n * header.n);
+  });
+  it('gives every passing cell more room to miss than the landing accuracy, and lists the roomiest sites first', () => {
+    // Without the Earth and darkness limits the smooth Moon has passing ground to look at.
+    const { header, rasters } = searchLanding(dem, { ...result.header.params, needEarthAtLanding: false, needSunAtLanding: false, maxDarknessHours: 1000 });
+    const reachM = Math.round(header.params.ellipseRadiusM / header.cellM) * header.cellM;
+    let passing = 0;
+    for (let i = 0; i < rasters.fail.length; i++) {
+      if (rasters.fail[i] !== 0) continue;
+      passing++;
+      expect(rasters.room[i]).toBeGreaterThan(reachM);
+    }
+    expect(passing).toBeGreaterThan(0);
+    const rooms = header.sites.map((site) => site.roomM);
+    expect(rooms).toEqual([...rooms].sort((a, b) => b - a));
+    expect(header.sites[0].roomM).toBe(rasters.room[header.sites[0].row * header.n + header.sites[0].col]);
   });
   it('is flat, evenly lit inside the circle, and marks the outside', () => {
     const { header, rasters } = result;

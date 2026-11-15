@@ -6,7 +6,6 @@
 //   npm run check:light -- --region malapert --start 2026-12-24T00:00Z --hours 336
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { defaultWeights } from '../src/criteria/index.js';
 import { searchQuestion } from '../src/finder/client.js';
 import { defaultFinder } from '../src/finder/score.js';
 import { defaultMission } from '../src/mission.js';
@@ -28,7 +27,7 @@ if (!raw) throw new Error(`No region "${id}" in data/missions.json`);
 const region = raw.site ? { ...sites.sites.find((s) => s.id === raw.site), searchRadiusKm: raw.searchRadiusKm } : raw;
 const profile = missions.profiles[0];
 const mission = { ...defaultMission(), start: new Date(arg('start', profile.mission.start)), durationHours: Number(arg('hours', profile.mission.durationHours)) };
-const params = searchQuestion({ center: region, values: { ...defaultFinder(), ...profile.finder }, mission, weights: defaultWeights() });
+const params = searchQuestion({ center: region, values: { ...defaultFinder(), ...profile.finder }, mission });
 
 const store = createTerrainStore(root);
 const found = await store.demFor(params.center.lat, 'auto', params.center.lon);

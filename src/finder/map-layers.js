@@ -28,7 +28,7 @@ export const TIME_LAYER = 'time';
  * Not in the list above either: the one map (Daniel, 2026-11-14), which shows sunlight, steepness and landing
  * ground together. Brightness is sunlight at one moment (the landing hour unless the map is given a time step);
  * colour marks steep ground in the route's colours, and ground under 10 degrees is left plain; landing ground is
- * blue with a bright outline. It is drawn finer than the search's cells (ALL_SCALE picture pixels per cell side),
+ * blue with a bright outline, a lighter blue where it has more room to miss. It is drawn finer than the search's cells (ALL_SCALE picture pixels per cell side),
  * with the shading and the slope smoothed between cells, so it is built as whole pictures: allPictures() and
  * composeAll() below. This is a picture of three yes-or-no facts, not a lens: it does not follow the lens rules.
  */
@@ -53,6 +53,28 @@ const lookup = (ramp) => Array.from({ length: 256 }, (_, i) => rampColor(ramp, i
 const BLUE = lookup(BLUE_RAMP);
 const ORANGE = lookup(ORANGE_RAMP);
 const at = (table, t) => table[Math.round(Math.min(Math.max(Number.isNaN(t) ? 0 : t, 0), 1) * 255)];
+
+/**
+ * The range the landing ground's blues run over, in metres of room to miss: from the landing accuracy (a spot
+ * that only just passes) to the most room any passing cell of this result has. Kept per result.
+ */
+const roomRanges = new WeakMap();
+export function roomRange(result) {
+  let range = roomRanges.get(result);
+  if (!range) {
+    const lo = result.params?.ellipseRadiusM ?? 0;
+    let hi = lo;
+    if (result.room) for (let i = 0; i < result.fail.length; i++) if (result.fail[i] === 0 && result.room[i] > hi) hi = result.room[i];
+    range = { lo, hi };
+    roomRanges.set(result, range);
+  }
+  return range;
+}
+/** Where a cell's room to miss falls in that range, 0–1. 0 where the result has no room raster. */
+const roomShare = (result, index) => {
+  const { lo, hi } = roomRange(result);
+  return hi > lo && result.room ? Math.min(Math.max((result.room[index] - lo) / (hi - lo), 0), 1) : 0;
+};
 
 /**
  * Hillshade of an elevation raster: light from the north-west (azimuth 315 degrees), 40 degrees above the horizon.
@@ -102,7 +124,7 @@ export function layerPixel(layerId, result, index, shade, extra) {
   switch (layerId) {
     case 'result': {
       if (!judged) return notChecked(shade);
-      if (fail === 0) return at(BLUE, result.score[index]);
+      if (fail === 0) return at(BLUE, roomShare(result, index)); // lighter = more room to miss
       const v = Math.round(28 + shade * 0.42);
       return [v, v, v];
     }
@@ -145,7 +167,10 @@ export function layerPixel(layerId, result, index, shade, extra) {
 }
 
 // ---- The one map -------------------------------------------------------------------------------------------------
-const LANDING_WASH = [70, 150, 255];
+// Landing ground on the one map takes the upper part of the blue ramp, so its darkest blue in sunlight is still
+// lighter than any shadow, and it is dimmed in shadow so that it never is as bright as sunlit ground (tested).
+const LANDING_FROM = 0.35;
+const LANDING_IN_SHADOW = 0.28;
 const LANDING_EDGE = [150, 215, 255];
 const LANDING_CASING = [6, 12, 30];
 
@@ -154,12 +179,13 @@ const LANDING_CASING = [6, 12, 30];
  * @param {number} light     1 = in sunlight, 0 = in shadow (values between blend the two)
  * @param {number} shade     hillshade there, 0-255: it changes brightness a little, never the hue
  * @param {number} slopeDeg  under 10 degrees the ground is a plain grey; steeper ground takes its slope band's colour
- * @param {boolean} landing  the ground passes every landing check: washed blue
+ * @param {number|null} room landing ground: where its room to miss falls between the least and the most, 0–1
+ *                           (lighter blue = more room; drawn flat). null for ground that is not landing ground
  */
-export function allPixel(light, shade, slopeDeg, landing) {
+export function allPixel(light, shade, slopeDeg, room = null) {
   const lit = [0, 0, 0];
   const dark = [0, 0, 0];
-  groundInto(lit, dark, 0, shade, slopeDeg, landing);
+  groundInto(lit, dark, 0, shade, slopeDeg, room);
   const t = Math.min(Math.max(light, 0), 1);
   return lit.map((v, k) => Math.round(dark[k] + (v - dark[k]) * t));
 }
@@ -167,7 +193,15 @@ export function allPixel(light, shade, slopeDeg, landing) {
 const BAND_LIST = SLOPE_BANDS.map((band) => ({ maxDeg: band.maxDeg, rgb: [1, 3, 5].map((i) => parseInt(band.hex.slice(i, i + 2), 16)) }));
 
 /** The colour of ground in full sunlight and in shadow, written into `lit` and `dark` at `at` (no new arrays: this runs per pixel). */
-function groundInto(lit, dark, at, shade, slopeDeg, landing) {
+function groundInto(lit, dark, at_, shade, slopeDeg, room) {
+  if (room != null) {
+    const blue = at(BLUE, LANDING_FROM + (1 - LANDING_FROM) * room);
+    for (let k = 0; k < 3; k++) {
+      lit[at_ + k] = blue[k];
+      dark[at_ + k] = Math.round(blue[k] * LANDING_IN_SHADOW);
+    }
+    return;
+  }
   const s = shade / 255;
   let band = 0;
   while (band < BAND_LIST.length - 1 && !(slopeDeg < BAND_LIST[band].maxDeg)) band++;
@@ -175,15 +209,8 @@ function groundInto(lit, dark, at, shade, slopeDeg, landing) {
   const rgb = BAND_LIST[band].rgb;
   for (let k = 0; k < 3; k++) {
     // Plain ground: a light grey in sunlight (a little warm), a near-black in shadow (a little blue).
-    let a = band === 0 ? (96 + s * 140) * (k === 2 ? 0.94 : 1) : rgb[k] * (0.72 + 0.28 * s);
-    let b = band === 0 ? (14 + s * 30) * (k === 2 ? 1.25 : 1) : rgb[k] * (0.15 + 0.07 * s);
-    if (landing) {
-      // The wash is dimmed in shadow, so that no shadowed ground is as bright as any sunlit ground (tested).
-      a += (LANDING_WASH[k] - a) * 0.38;
-      b += (LANDING_WASH[k] * 0.45 - b) * 0.38;
-    }
-    lit[at + k] = Math.round(a);
-    dark[at + k] = Math.round(b);
+    lit[at_ + k] = Math.round(band === 0 ? (96 + s * 140) * (k === 2 ? 0.94 : 1) : rgb[k] * (0.72 + 0.28 * s));
+    dark[at_ + k] = Math.round(band === 0 ? (14 + s * 30) * (k === 2 ? 1.25 : 1) : rgb[k] * (0.15 + 0.07 * s));
   }
 }
 
@@ -250,7 +277,7 @@ export function allPictures(result, shade, scale = ALL_SCALE) {
       const cy = (y + 0.5) / scale;
       const sh = blend(shade, cx, cy);
       const deg = blend(slope, cx, cy);
-      groundInto(lit, dark, at, sh, deg, landing);
+      groundInto(lit, dark, at, sh, deg, landing ? roomShare(result, cell) : null);
     }
   }
   return { size, scale, lit, dark };
@@ -340,13 +367,13 @@ export function layerLegend(layerId, result, extra) {
     case ALL_LAYER:
       return {
         title: 'Sunlight, slope and landing ground',
-        note: 'Brightness is sunlight at the time shown. Colour marks steep ground, in the route\'s colours; ground under 10° is left plain. Blue ground passes every landing check. The soft shading only shows the shape of the ground; it and the slope colours are smoothed between the search\'s cells.',
+        note: 'Brightness is sunlight at the time shown. Colour marks steep ground, in the route\'s colours; ground under 10° is left plain. Blue ground passes every landing check; lighter blue has more room to miss. The soft shading only shows the shape of the ground; it and the slope colours are smoothed between the search\'s cells.',
         stops: [],
         swatches: [
-          { hex: rgbHex(allPixel(1, 150, 0, false)), label: 'in sunlight' },
-          { hex: rgbHex(allPixel(0, 150, 0, false)), label: 'in shadow' },
-          ...SLOPE_BANDS.slice(1).map((band) => ({ hex: rgbHex(allPixel(1, 200, band.maxDeg === Infinity ? 90 : band.maxDeg - 1, false)), label: `slope ${band.label}` })),
-          { hex: rgbHex(allPixel(1, 150, 0, true)), label: 'landing ground' },
+          { hex: rgbHex(allPixel(1, 150, 0)), label: 'in sunlight' },
+          { hex: rgbHex(allPixel(0, 150, 0)), label: 'in shadow' },
+          ...SLOPE_BANDS.slice(1).map((band) => ({ hex: rgbHex(allPixel(1, 200, band.maxDeg === Infinity ? 90 : band.maxDeg - 1)), label: `slope ${band.label}` })),
+          { hex: rgbHex(allPixel(1, 150, 0, 0.5)), label: 'landing ground' },
         ],
       };
     case TIME_LAYER:
@@ -359,16 +386,19 @@ export function layerLegend(layerId, result, extra) {
           { hex: '#12121a', label: 'in shadow' },
         ],
       };
-    default:
+    default: {
+      const { lo, hi } = result ? roomRange(result) : { lo: 0, hi: 0 };
+      const m = (v) => `${Math.round(v / 10) * 10} m`;
       return {
         title: 'Landing sites',
-        note: 'Blue ground passes every check; lighter is better. Grey ground fails at least one.',
-        stops: withLabels(blue, 'lower score', 'higher score'),
+        note: 'Blue ground passes every check. Lighter blue has more room to miss: the nearest ground that fails a check is farther away. Measured between the search\'s cells, so it knows nothing of rocks or craters smaller than a cell. Grey ground fails at least one check.',
+        stops: withLabels(blue, hi > lo ? `${m(lo)} room to miss` : 'less room to miss', hi > lo ? m(hi) : 'more'),
         swatches: [
           { hex: FAIL_GREY_HEX, label: 'fails a check' },
           { hex: NOT_CHECKED_HEX, label: 'not checked: outside the search circle' },
         ],
       };
+    }
   }
 }
 
@@ -381,7 +411,7 @@ export function describeCell(result, row, col, extra) {
   const verdict = !judged
     ? 'not checked for landing: outside the search circle, or too near the map edge for the landing accuracy'
     : result.fail[i] === 0
-      ? 'passes every check'
+      ? `passes every check${result.room ? `, room to miss ${Math.round(result.room[i])} m` : ''}`
       : `fails: ${describeFail(result.fail[i]).join('; ')}`;
   const reach = extra?.reach;
   const drive = !reach ? [] : [Number.isFinite(reach.dist[i]) ? `${(reach.dist[i] / 1000).toFixed(1)} km drive from the start` : 'not reachable from the start'];

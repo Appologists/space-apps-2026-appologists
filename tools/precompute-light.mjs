@@ -10,7 +10,6 @@
 // About a minute per region. Rerun it after changing the code listed in server/light-store.mjs.
 import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { defaultWeights } from '../src/criteria/index.js';
 import { ephemerisSeries } from '../src/astro/ephemeris.js';
 import { searchQuestion } from '../src/finder/client.js';
 import { defaultFinder } from '../src/finder/score.js';
@@ -50,7 +49,7 @@ console.log(`Sunlight and Earth maps, hourly from ${from.toISOString().slice(0, 
 let total = 0;
 for (const region of regions) {
   const started = performance.now();
-  const params = { ...searchQuestion({ center: region, values: defaultFinder(), mission, weights: defaultWeights() }), stepMinutes: 60 };
+  const params = { ...searchQuestion({ center: region, values: defaultFinder(), mission }), stepMinutes: 60 };
   const found = await store.demFor(params.center.lat, 'auto', params.center.lon);
   if (!found.dem) {
     console.log(`  ${region.id}: skipped, no terrain data here (${found.missing?.label ?? found.outside?.label ?? 'none'})`);
