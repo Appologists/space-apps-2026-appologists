@@ -1,6 +1,6 @@
 // When can you land? For a landing spot and the next weeks, try every landing hour and say whether the mission
-// would pass: Sun and Earth in view at touchdown, never dark for longer than the rover survives, and the same
-// score the landing-site search gives (unbroken sunlight and Earth in view). Pure: no DOM, no fetching.
+// would pass: Sun and Earth in view at touchdown, never dark for longer than the rover survives, and a score
+// for unbroken sunlight and Earth in view (LANDING_WEIGHTS). Pure: no DOM, no fetching.
 //
 // Method (the "decouple terrain from time" idea): the terrain is reduced once to a horizon profile per spot
 // (src/terrain/polar-grid.js, 300 km of LOLA terrain in every direction). The Sun's and Earth's paths come from
@@ -35,11 +35,19 @@ export const REASON_TEXT = {
 };
 
 /**
- * Score of a landing, 0–1: the same formula as the landing-site search (src/finder/score.js cellScore).
+ * How much unbroken sunlight and Earth in view count when ranking landing times: the criteria's default weights
+ * (src/criteria/sunlight.js 1, earth-comms.js 0.7). The region search no longer gives a 0–1 score (decision Z),
+ * so the date scan keeps its own.
  */
-export function landingScore(longestLitH, missionHours, earthFraction, weights) {
-  const wSun = Math.max(weights?.sunlight ?? 1, 0);
-  const wEarth = Math.max(weights?.earthComms ?? 0, 0);
+export const LANDING_WEIGHTS = Object.freeze({ sunlight: 1, earthComms: 0.7 });
+
+/**
+ * Score of a landing, 0–1: unbroken sunlight as a share of the stay and the share of the stay with Earth in view,
+ * weighted (LANDING_WEIGHTS unless given).
+ */
+export function landingScore(longestLitH, missionHours, earthFraction, weights = LANDING_WEIGHTS) {
+  const wSun = Math.max(weights?.sunlight ?? LANDING_WEIGHTS.sunlight, 0);
+  const wEarth = Math.max(weights?.earthComms ?? LANDING_WEIGHTS.earthComms, 0);
   if (wSun + wEarth === 0) return 0;
   return (wSun * Math.min(longestLitH / missionHours, 1) + wEarth * earthFraction) / (wSun + wEarth);
 }
@@ -58,7 +66,7 @@ export function landingScore(longestLitH, missionHours, earthFraction, weights) 
  * @param {number} [input.rules.maxDarknessHours=Infinity]
  * @param {number} [input.rules.minSunClearDeg=0]       Sun counts as up above this clearance (0: centre of the disc)
  * @param {number} [input.rules.minEarthClearDeg=0]     Earth counts as in view above this (see EARTH_LINK_RULES)
- * @param {object} [input.weights]                      { sunlight, earthComms }, as in the search
+ * @param {object} [input.weights]                      { sunlight, earthComms }; LANDING_WEIGHTS if left out
  * @returns {{ starts: Array<{ index, hours, pass, reasons: string[], longestDarkH, longestLitH, litFraction,
  *            earthFraction, score }>, stepHours }}
  *   Every series must hold at least scanHours + missionHours of steps; more is used to measure darkness that is

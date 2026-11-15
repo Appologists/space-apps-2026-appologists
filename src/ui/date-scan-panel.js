@@ -102,7 +102,6 @@ export function createDateScan({ el, onUse }) {
           scanHours,
           missionHours,
           rules,
-          weights: q.weights,
         });
         spotRows.push({ spot, scan, light: { sunClear, earthClear, sunEl: sky.sunEl }, windows: landingWindows(scan), days: dailySummary(scan, 24) });
       } catch (error) {
@@ -149,6 +148,13 @@ export function createDateScan({ el, onUse }) {
   /** One stat: a big number and a few words under it. */
   const stat = (cls, value, label) => h('div', { class: `when-stat ${cls}` }, h('b', {}, value), h('span', {}, label));
 
+  /** A few words under the power number: does the panel run the steady load, and with how much battery? */
+  function powerLabel(stay) {
+    if (!(panel.loadW > 0)) return 'solar at landing';
+    if (!stay.coversLoad) return `solar · too little for ${watts(panel.loadW)}`;
+    return stay.batteryWh > 0 ? `solar · ${wattHours(stay.batteryWh)} battery` : `solar · runs ${watts(panel.loadW)}`;
+  }
+
   function answer(row, start) {
     const date = dateOf(start);
     const spotText = row.spot.fromSearch ? row.spot.name : `${row.spot.name} (named point)`;
@@ -160,7 +166,7 @@ export function createDateScan({ el, onUse }) {
       h('div', { class: 'when-stats' },
         stat('sun', formatHours(start.longestLitH), 'of sun in a row'),
         stat('earth', pct(start.earthFraction), 'Earth in view'),
-        power ? stat('power', `~${watts(power.atLanding)}`, power.stay.batteryWh > 0 ? `solar · ${wattHours(power.stay.batteryWh)} battery` : `solar · runs ${watts(panel.loadW)}`) : '',
+        power ? stat('power', `~${watts(power.atLanding)}`, powerLabel(power.stay)) : '',
         stat('dark', start.longestDarkH > 0 ? formatHours(start.longestDarkH) : 'None', start.longestDarkH > 0 ? 'longest dark' : 'dark hours')),
       h('details', { class: 'when-more', open: open.more, onToggle: remember('more') },
         h('summary', {}, 'Details'),
@@ -321,7 +327,7 @@ export function createDateScan({ el, onUse }) {
       h('button', { type: 'button', 'aria-pressed': String(id === earthRule), onClick: () => { earthRule = id; key = null; last && update(last.input); } }, rule.label));
     return h('details', { class: 'explain' },
       h('summary', {}, 'How this is worked out'),
-      h('p', {}, 'For each spot the terrain is turned once into its horizon: how high the land rises in every direction, out to 300 km, seen from the solar panel and from the antenna. The Sun and Earth are then followed hour by hour; each hour is one comparison, the body\'s height against the horizon in its direction. A landing hour passes if the Sun and Earth are in view at touchdown (when your mission asks for that) and the rover is never dark for longer than it survives, darkness counted from touchdown until the light comes back, even after the stay ends. Landings that pass are ranked by the same score as the region search: unbroken sunlight and Earth in view, with your weights.'),
+      h('p', {}, 'For each spot the terrain is turned once into its horizon: how high the land rises in every direction, out to 300 km, seen from the solar panel and from the antenna. The Sun and Earth are then followed hour by hour; each hour is one comparison, the body\'s height against the horizon in its direction. A landing hour passes if the Sun and Earth are in view at touchdown (when your mission asks for that) and the rover is never dark for longer than it survives, darkness counted from touchdown until the light comes back, even after the stay ends. Landings that pass are ranked by unbroken sunlight and the share of the stay with Earth in view, counted 1 to 0.7.'),
       h('div', { class: 'when-rule' }, h('span', {}, 'Earth counts as in view when '), h('span', { class: 'lensbuttons two' }, ruleButtons)),
       h('p', { class: 'caveats' }, `Earth looks about 1.9° wide from the Moon, so its edge can show over a ridge while its centre is hidden; radio also bends a little over a sharp ridge. "Any part" is closer to how a radio link behaves; "its centre" is what the region search uses. The Sun counts as up while the centre of its disc clears the terrain; for power, whatever part of its disc shows counts. "Earth in view" means the geometry allows a direct-to-Earth link: the app does not check antennas, transmitter power or ground-station schedules, and where Earth is hidden by terrain a relay would be needed. Terrain is NASA LOLA at about 80 m per pixel, so rocks and small craters are not seen. Times are checked every hour. The spots are the best ones the search found for your current landing time; on other dates other spots nearby may do better.`));
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { REASON, dailySummary, landingScore, landingWindows, scanLandings } from '../src/finder/date-scan.js';
+import { LANDING_WEIGHTS, REASON, dailySummary, landingScore, landingWindows, scanLandings } from '../src/finder/date-scan.js';
 
 /** Clearance series from a pattern: '#' = clear by +5°, '.' = blocked by −5°. One character per hour. */
 const series = (pattern) => Float64Array.from(pattern, (c) => (c === '#' ? 5 : -5));
@@ -79,5 +79,22 @@ describe('landingWindows and dailySummary', () => {
     const [day] = dailySummary(scan, 24);
     expect(day.best).toBe(null);
     expect(day.reason).toBe(REASON.NO_SUN);
+  });
+});
+
+describe('landingScore without weights', () => {
+  it('counts Earth in view too (the region search no longer passes weights, decision Z)', () => {
+    expect(landingScore(10, 10, 1)).toBe(1);
+    expect(landingScore(10, 10, 0)).toBeCloseTo(1 / 1.7, 12);
+    expect(landingScore(10, 10, 0.5)).toBeGreaterThan(landingScore(10, 10, 0.2));
+    expect(landingScore(5, 10, 0.5)).toBeCloseTo((LANDING_WEIGHTS.sunlight * 0.5 + LANDING_WEIGHTS.earthComms * 0.5) / 1.7, 12);
+  });
+
+  it('ranks two always-sunlit landings by how much of the stay Earth is in view', () => {
+    const sun = allClear(40);
+    const earth = series('....................####################');
+    const scan = scanLandings({ sunClear: sun, earthClear: earth, stepHours: 1, scanHours: 20, missionHours: 10, rules: { needEarthAtLanding: false } });
+    expect(scan.starts[19].score).toBeGreaterThan(scan.starts[0].score);
+    expect(landingWindows(scan)[0].best.index).toBe(19); // the latest start sees Earth longest
   });
 });
