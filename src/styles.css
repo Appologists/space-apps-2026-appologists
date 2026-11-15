@@ -1843,3 +1843,11 @@ input[type='range'].duration-slider {
     font-size: 18px;
   }
 }
+
+/* An open group shows its questions, so the line that sums them up is hidden. */
+.group[open] .group-summary {
+  display: none;
+}
+.group[open] > summary {
+  min-height: 0;
+}
