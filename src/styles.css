@@ -437,6 +437,10 @@ input[type='range'] {
 .timebar button {
   background: var(--panel);
 }
+/* Pressed (playing): beige like every other pressed button, or its dark "Pause" text sits on a dark background. */
+.timebar button[aria-pressed='true'] {
+  background: var(--regolith);
+}
 .views button {
   padding: 6px 9px;
   font-size: 13px;
