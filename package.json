@@ -16,7 +16,8 @@
     "check:horizons": "node tools/check-horizons.mjs",
     "check:landing": "node tools/check-landing-search.mjs",
     "check:tiles": "node tools/check-tiles.mjs",
-    "demo:warm": "node tools/warm-demo.mjs"
+    "demo:warm": "node tools/warm-demo.mjs",
+    "dev:quest": "sh tools/quest-cert.sh && vite --config vite.quest.config.js --port 5443 --strictPort"
   },
   "engines": {
     "node": ">=22.12"

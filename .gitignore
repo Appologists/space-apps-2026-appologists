@@ -13,3 +13,4 @@ data/raw/*
 .env
 .env.*
 *.local
+.certs/
