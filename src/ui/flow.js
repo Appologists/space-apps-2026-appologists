@@ -726,15 +726,17 @@ export function createFlow({ app, globe, finder, surface, api }) {
     }
     clockText = h('p', { class: 'clock-text' });
     el.append(
+      ...[
       h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
       clockText,
-      h(
-        'p',
-        { class: 'caveats' },
-        step === 5
-          ? 'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.'
-          : 'While it plays, the map shows which ground is in sunlight at that hour. The rover is amber in sunlight and blue in the dark.',
-      ),
+      step === 5
+        ? h(
+            'p',
+            { class: 'caveats' },
+            'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.',
+          )
+        : null,
+    ].filter(Boolean), // append() would write a null out as the word "null"
     );
     updateClockText();
   }

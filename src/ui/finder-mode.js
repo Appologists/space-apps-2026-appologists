@@ -3,7 +3,7 @@
 import { searchLanding, searchQuestion } from '../finder/client.js';
 import { latLonToCell } from '../finder/grid.js';
 import { pathStats, reachFrom } from '../finder/route.js';
-import { MAX_DESTINATIONS, latestDeparture, planMission } from '../finder/planner.js';
+import { MAX_DESTINATIONS, planMission } from '../finder/planner.js';
 import { destinationName, planText } from '../finder/plan-text.js';
 import { MAP_LAYERS, createFinderMap } from '../finder/map-view.js';
 import { defaultFinder } from '../finder/score.js';
@@ -239,23 +239,9 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
   }
 
   function drawSchedule(text) {
-    renderSchedule($('finderSchedule'), {
-      result,
-      plan,
-      text,
-      departHours,
-      onDepart: (hours) => {
-        departHours = Math.max(0, hours);
-        updateRoute();
-      },
-      onFindLatest: () => {
-        const found = latestDeparture(result, start, targets, roverNow());
-        if (found) {
-          departHours = found.departHours;
-          updateRoute();
-        }
-      },
-    });
+    renderSchedule($('finderSchedule'), { result, plan, text });
+    // How the plan is worked out, and what it leaves out: kept, but in the closed "What these results leave out".
+    $('planNotes').textContent = text?.notes ?? '';
   }
   const updateRouteSoon = debounce(updateRoute, 250);
 
