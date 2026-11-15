@@ -53,7 +53,10 @@ const GROUPS = [
     id: 'lander',
     title: 'Lander',
     choices: [
-      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']], format: (v) => `${v} m`, summary: (v) => `within ${v} m` },
+      // 100 m is NASA's figure for the Artemis lander (missions.json, hls-2024); 200 m and 2 km are our choices, the
+      // last for an older-style lander (decision V). 50 m was dropped: the search's 80 m cells make it the same as
+      // 100 m. On the seven demo regions 100 m finds 8.4 km² that can take a landing, 200 m 1.8 km², 2 km none.
+      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[100, '100 m', 'NASA: Artemis Human Landing System (2024)'], [200, '200 m', 'Our choice'], [2000, '2 km', 'Our choice: an older-style lander']], format: (v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`), summary: (v) => `within ${v >= 1000 ? `${v / 1000} km` : `${v} m`}` },
       { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
       { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['Earth in view', null]) },
       { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['in sunlight', null]) },
@@ -301,7 +304,8 @@ export function createFlow({ app, globe, finder, surface, api }) {
       h(
         'div',
         { class: 'choice-options', role: 'group', 'aria-label': def.label },
-        options.map(([value, text]) => h('button', { type: 'button', 'aria-pressed': String(same(value, current)), onClick: () => set(value) }, text)),
+        // A third entry, where given, is the value's source, shown on hover.
+        options.map(([value, text, source]) => h('button', { type: 'button', title: source ?? '', 'aria-pressed': String(same(value, current)), onClick: () => set(value) }, text)),
       ),
     );
   }

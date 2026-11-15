@@ -325,7 +325,8 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       ),
     );
     $('finderNotes').textContent =
-      `Every point within ${params.ellipseRadiusM} m of a site must pass. Checked on ${cellM} m cells; the terrain data is ${result.sourceLabel ?? 'NASA LOLA'} at about ${Math.round(result.terrainPixelM ?? cellM)} m per pixel, so hills show, rocks and small craters do not. ${result.sourceNote ? `${result.sourceNote} ` : ''}` +
+      `Landing accuracy is treated as a circle of ${params.ellipseRadiusM >= 1000 ? `${params.ellipseRadiusM / 1000} km` : `${params.ellipseRadiusM} m`} radius round each site, and every ${cellM} m cell inside it must pass. ` +
+      `That screens the slope of the whole landing area; boulders, and slopes only a few metres across, are not seen. The terrain data is ${result.sourceLabel ?? 'NASA LOLA'} at about ${Math.round(result.terrainPixelM ?? cellM)} m per pixel. ${result.sourceNote ? `${result.sourceNote} ` : ''}` +
       'The Sun and Earth count as visible when the centre of their disc clears the terrain. Darkness at the very start or end of the mission may be longer than shown. ' +
       'Click the map or a site, then "Look around from here" to stand there.';
   }
