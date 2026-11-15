@@ -1104,19 +1104,15 @@ button:disabled {
 
 /* Route choices (src/ui/route-options-panel.js): safest, fastest, shortest. */
 .route-options:empty { display: none; }
-.route-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
-.route-card { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 7px 8px; background: var(--card); border: 1px solid var(--rule); color: var(--ink); font: 12px var(--font-ui); cursor: pointer; }
+/* One row per route choice (Daniel, 2026-11-14): {emoji} {name} · {days} days · {distance} km. */
+.route-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.route-card { display: block; width: 100%; min-height: 44px; text-align: left; padding: 9px 12px; background: var(--card); border: 1px solid var(--rule); color: var(--ink); font: 15px/1.4 var(--font-ui); cursor: pointer; }
+.route-name { font-weight: 600; }
+.route-card.warn .route-when { color: #ff8a7a; }
 .route-card:hover { border-color: var(--dim); }
 /* Background and colour too, or the app-wide pressed-button style (beige) shows under the light text. */
 .route-card.on { background: var(--card); color: var(--ink); border-color: var(--south); box-shadow: inset 0 0 0 1px var(--south); }
-.route-card.warn .route-title { color: var(--warn); }
 .route-card.none { cursor: default; color: var(--dim); }
-.route-title { font-weight: 600; font-size: 13.5px; }
-.route-title small { font-weight: 400; color: var(--dim); font-size: 11.5px; }
-.route-line { color: var(--dim); line-height: 1.35; }
-.route-big { color: var(--ink); font-family: var(--font-num); font-size: 12.5px; }
-.route-bad { color: #ff8a7a; }
-.route-note { color: var(--dim); font-style: italic; }
 .route-slopebar { display: flex; height: 5px; margin-top: 3px; border: 1px solid var(--rule); }
 .route-slopebar i { display: block; height: 100%; }
 .route-key { margin: 6px 0 2px; color: var(--dim); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }

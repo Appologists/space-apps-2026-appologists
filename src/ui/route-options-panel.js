@@ -9,17 +9,13 @@ import { h } from './dom.js';
 const km = (m) => `${(m / 1000).toFixed(m < 10000 ? 1 : 0)} km`;
 const ICON = { safest: '🛡', fastest: '⚡', shortest: '📏' };
 
-/** What a card says: when it arrives (or how it fails), and how far and how steep. */
-function cardLines(option) {
-  const s = option.summary;
-  const lines = [];
-  if (!s.arrived) lines.push(h('span', { class: 'route-bad' }, s.lostAtHours != null ? `Lost in the dark ${formatHours(s.lostAtHours)} after landing` : 'Does not arrive in the mission'));
-  else if (!s.survived) lines.push(h('span', { class: 'route-bad' }, `Arrives at ${formatHours(s.arrivalHours)}, then lost in the dark`));
-  else lines.push(h('span', { class: 'route-big' }, `Arrives ${formatHours(s.arrivalHours)} after landing`));
-  lines.push(`${km(s.distanceM)} · steepest ${s.steepestDeg.toFixed(0)}°`);
-  // Darkness to spare, Earth in view, the safest route's limits and "same path as" were taken off the cards to keep
-  // the Drive step short (Daniel, 2026-11-14); the limits are still in the "What these results leave out" note.
-  return lines;
+const days = (hours) => `${(hours / 24).toFixed(1)} days`;
+
+/** When a route gets there, or how it fails: the middle of its one-line card (Daniel, 2026-11-14). */
+function whenText(summary) {
+  if (!summary.arrived) return summary.lostAtHours != null ? `lost at ${days(summary.lostAtHours)}` : 'does not arrive';
+  if (!summary.survived) return `${days(summary.arrivalHours)}, then lost`; // only with the old rule (decision U)
+  return days(summary.arrivalHours);
 }
 
 /** Height along the route, the ground under it coloured by slope band; waits and arrivals marked. */
@@ -137,14 +133,16 @@ export function renderRouteOptions(el, { options, choice, rover, onChoose, resul
       ROUTE_KINDS.map((kind) => {
         const option = options[kind.id];
         const on = kind.id === choice;
+        // One line each: {emoji} {name} · {days} days · {distance} km. What each choice means stays on hover.
+        const name = h('span', { class: 'route-name' }, `${ICON[kind.id]} ${kind.label}`);
         if (!option?.summary) {
-          return h('div', { class: 'route-card none' },
-            h('div', { class: 'route-title' }, `${ICON[kind.id]} ${kind.label}`),
-            h('small', {}, kind.id === 'safest' ? 'No route within the safer limits.' : kind.id === 'fastest' ? 'No drive works. The reason is in the plan below.' : 'No drivable path on slopes the rover can climb.'));
+          return h('div', { class: 'route-card none', title: kind.blurb }, name, h('span', { class: 'route-when' }, ' · no route'));
         }
-        return h('button', { type: 'button', class: `route-card${on ? ' on' : ''}${option.summary.ok ? '' : ' warn'}`, 'aria-pressed': String(on), onClick: () => onChoose(kind.id) },
-          h('div', { class: 'route-title' }, `${ICON[kind.id]} ${kind.label}`, h('small', {}, ` ${kind.blurb}`)),
-          ...cardLines(option).map((line) => h('div', { class: 'route-line' }, line)));
+        const s = option.summary;
+        return h('button', { type: 'button', title: kind.blurb, class: `route-card${on ? ' on' : ''}${s.ok ? '' : ' warn'}`, 'aria-pressed': String(on), onClick: () => onChoose(kind.id) },
+          name,
+          h('span', { class: 'route-when' }, ` · ${whenText(s)}`),
+          h('span', { class: 'route-km' }, ` · ${(s.distanceM / 1000).toFixed(1)} km`));
       })),
     h('div', { class: 'route-key' }, 'Slope: ',
       SLOPE_BANDS.map((band) => h('span', { class: 'schedule-key' }, h('i', { style: `background:${band.hex}` }), band.label)),
