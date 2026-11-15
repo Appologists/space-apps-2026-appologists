@@ -42,7 +42,6 @@ const REGIONS = missions.regions.map((region) => {
 // The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
 const DAY = 24;
 const CHOICES = [
-  { group: 'Mission' },
   { on: 'mission', key: 'durationHours', label: 'Duration', options: [[7 * DAY, '7 days'], [14 * DAY, '14 days'], [LUNAR_DAY_HOURS, '29.5 days']], format: (v) => formatHours(v) },
   { group: 'Lander' },
   { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']], format: (v) => `${v} m` },
@@ -344,7 +343,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       );
       return;
     }
-    el.append(h('div', { class: 'eyebrow' }, 'When'), dateRow(), ...CHOICES.map(choiceRow));
+    el.append(h('div', { class: 'eyebrow' }, 'Mission'), dateRow(), ...CHOICES.map(choiceRow));
   }
 
   // ---- 2 Regions ----------------------------------------------------------------------------------------
