@@ -2089,3 +2089,60 @@ input[type='range'].duration-slider {
   }
 }
 
+
+/* Steps 2 and 3: what the map is coloured by, and its key, in a small panel on the map itself (Daniel,
+   2026-11-14). Top left, clear of the time bar at the bottom and the timeline at the right. */
+.map-key {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  max-width: min(320px, calc(100% - 24px));
+  pointer-events: none;
+}
+.map-key > * {
+  pointer-events: auto;
+}
+.map-views {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+.map-views button {
+  flex: 1;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 14.5px;
+  background: none;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.map-views button[aria-pressed='true'] {
+  background: var(--regolith);
+  border-color: var(--regolith);
+  color: var(--space);
+}
+.map-legend {
+  margin: 0;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+.map-legend .legend-note {
+  display: none; /* the buttons and the key say enough; the notes stay in "What these results leave out" */
+}
+.map-legend .legend-swatches {
+  margin: 4px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13.5px;
+  color: var(--ink);
+}

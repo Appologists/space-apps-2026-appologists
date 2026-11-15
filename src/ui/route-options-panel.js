@@ -1,7 +1,7 @@
 // The three route choices (safest, fastest, shortest) as cards above the drive plan, like a road map's route
 // list. Clicking a card shows that route on the map and in the plan below.
 import { ROUTE_KINDS, SLOPE_BANDS, slopeBand } from '../finder/route-options.js';
-import { directions, profile } from '../finder/directions.js';
+import { profile } from '../finder/directions.js';
 import { formatHours } from '../format.js';
 import { WHY_COLOURS } from '../finder/why-not.js';
 import { h } from './dom.js';
@@ -93,24 +93,17 @@ function drawProfile(canvas, result, plan) {
   ctx.fillText(km(total), w - pad.r, hgt);
 }
 
-/** The chosen route: its height profile and its step-by-step directions. */
+/**
+ * The chosen route's height profile, folded. Its step-by-step directions were taken off the page (Daniel,
+ * 2026-11-14): the timeline beside the map now tells the drive. directions() in src/finder/directions.js remains.
+ */
 function routeDetail(result, plan) {
   if (!plan?.path || plan.path.length < 2 || !plan.drive) return null;
   const canvas = h('canvas', { class: 'route-profile', 'aria-label': 'Height along the route, coloured by slope' });
-  const steps = directions(result, plan);
-  const icon = { depart: '▶', drive: '↗', creep: '⋯', wait: '⏸', arrive: '◆', lost: '✕' };
-  // Folded, so the Drive step stays short enough for "Play the drive" to be seen without scrolling.
   const box = h('details', { class: 'explain route-detail' },
-    h('summary', {}, 'Height along the route, and directions'),
-    h('div', { class: 'route-sub' }, 'Height along the route (elevation above the Moon\'s reference sphere)'),
-    canvas,
-    h('div', { class: 'route-sub' }, 'Directions'),
-    h('ol', { class: 'route-steps' },
-      steps.map((step) => h('li', { class: `step-${step.kind}` },
-        h('span', { class: 'step-icon', 'aria-hidden': 'true' }, icon[step.kind]),
-        h('span', { class: 'step-text' }, step.text),
-        h('span', { class: 'step-time' }, step.atHours == null || Number.isNaN(step.atHours) ? '' : `${formatHours(step.atHours)}`)))),
-    h('p', { class: 'caveats' }, 'Headings use the map: up is north. Times are hours after landing. Directions merge small zigzags of the 80 m grid into longer legs.'));
+    h('summary', {}, 'Height along the route'),
+    h('div', { class: 'route-sub' }, 'Elevation above the Moon\'s reference sphere'),
+    canvas);
   box.addEventListener('toggle', () => {
     if (box.open) drawProfile(canvas, result, plan);
   });
