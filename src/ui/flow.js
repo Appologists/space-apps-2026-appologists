@@ -308,39 +308,76 @@ export function createFlow({ app, globe, finder, surface, api }) {
     );
   }
 
+  /** The landing time: big in the middle, with steps of a week, a day and an hour back on the left and forward on the right. */
   function dateRow() {
     const mission = api.getMission();
-    const shift = (days) => {
-      api.setMission({ start: new Date(mission.start.getTime() + days * 86_400_000) });
+    const move = (hours) => {
+      api.setMission({ start: new Date(mission.start.getTime() + hours * 3_600_000) });
       drawSetup();
       save();
     };
+    const STEPS = [
+      [24 * 7, 'week'],
+      [24, 'day'],
+      [1, 'hour'],
+    ];
+    const side = (sign) =>
+      h(
+        'div',
+        { class: 'date-steps', role: 'group', 'aria-label': sign < 0 ? 'Earlier' : 'Later' },
+        STEPS.map(([hours, unit]) =>
+          h('button', { type: 'button', 'aria-label': `One ${unit} ${sign < 0 ? 'earlier' : 'later'}`, onClick: () => move(sign * hours) }, `${sign < 0 ? '−' : '+'}1 ${unit}`),
+        ),
+      );
+    // The date box itself is hidden: tapping the big date opens its picker, for a jump of more than a few weeks.
+    const input = h('input', {
+      id: 'setupStart',
+      class: 'date-input',
+      type: 'datetime-local',
+      step: '3600',
+      tabIndex: -1,
+      'aria-hidden': 'true',
+      value: mission.start.toISOString().slice(0, 16),
+      onChange: (e) => {
+        const date = new Date(`${e.target.value}Z`);
+        if (Number.isNaN(date.getTime())) return;
+        api.setMission({ start: date });
+        drawSetup();
+        save();
+      },
+    });
+    const day = mission.start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
     return h(
       'div',
       { class: 'choice' },
-      h('label', { class: 'choice-label', htmlFor: 'setupStart' }, 'Landing datetime', h('small', { class: 'inline' }, 'UTC')),
+      h('div', { class: 'choice-label' }, 'Landing datetime'),
       h(
         'div',
-        { class: 'date-row', role: 'group', 'aria-label': 'Landing date' },
-        h('input', {
-        id: 'setupStart',
-        class: 'big',
-        type: 'datetime-local',
-        step: '3600',
-        value: mission.start.toISOString().slice(0, 16),
-        onChange: (e) => {
-          const date = new Date(`${e.target.value}Z`);
-          if (Number.isNaN(date.getTime())) return;
-          api.setMission({ start: date });
-          drawSetup();
-          save();
-        },
-        }),
-        h('button', { type: 'button', 'aria-label': 'Two weeks earlier', onClick: () => shift(-14) }, '−2 weeks'),
-        h('button', { type: 'button', 'aria-label': 'Two weeks later', onClick: () => shift(14) }, '+2 weeks'),
+        { class: 'date-row' },
+        side(-1),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'date-now',
+            title: 'Choose a date',
+            onClick: () => {
+              try {
+                input.showPicker();
+              } catch {
+                input.focus();
+              }
+            },
+          },
+          h('span', { class: 'date-day' }, day),
+          h('span', { class: 'date-time' }, `${mission.start.toISOString().slice(11, 16)} UTC`),
+          input,
+        ),
+        side(1),
       ),
     );
   }
+
 
   // The mission cards are built once and then only updated, so the change to the compact row can slide.
   const profileButtons = missions.profiles.map((profile) =>
