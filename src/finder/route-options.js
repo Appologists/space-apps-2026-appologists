@@ -13,14 +13,8 @@ import { planMission } from './planner.js';
 import { pathTo, reachFrom } from './route.js';
 import { STATE, simulatePlan } from './schedule.js';
 
-/** Slope bands for colouring a route, in degrees. Our estimate, from the finder's own limits. */
-export const SLOPE_BANDS = Object.freeze([
-  { maxDeg: 10, id: 'easy', label: 'under 10°', hex: '#7bd88f' },
-  { maxDeg: 15, id: 'moderate', label: '10–15°', hex: '#ffd36b' },
-  { maxDeg: 20, id: 'steep', label: '15–20°', hex: '#ff8a5b' },
-  { maxDeg: Infinity, id: 'too-steep', label: 'over 20°', hex: '#e04848' },
-]);
-export const slopeBand = (deg) => SLOPE_BANDS.find((band) => deg < band.maxDeg) ?? SLOPE_BANDS[SLOPE_BANDS.length - 1];
+import { SLOPE_BANDS, slopeBand } from './slope-bands.js';
+export { SLOPE_BANDS, slopeBand }; // moved to slope-bands.js; still exported from here for existing callers
 
 /** The safest route keeps this share of the darkness limit in reserve (0.3 = it must survive 30% longer). */
 export const DARK_MARGIN = 0.3;
