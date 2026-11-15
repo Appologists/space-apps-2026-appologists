@@ -106,6 +106,7 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   let q = 0;
   // The draft: nothing is applied to the app until "Find regions that fit".
   const answer = { profile: 'nasa', start: null, hours: 336, values: {} };
+  const typing = new Set(); // questions whose "Other" number box is open
   const draftOf = (def) => (def.on === 'mission' ? answer.hours : answer.values[def.key]);
   const draft = (def, value) => {
     if (def.on === 'mission') answer.hours = value;
@@ -158,7 +159,7 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
         pages.push(() => [
           h('h3', {}, group.title),
           group.date ? dateRow(answer.start, (start) => { answer.start = start; drawSurvey(); }) : null,
-          ...group.choices.map((def) => (def.slider ? durationRow : choiceRow)(def, draftOf(def), (value) => draft(def, value))),
+          ...group.choices.map((def) => (def.slider ? durationRow : choiceRow)(def, draftOf(def), (value) => draft(def, value), typing)),
         ]);
       }
     }

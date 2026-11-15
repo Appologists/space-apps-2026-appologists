@@ -38,6 +38,14 @@ describe('the mission questions', () => {
     expect(optionsWith(def, 350).at(-1)).toEqual([350, '350 m']);
   });
 
+  it('offer "Other" for any number in a sensible range, with every ready-made value inside it', () => {
+    for (const def of questions.filter((d) => d.options && typeof d.options[0][0] === 'number')) {
+      expect(def.custom, def.key).toMatchObject({ min: expect.any(Number), max: expect.any(Number), step: expect.any(Number), unit: expect.any(String) });
+      for (const [value] of def.options) expect(value >= def.custom.min && value <= def.custom.max, `${def.key} ${value}`).toBe(true);
+    }
+    for (const def of questions.filter((d) => d.options && typeof d.options[0][0] === 'boolean')) expect(def.custom, def.key).toBeUndefined();
+  });
+
   it('say a group in a few words, leaving out what is not needed', () => {
     const preset = missions.profiles.find((p) => p.id === 'nasa');
     const valueOf = (def) => (def.on === 'mission' ? preset.mission[def.key] : preset.finder[def.key]);
