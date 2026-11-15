@@ -286,8 +286,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
     return h(
       'div',
       { class: 'choice' },
-      h('label', { class: 'choice-label', htmlFor: 'setupStart' }, 'Landing date and time (UTC)'),
-      h('input', {
+      h('label', { class: 'choice-label', htmlFor: 'setupStart' }, 'Landing datetime', h('small', { class: 'inline' }, 'UTC')),
+      h(
+        'div',
+        { class: 'date-row', role: 'group', 'aria-label': 'Landing date' },
+        h('input', {
         id: 'setupStart',
         class: 'big',
         type: 'datetime-local',
@@ -300,12 +303,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
           drawSetup();
           save();
         },
-      }),
-      h(
-        'div',
-        { class: 'choice-options', role: 'group', 'aria-label': 'Move the landing date' },
-        h('button', { type: 'button', onClick: () => shift(-14) }, '2 weeks earlier'),
-        h('button', { type: 'button', onClick: () => shift(14) }, '2 weeks later'),
+        }),
+        h('button', { type: 'button', 'aria-label': 'Two weeks earlier', onClick: () => shift(-14) }, '−2 weeks'),
+        h('button', { type: 'button', 'aria-label': 'Two weeks later', onClick: () => shift(14) }, '+2 weeks'),
       ),
     );
   }
@@ -316,6 +316,20 @@ export function createFlow({ app, globe, finder, surface, api }) {
         h(
           'button',
           { type: 'button', class: 'profile', 'aria-pressed': String(profile.id === profileId), onClick: () => useProfile(profile.id) },
+          profile.pictures?.length
+            ? h(
+                'span',
+                { class: 'profile-pictures' },
+                profile.pictures.map((picture) =>
+                  h('img', {
+                    src: /^https?:/.test(picture.src) ? picture.src : `${import.meta.env.BASE_URL}${picture.src}`,
+                    alt: picture.alt,
+                    title: picture.credit,
+                    style: `flex: ${picture.width ?? 100} 1 0; object-position: ${picture.position ?? '50% 50%'}`,
+                  }),
+                ),
+              )
+            : null,
           h('strong', {}, profile.name),
           h('span', {}, profile.blurb),
         ),
