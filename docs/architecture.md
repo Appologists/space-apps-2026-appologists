@@ -133,10 +133,10 @@ viewer, the ground beyond is drawn flat and blue-grey, and the app says so.
   59 m data and the rest from memory. With the 59 m data chosen by itself the same view reads 382 blocks
   (100 MB) and takes about 3 s the first time.
 
-Check we ran (2026-11-14, `npm run check:tiles`): on the five tiles downloaded so far, 3,000 points per tile
-against the 470 m whole-Moon map gave correlations of 0.9998 to 1.0000, mean differences under 1.2 m and a
-spread of 14–17 m (the two maps differ in detail, not in place). The same check against the 80 m south-pole
-grid between 80° and 88° S is written but has not run: it needs the `90s_45s` tiles.
+Check we ran (2026-11-14, `npm run check:tiles`, all 16 tiles): 3,000 points per tile against the 470 m
+whole-Moon map gave correlations of 0.9998 to 1.0000, mean differences of at most 2.1 m and a spread of
+13–23 m (the two maps differ in detail, not in place). The four southern tiles against the 80 m south-pole
+grid between 80° and 88° S: correlation 1.0000, mean difference at most 0.1 m, spread 1.8–3.2 m.
 
 ## The landing-site finder
 
