@@ -225,7 +225,7 @@ nothing itself. It decides which view is on the stage and passes values between 
 | Step | What does the work |
 | --- | --- |
 | 1 Mission | Fills the finder's values and the mission from a profile in `data/missions.json`, or from the big custom choices |
-| 2 Regions | One landing search per region (`searchQuestion` in `src/finder/client.js` builds each question); the finder's map shows the chosen region |
+| 2 Regions | One landing search per region (`searchQuestion` in `src/finder/client.js` builds each question); the 3D Moon stays on the stage, turned to the chosen region, with every region marked by its result (`setRegions` in `src/globe/globe.js`); the finder's flat map comes in at step 3 |
 | 3 Drive | The finder's reach, route and drive planner, unchanged. `src/finder/playback.js` turns a plan into "where is the rover at hour t" |
 | 4 Surface | The surface view, opened at the rover's start |
 | 5 Ride | The same surface view with `setPosition()` moving the viewpoint along the route |

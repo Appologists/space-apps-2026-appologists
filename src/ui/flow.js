@@ -72,6 +72,10 @@ const GROUPS = [
   },
 ];
 
+// Region markers on the globe, coloured like the verdicts in the list (styles.css, .region .verdict).
+const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
+// How close the globe comes on step 2: the whole cluster of south-pole regions stays in view (our choice).
+const REGION_ZOOM = 12;
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
 /**
@@ -147,9 +151,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
     $('flowBody').scrollTop = 0;
     drawNav();
 
+    drawGlobeRegions();
     if (step === 1) {
       finder.close();
       surface.close();
+      globe.view('south');
       api.setStatus(null);
       drawSetup();
     } else if (step === 2 || step === 3) {
@@ -157,7 +163,13 @@ export function createFlow({ app, globe, finder, surface, api }) {
       if (step === 2) searchRegions();
       const result = shownResult();
       if (result && finder.getResult() !== result) showRegion(regionId); // found while another step was on the stage
-      else if (result) finder.open();
+      if (step === 2) {
+        // The globe stays on the stage, turned to the region; the flat map comes in at step 3.
+        finder.close();
+        const region = REGIONS.find((r) => r.id === regionId);
+        if (region) globe.focus(region.lat, region.lon, REGION_ZOOM);
+        else globe.view('southClose');
+      } else if (result) finder.open();
       const map = finder.getMap();
       clock.showTime = false;
       map?.setTime(null);
@@ -534,6 +546,10 @@ export function createFlow({ app, globe, finder, surface, api }) {
     regionId = id;
     const region = REGIONS.find((r) => r.id === id);
     if (step === 2 || step === 3) finder.showResult(result, region.name, { startAt: result.sites[0] ?? null });
+    if (step === 2) {
+      finder.close(); // loaded for step 3, but step 2 shows the globe
+      globe.focus(region.lat, region.lon, REGION_ZOOM);
+    }
     drawRegions();
     drawNav();
     save();
@@ -571,6 +587,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       return result ? passingKm2(result) : -1;
     };
     const order = scan.done ? [...REGIONS].sort((a, b) => rank(b) - rank(a)) : REGIONS;
+    drawGlobeRegions();
     clear($('regions')).append(
       ...order.map((region) => {
         const entry = scan.results.get(region.id);
@@ -585,10 +602,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
               class: 'region',
               'aria-pressed': String(region.id === regionId),
               disabled: !entry?.result,
-              onClick: () => {
-                userChoseRegion = true;
-                showRegion(region.id);
-              },
+              onClick: () => chooseRegion(region.id),
             },
             h('strong', {}, region.name),
             h('span', { class: `verdict ${kind}` }, text),
@@ -596,6 +610,25 @@ export function createFlow({ app, globe, finder, surface, api }) {
           region.note ? h('small', { class: 'region-note', title: region.source?.title ?? '' }, region.note) : null,
         );
       }),
+    );
+  }
+
+  function chooseRegion(id) {
+    if (!scan.results.get(id)?.result) return;
+    userChoseRegion = true;
+    showRegion(id);
+  }
+
+  /** The regions on the globe while step 2 is on, each coloured by its verdict; none on the other steps. */
+  function drawGlobeRegions() {
+    if (step !== 2) return globe.setRegions([]);
+    globe.setRegions(
+      REGIONS.map((region) => ({
+        ...region,
+        color: REGION_COLOURS[verdict(scan.results.get(region.id))[0]],
+        selected: region.id === regionId,
+      })),
+      { onPick: chooseRegion },
     );
   }
 

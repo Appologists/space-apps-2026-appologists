@@ -401,6 +401,16 @@ input[type='range'] {
   border-radius: 3px;
   background: color-mix(in srgb, var(--panel) 80%, transparent);
 }
+/* The mission steps' regions on the globe (step 2): bigger, and the chosen one matches its beige button. */
+.lbl.region-lbl {
+  font-size: 15px;
+}
+.lbl.region-lbl.on {
+  z-index: 1; /* on top where neighbouring regions' names overlap */
+  color: var(--space);
+  background: var(--regolith);
+  text-shadow: none;
+}
 .tip {
   position: absolute;
   left: 0;
