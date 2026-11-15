@@ -1,0 +1,12 @@
+{
+  "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed.",
+  "teamName": "Team Appologists",
+  "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
+  "team": [],
+  "thanks": [
+    { "what": "Terrain", "who": "NASA Lunar Reconnaissance Orbiter, LOLA instrument" },
+    { "what": "Sun and Earth positions", "who": "Astronomy Engine by Don Cross, checked against NASA JPL Horizons" },
+    { "what": "Moon colour map", "who": "NASA Scientific Visualization Studio, CGI Moon Kit" },
+    { "what": "Drawn with", "who": "three.js, Vite and Vitest" }
+  ]
+}
