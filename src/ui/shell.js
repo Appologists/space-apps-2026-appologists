@@ -276,7 +276,7 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
       return false;
     }
     const name = region ? `${region.name} · landing spot` : 'Landing spot';
-    const url = `/Street-view/index.html?embed&lat=${start.lat.toFixed(5)}&lon=${start.lon.toFixed(5)}&name=${encodeURIComponent(name)}&start=${getMission().start.toISOString()}`;
+    const url = `/Street-view/index.html?embed&lat=${start.lat.toFixed(5)}&lon=${start.lon.toFixed(5)}&name=${encodeURIComponent(name)}&start=${getMission().start.toISOString()}${location.search.includes('vr-test') ? '&vr-test' : ''}`;
     const frame = $('svFrame');
     if (frame.dataset.url !== url) {
       frame.dataset.url = url;

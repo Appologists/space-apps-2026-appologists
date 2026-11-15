@@ -52,6 +52,8 @@
     border-radius:2px;border:0;background:var(--accent);color:#140c08;font:600 12.5px var(--mono);box-shadow:0 4px 18px rgba(255,106,61,.35)}
   #vrBtn:hover{filter:brightness(1.1)}
   #vrBtn svg{width:20px;height:20px}
+  @keyframes vrPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,106,61,.7)}50%{box-shadow:0 0 0 10px rgba(255,106,61,0)}}
+  body.vr-ready #vrBtn:not(.off){animation:vrPulse 1.6s ease-in-out infinite}
   #vrBtn.off{background:rgba(14,13,12,.9);color:var(--muted);border:1px dashed rgba(239,233,221,.35);box-shadow:none;cursor:help}
   #site h1{margin:6px 0 2px;font-size:20px;font-weight:700;letter-spacing:-.01em}
   #site .coords{font-size:12px;color:var(--muted)}
@@ -1087,11 +1089,18 @@ function vrQuality(on){
   if(renderer.xr.setFoveation) renderer.xr.setFoveation(on?1:0);
 }
 const vrBtn=document.getElementById('vrBtn');
-async function checkVR(){ let ok=false; try{ ok=!!(navigator.xr&&await navigator.xr.isSessionSupported('immersive-vr')); }catch(e){}
+// Inside the app (an embedded frame) VR is not reliable: emulators and some browsers only reach the top page.
+// So there the button opens this same spot and moment as its own page, where Enter VR works.
+const IN_APP=new URLSearchParams(location.search).has('embed')&&window.top!==window;
+function ownPageUrl(){ const q=new URLSearchParams(location.search); q.delete('embed');
+  if(START_AT_FOR_VR()) q.set('start',START_AT_FOR_VR()); q.set('vr','1'); return location.pathname+'?'+q.toString().replace(/=(?=&|$)/g,''); }
+const START_AT_FOR_VR=()=>{ try{ return new Date(T0+t*3600e3).toISOString(); }catch(e){ return null; } };
+async function checkVR(){ if(IN_APP){ vrBtn.disabled=false; vrBtn.classList.remove('off'); vrBtn.querySelector('span').textContent='Enter VR ↗'; vrBtn.title='Opens this spot in its own tab, where VR starts'; return; }
+  let ok=false; try{ ok=!!(navigator.xr&&await navigator.xr.isSessionSupported('immersive-vr')); }catch(e){}
   vrBtn.disabled=!ok; vrBtn.classList.toggle('off',!ok); vrBtn.querySelector('span').textContent=ok?'Enter VR':'VR: open on a Quest';
   vrBtn.title=ok?'Stand here in VR':'Open this page in the Meta Quest browser (or Chrome with Meta’s Immersive Web Emulator)'; }
 checkVR(); addEventListener('vrtest-ready',checkVR);
-vrBtn.addEventListener('click',async()=>{ if(vrBtn.disabled||inVR) return;
+vrBtn.addEventListener('click',async()=>{ if(IN_APP){ window.open(ownPageUrl(),'_blank'); return; } if(vrBtn.disabled||inVR) return;
   try{ const s=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor','bounded-floor']}); await renderer.xr.setSession(s);
     inVR=true; vrYaw=cam.yaw; vrQuality(true); camera.near=0.05; camera.updateProjectionMatrix();   // hands and the wrist panel are closer than 30 cm hoverEl.style.display='none'; document.body.classList.add('vr');
     s.addEventListener('end',()=>{ inVR=false; vrQuality(false); camera.near=0.3; camera.updateProjectionMatrix();
@@ -1153,7 +1162,8 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;   // run
 
 resize(); renderer.setAnimationLoop(frame);
 const QS=new URLSearchParams(location.search), EMBED=QS.has('embed');
-if(EMBED) document.body.classList.add('embed');   // inside the app: the app has its own navigation
+if(EMBED) document.body.classList.add('embed');
+if(QS.has('vr')) document.body.classList.add('vr-ready');   // opened from the app to go into VR: the button pulses   // inside the app: the app has its own navigation
 if(QS.has('lat')&&QS.has('lon')){ SITES.here.at={lat:+QS.get('lat'), lon:+QS.get('lon'), name:QS.get('name')||'Landing spot'}; }
 // &start=<ISO time>: open on that week, at that hour (the app passes the moment of touchdown)
 const START_AT=QS.has('start')?new Date(QS.get('start')):null;
