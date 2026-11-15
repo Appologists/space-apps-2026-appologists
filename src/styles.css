@@ -1255,13 +1255,19 @@ input.big {
   min-height: 48px;
   font-size: 16px;
 }
-/* The landing date: the date box and its two buttons on one row. */
+/* The landing date: the date box and its two buttons on one row when they fit, the buttons below when not. */
 .date-row {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
+.date-row input {
+  flex: 2 1 270px;
+  width: auto;
+  min-width: 0;
+}
 .date-row button {
+  flex: 1 1 110px;
   min-height: 48px;
   padding-inline: 4px;
   font-size: 16px;
@@ -1643,5 +1649,77 @@ input.big {
   }
   .app[data-step='1'] #missionSection.compact .profile[aria-pressed='false'] .profile-back {
     font-size: 22px;
+  }
+}
+
+/* The custom form's groups: Mission, Lander, Rover. Closed, a group is one big row naming what is set. */
+.group {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--card);
+}
+.group > summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title chevron' 'said chevron';
+  align-items: center;
+  gap: 2px 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+}
+.group > summary::-webkit-details-marker {
+  display: none;
+}
+.group > summary::after {
+  content: '▾';
+  grid-area: chevron;
+  font-size: 20px;
+  color: var(--dim);
+  transition: transform 0.2s ease;
+}
+.group[open] > summary::after {
+  transform: rotate(180deg);
+}
+.group > summary:focus-visible {
+  outline: 2px solid var(--regolith);
+  outline-offset: -2px;
+}
+.group-title {
+  grid-area: title;
+  font-size: 18px;
+  font-weight: 600;
+}
+.group-summary {
+  grid-area: said;
+  font-size: 14px;
+  color: var(--dim);
+}
+.group-body {
+  display: grid;
+  gap: 14px;
+  padding: 4px 14px 16px;
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] .group > summary {
+    min-height: 76px;
+    padding: 12px 18px;
+  }
+  .app[data-step='1'] .group-title {
+    font-size: 24px;
+  }
+  .app[data-step='1'] .group-summary {
+    font-size: 17px;
+  }
+  .app[data-step='1'] .group > summary::after {
+    font-size: 26px;
+  }
+  .app[data-step='1'] .group-body {
+    gap: 20px;
+    padding: 4px 18px 20px;
+  }
+  .app[data-step='1'] .setup {
+    gap: 12px;
   }
 }
