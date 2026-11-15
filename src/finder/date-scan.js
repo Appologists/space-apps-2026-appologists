@@ -1,6 +1,6 @@
 // When can you land? For a landing spot and the next weeks, try every landing hour and say whether the mission
-// would pass: Sun and Earth in view at touchdown, never dark for longer than the rover survives, and the same
-// score the landing-site search gives (unbroken sunlight and Earth in view). Pure: no DOM, no fetching.
+// would pass: Sun and Earth in view at touchdown, never dark for longer than the rover survives. Passing hours are
+// ranked by a time score (landingScore below): unbroken sunlight and Earth in view. Pure: no DOM, no fetching.
 //
 // Method (the "decouple terrain from time" idea): the terrain is reduced once to a horizon profile per spot
 // (src/terrain/polar-grid.js, 300 km of LOLA terrain in every direction). The Sun's and Earth's paths come from
@@ -35,11 +35,20 @@ export const REASON_TEXT = {
 };
 
 /**
- * Score of a landing, 0–1: the same formula as the landing-site search (src/finder/score.js cellScore).
+ * How much the time score counts each part (our choice): the longest unbroken sunlight 1, Earth in view 0.7, so
+ * 0.59 and 0.41 of the score. They are the default weights of the ranked list of known sites
+ * (src/criteria/sunlight.js, earth-comms.js).
  */
-export function landingScore(longestLitH, missionHours, earthFraction, weights) {
-  const wSun = Math.max(weights?.sunlight ?? 1, 0);
-  const wEarth = Math.max(weights?.earthComms ?? 0, 0);
+export const TIME_SCORE_WEIGHTS = Object.freeze({ sunlight: 1, earthComms: 0.7 });
+
+/**
+ * Score of a landing time, 0–1, used only to rank the landing hours that pass: the longest unbroken sunlight as a
+ * share of the stay, and the share of the stay with Earth in view, weighted. It is not how the landing-site
+ * search ranks places (that is room to miss, src/finder/score.js); one spot's hours all have the same room.
+ */
+export function landingScore(longestLitH, missionHours, earthFraction, weights = TIME_SCORE_WEIGHTS) {
+  const wSun = Math.max(weights.sunlight ?? 0, 0);
+  const wEarth = Math.max(weights.earthComms ?? 0, 0);
   if (wSun + wEarth === 0) return 0;
   return (wSun * Math.min(longestLitH / missionHours, 1) + wEarth * earthFraction) / (wSun + wEarth);
 }
@@ -58,13 +67,13 @@ export function landingScore(longestLitH, missionHours, earthFraction, weights) 
  * @param {number} [input.rules.maxDarknessHours=Infinity]
  * @param {number} [input.rules.minSunClearDeg=0]       Sun counts as up above this clearance (0: centre of the disc)
  * @param {number} [input.rules.minEarthClearDeg=0]     Earth counts as in view above this (see EARTH_LINK_RULES)
- * @param {object} [input.weights]                      { sunlight, earthComms }, as in the search
+ * @param {object} [input.weights]                      { sunlight, earthComms } for the time score (default TIME_SCORE_WEIGHTS)
  * @returns {{ starts: Array<{ index, hours, pass, reasons: string[], longestDarkH, longestLitH, litFraction,
- *            earthFraction, score }>, stepHours }}
+ *            earthFraction, sunClearDeg, score }>, stepHours }}
  *   Every series must hold at least scanHours + missionHours of steps; more is used to measure darkness that is
  *   still going when the mission ends.
  */
-export function scanLandings({ sunClear, earthClear, stepHours, scanHours, missionHours, rules = {}, weights }) {
+export function scanLandings({ sunClear, earthClear, stepHours, scanHours, missionHours, rules = {}, weights = TIME_SCORE_WEIGHTS }) {
   const { needSunAtLanding = true, needEarthAtLanding = true, maxDarknessHours = Infinity, minSunClearDeg = 0, minEarthClearDeg = 0 } = rules;
   const total = Math.min(sunClear.length, earthClear.length);
   const missionSteps = Math.round(missionHours / stepHours);
@@ -140,6 +149,7 @@ export function scanLandings({ sunClear, earthClear, stepHours, scanHours, missi
       longestLitH,
       litFraction,
       earthFraction,
+      sunClearDeg: sunClear[s], // how far the Sun's centre clears the terrain at touchdown
       score: landingScore(longestLitH, missionHours, earthFraction, weights),
     };
   }
@@ -147,8 +157,23 @@ export function scanLandings({ sunClear, earthClear, stepHours, scanHours, missi
 }
 
 /**
+ * True if landing time a ranks above b: the higher time score; on a tie (common: a whole stay in sunlight with Earth
+ * always in view scores 1), the shorter longest darkness, then the Sun higher above the terrain at touchdown, so the
+ * answer is not the hour the Sun has only just cleared a ridge (our choice).
+ */
+export function betterLanding(a, b) {
+  if (!b) return true;
+  if (Math.abs(a.score - b.score) > 1e-12) return a.score > b.score;
+  if (a.longestDarkH !== b.longestDarkH) return a.longestDarkH < b.longestDarkH;
+  return (a.sunClearDeg ?? 0) > (b.sunClearDeg ?? 0);
+}
+
+/** For sorting: best landing time first. */
+export const byBetterLanding = (a, b) => (betterLanding(a, b) ? -1 : betterLanding(b, a) ? 1 : 0);
+
+/**
  * Group the landing times that pass into windows (unbroken runs of passing hours), best first.
- * @returns {Array<{ fromHours, toHours, best }>}  best: the highest-scoring start inside the window
+ * @returns {Array<{ fromHours, toHours, best }>}  best: the best start inside the window (betterLanding)
  */
 export function landingWindows(scan) {
   const out = [];
@@ -157,14 +182,14 @@ export function landingWindows(scan) {
     if (st.pass) {
       if (!cur) cur = { fromHours: st.hours, toHours: st.hours, best: st };
       cur.toHours = st.hours;
-      if (st.score > cur.best.score + 1e-12 || (Math.abs(st.score - cur.best.score) <= 1e-12 && st.longestDarkH < cur.best.longestDarkH)) cur.best = st;
+      if (betterLanding(st, cur.best)) cur.best = st;
     } else if (cur) {
       out.push(cur);
       cur = null;
     }
   }
   if (cur) out.push(cur);
-  return out.sort((a, b) => b.best.score - a.best.score || a.fromHours - b.fromHours);
+  return out.sort((a, b) => byBetterLanding(a.best, b.best) || a.fromHours - b.fromHours);
 }
 
 /**
@@ -183,7 +208,7 @@ export function dailySummary(scan, dayHours = 24) {
     for (const st of slice) {
       if (st.pass) {
         passHours += scan.stepHours;
-        if (!best || st.score > best.score) best = st;
+        if (betterLanding(st, best)) best = st;
       } else for (const r of st.reasons) reasonCounts[r] = (reasonCounts[r] ?? 0) + 1;
     }
     const reason = best ? null : Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;

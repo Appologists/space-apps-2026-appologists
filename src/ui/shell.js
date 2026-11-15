@@ -295,6 +295,11 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     globe.setOption('grid', false);
   }
 
+  // "Use this landing time" (When can you land?, flow.js) moves the landing time: the summary line says the new one.
+  $('dateScan').addEventListener('click', (e) => {
+    if (e.target.closest('.when-use')) drawSummary();
+  });
+
   // ---- start ------------------------------------------------------------------------------------------------
   // A saved address (a reload, a shared link, coming back from the street view page) goes straight back; a first
   // visit starts with the survey. flow.savedStep says which: by now the address itself has been rewritten.

@@ -2439,8 +2439,9 @@ button.linklike {
 }
 .when-row {
   display: grid;
-  grid-template-columns: 112px repeat(30, minmax(9px, 1fr));
-  gap: 2px;
+  /* 30 days fit the Moon tab's narrow left card (about 250 px) without scrolling sideways */
+  grid-template-columns: minmax(64px, 112px) repeat(30, minmax(3px, 1fr));
+  gap: 1px;
   align-items: center;
 }
 .when-name {
@@ -2452,7 +2453,7 @@ button.linklike {
   padding-right: 4px;
 }
 .when-head .when-day-label {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--dim);
   white-space: nowrap;
   overflow: visible;
@@ -2465,7 +2466,7 @@ button.linklike {
 .when-cell {
   display: inline-block;
   height: 16px;
-  min-width: 9px;
+  min-width: 3px;
   padding: 0;
   border: none;
   border-radius: 2px;

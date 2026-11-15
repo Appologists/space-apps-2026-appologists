@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { REASON, dailySummary, landingScore, landingWindows, scanLandings } from '../src/finder/date-scan.js';
+import { REASON, TIME_SCORE_WEIGHTS, dailySummary, landingScore, landingWindows, scanLandings } from '../src/finder/date-scan.js';
 
 /** Clearance series from a pattern: '#' = clear by +5°, '.' = blocked by −5°. One character per hour. */
 const series = (pattern) => Float64Array.from(pattern, (c) => (c === '#' ? 5 : -5));
@@ -79,5 +79,21 @@ describe('landingWindows and dailySummary', () => {
     const [day] = dailySummary(scan, 24);
     expect(day.best).toBe(null);
     expect(day.reason).toBe(REASON.NO_SUN);
+  });
+  it('scores landing times with its own stated weights, not the search\'s', () => {
+    expect(TIME_SCORE_WEIGHTS).toEqual({ sunlight: 1, earthComms: 0.7 });
+    expect(landingScore(14, 14, 1)).toBe(1);
+    expect(landingScore(7, 14, 0)).toBeCloseTo(0.5 / 1.7, 12);
+  });
+
+  it('on equal scores, picks the hour with the Sun higher above the terrain', () => {
+    // always lit and in view of Earth (every hour scores 1); the Sun climbs from just over the ridge
+    const sun = Array.from({ length: 40 }, (_, i) => 0.01 + i * 0.1);
+    const earth = new Array(40).fill(5);
+    const scan = scanLandings({ sunClear: sun, earthClear: earth, stepHours: 1, scanHours: 10, missionHours: 20 });
+    const [win] = landingWindows(scan);
+    expect(win.fromHours).toBe(0);
+    expect(win.best.hours).toBe(9);
+    expect(dailySummary(scan, 24)[0].best.hours).toBe(9);
   });
 });

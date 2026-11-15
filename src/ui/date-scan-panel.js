@@ -3,7 +3,7 @@
 // answer; the day-by-day strip and the method fold out. Picking a time sets the mission's landing time.
 import { ephemerisSeries } from '../astro/ephemeris.js';
 import { skySeries } from '../astro/sky.js';
-import { EARTH_LINK_RULES, REASON, REASON_TEXT, dailySummary, landingWindows, scanLandings } from '../finder/date-scan.js';
+import { EARTH_LINK_RULES, REASON, REASON_TEXT, betterLanding, byBetterLanding, dailySummary, landingWindows, scanLandings } from '../finder/date-scan.js';
 import { EXAMPLE_PANEL, MOUNTS, energySummary, hoursUntilBelow, powerSeries } from '../finder/power.js';
 import { formatHours, formatLatLon } from '../format.js';
 import { fetchTerrainPatch } from '../terrain/client.js';
@@ -102,7 +102,6 @@ export function createDateScan({ el, onUse }) {
           scanHours,
           missionHours,
           rules,
-          weights: q.weights,
         });
         spotRows.push({ spot, scan, light: { sunClear, earthClear, sunEl: sky.sunEl }, windows: landingWindows(scan), days: dailySummary(scan, 24) });
       } catch (error) {
@@ -111,18 +110,25 @@ export function createDateScan({ el, onUse }) {
       await new Promise((r) => setTimeout(r, 0));
     }
     if (mine !== job) return;
-    const regions = groupByRegion(spotRows);
+    // Spots whose ground could not be read are left out (on the website only the ready-made missions' first
+    // landing spots are saved); a region with none left is named in one plain line under the answer.
+    const failed = spotRows.filter((r) => r.error);
+    const regions = groupByRegion(spotRows.filter((r) => !r.error));
+    const missing = [...new Set(failed.map((r) => r.spot.region ?? r.spot.name))].filter((name) => !regions.some((region) => region.name === name));
+    const onWebsite = failed.some((r) => /not saved on the website/.test(r.error));
+    const why = onWebsite ? 'The ground there is not saved on this website; the app run on a computer (npm run dev) checks it.' : failed[0]?.error;
+    const skipped = failed.length ? { names: missing, why } : null;
     // Best landing per region (its best window over all its spots), best first.
     const ranked = regions
       .map((region) => {
         let best = null;
-        for (const r of region.spots) for (const win of r.windows ?? []) if (!best || win.best.score > best.win.best.score) best = { row: r, win };
+        for (const r of region.spots) for (const win of r.windows ?? []) if (!best || betterLanding(win.best, best.win.best)) best = { row: r, win };
         return best && { ...best, region };
       })
       .filter(Boolean)
-      .sort((a, b) => b.win.best.score - a.win.best.score);
+      .sort((a, b) => byBetterLanding(a.win.best, b.win.best));
     const sunAU = Float64Array.from(series.samples, (sample) => sample.sunDistanceAU);
-    last = { input, rows: regions, ranked, missionHours, rules, sunAU };
+    last = { input, rows: regions, ranked, missionHours, rules, sunAU, skipped };
     picked = ranked[0] ? { row: ranked[0].row, start: ranked[0].win.best } : null;
     draw();
   }
@@ -245,10 +251,16 @@ export function createDateScan({ el, onUse }) {
   }
 
   function draw() {
-    const { rows, ranked, missionHours } = last;
+    const { rows, ranked, missionHours, skipped } = last;
     const end = new Date(anchor.getTime() + SCAN_DAYS * DAY_MS - 1);
     const range = `${dayLabel(anchor)} – ${dayLabel(end)}`;
     clear(el);
+    if (!rows.length) {
+      // No spot's ground could be read (on the website, a mission other than the ready-made ones): one plain line.
+      el.append(h('p', { class: 'when-note' }, `Landing times could not be checked. ${skipped?.why ?? ''}`));
+      return;
+    }
+    const skippedLine = skipped?.names.length ? h('p', { class: 'when-note' }, `Not checked: ${skipped.names.join(', ')}. ${skipped.why}`) : '';
     if (!ranked.length) {
       // Nothing passes: say what stands in the way most often.
       const counts = {};
@@ -267,14 +279,14 @@ export function createDateScan({ el, onUse }) {
             `${dayLabel(dateOf(o.win.best))} at ${o.row.spot.name}`)])));
       }
     }
-    el.append(strip(rows, missionHours), method());
+    el.append(skippedLine, strip(rows, missionHours), method());
   }
 
   function strip(rows, missionHours) {
     const header = h('div', { class: 'when-row when-head' }, h('span', { class: 'when-name' }, ''),
       Array.from({ length: SCAN_DAYS }, (_, d) => {
         const date = new Date(anchor.getTime() + d * DAY_MS);
-        const showLabel = d === 0 || date.getUTCDate() === 1 || d % 7 === 0;
+        const showLabel = d % 7 === 0 && d <= SCAN_DAYS - 6; // weekly, and none so near the end that it sticks out of a narrow card
         return h('span', { class: 'when-day-label' }, showLabel ? date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '');
       }));
     const body = rows.map((region) =>
@@ -305,7 +317,7 @@ export function createDateScan({ el, onUse }) {
               });
             })));
     const key = h('div', { class: 'when-key' },
-      h('span', {}, h('i', { class: 'when-cell ok', style: '--k:1' }), 'can land (brighter: better score)'),
+      h('span', {}, h('i', { class: 'when-cell ok', style: '--k:1' }), 'can land (brighter: longer sun in a row, more Earth in view)'),
       h('span', {}, h('i', { class: 'when-cell dark' }), REASON_TEXT[REASON.DARK]),
       h('span', {}, h('i', { class: 'when-cell nosun' }), REASON_TEXT[REASON.NO_SUN]),
       h('span', {}, h('i', { class: 'when-cell noearth' }), REASON_TEXT[REASON.NO_EARTH]));
@@ -321,7 +333,7 @@ export function createDateScan({ el, onUse }) {
       h('button', { type: 'button', 'aria-pressed': String(id === earthRule), onClick: () => { earthRule = id; key = null; last && update(last.input); } }, rule.label));
     return h('details', { class: 'explain' },
       h('summary', {}, 'How this is worked out'),
-      h('p', {}, 'For each spot the terrain is turned once into its horizon: how high the land rises in every direction, out to 300 km, seen from the solar panel and from the antenna. The Sun and Earth are then followed hour by hour; each hour is one comparison, the body\'s height against the horizon in its direction. A landing hour passes if the Sun and Earth are in view at touchdown (when your mission asks for that) and the rover is never dark for longer than it survives, darkness counted from touchdown until the light comes back, even after the stay ends. Landings that pass are ranked by the same score as the region search: unbroken sunlight and Earth in view, with your weights.'),
+      h('p', {}, 'For each spot the terrain is turned once into its horizon: how high the land rises in every direction, out to 300 km, seen from the solar panel and from the antenna. The Sun and Earth are then followed hour by hour; each hour is one comparison, the body\'s height against the horizon in its direction. A landing hour passes if the Sun and Earth are in view at touchdown (when your mission asks for that) and the rover is never dark for longer than it survives, darkness counted from touchdown until the light comes back, even after the stay ends. Landing hours that pass are ranked by a time score of our own: the longest unbroken sunlight as a share of the stay counts 0.59, the share of the stay with Earth in view 0.41. It only orders landing times; the region search ranks places by room to miss.'),
       h('div', { class: 'when-rule' }, h('span', {}, 'Earth counts as in view when '), h('span', { class: 'lensbuttons two' }, ruleButtons)),
       h('p', { class: 'caveats' }, `Earth looks about 1.9° wide from the Moon, so its edge can show over a ridge while its centre is hidden; radio also bends a little over a sharp ridge. "Any part" is closer to how a radio link behaves; "its centre" is what the region search uses. The Sun counts as up while the centre of its disc clears the terrain; for power, whatever part of its disc shows counts. "Earth in view" means the geometry allows a direct-to-Earth link: the app does not check antennas, transmitter power or ground-station schedules, and where Earth is hidden by terrain a relay would be needed. Terrain is NASA LOLA at about 80 m per pixel, so rocks and small craters are not seen. Times are checked every hour. The spots are the best ones the search found for your current landing time; on other dates other spots nearby may do better.`));
   }
@@ -350,7 +362,7 @@ function groupByRegion(spotRows) {
       const reasonCounts = {};
       for (const r of ok) {
         const day = r.days[d];
-        if (day.best && (!best || day.best.score > best.score)) {
+        if (day.best && betterLanding(day.best, best)) {
           best = day.best;
           row = r;
           passHours = day.passHours;
