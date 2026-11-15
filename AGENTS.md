@@ -5,10 +5,13 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 
 ## Commands
 
+**Setting up a machine to show the demo:** follow [`docs/demo-runbook.md`](docs/demo-runbook.md) step by step
+(terrain, `npm run data:light`, `npm run demo:warm`). Tell the person if a step has not been done.
+
 - `npm run dev` runs the app. `npm test` must pass before you say a change is done.
 - `npm run check:horizons` compares our Sun/Earth maths with NASA JPL Horizons. Run it after touching
   `src/astro/`.
-- `npm run data:light` (once, after downloading terrain; about 7 minutes) stores which ground sees the Sun and
+- `npm run data:light` (once, after downloading terrain; about 5 minutes) stores which ground sees the Sun and
   Earth, hour by hour, for the seven mission regions from 14 Nov 2026 to 15 Jan 2027 (`data/raw/light/`, not in
   git). A search there then answers in about a second, for any landing limits and any whole-hour landing time
   in that stretch. Rerun it after changing the code listed in `server/light-store.mjs`; `npm run check:light`
