@@ -20,7 +20,7 @@ const portArg = process.argv.indexOf('--port');
 const port = portArg > 0 ? Number(process.argv[portArg + 1]) : 5173;
 const url = `http://localhost:${port}/api/terrain/landing-search`;
 
-const regions = missions.regions.map((region) => (region.site ? { ...sites.sites.find((s) => s.id === region.site), id: region.id } : region));
+const regions = missions.regions.map((region) => (region.site ? { ...sites.sites.find((s) => s.id === region.site), id: region.id, searchRadiusKm: region.searchRadiusKm } : region));
 let failed = 0;
 let notKept = 0;
 console.log(`Asking the app on port ${port} (${url})`);
