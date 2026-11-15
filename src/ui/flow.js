@@ -16,7 +16,7 @@ import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
 import { STATE } from '../finder/schedule.js';
 import { formatHours, formatUTC } from '../format.js';
-import { LUNAR_DAY_HOURS } from '../mission.js';
+import { DURATION_MARKS, formatDuration, positionOf, tidyDuration } from '../mission.js';
 import { clear, h } from './dom.js';
 import { decodeFlow, encodeFlow } from './flow-state.js';
 
@@ -40,7 +40,6 @@ const REGIONS = missions.regions.map((region) => {
 });
 
 // The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
-const DAY = 24;
 const yes = (when) => (v) => (v ? when[0] : when[1]);
 const GROUPS = [
   {
@@ -48,7 +47,7 @@ const GROUPS = [
     title: 'Mission',
     date: true, // the landing date comes first, with its own row
     choices: [
-      { on: 'mission', key: 'durationHours', label: 'Duration', options: [[7 * DAY, '7 days'], [14 * DAY, '14 days'], [LUNAR_DAY_HOURS, '29.5 days']], format: (v) => formatHours(v), summary: (v) => `for ${v === LUNAR_DAY_HOURS ? '29.5 days' : formatHours(v).replace('.0 ', ' ')}` },
+      { on: 'mission', key: 'durationHours', label: 'Duration', slider: true, summary: (v) => `for ${formatDuration(v)}` },
     ],
   },
   {
@@ -279,7 +278,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       'details',
       { class: 'group', open: openGroups.has(group.id), onToggle: (e) => (e.target.open ? openGroups.add(group.id) : openGroups.delete(group.id)) },
       h('summary', {}, h('span', { class: 'group-title' }, group.title), h('span', { class: 'group-summary' }, said.join(' · '))),
-      h('div', { class: 'group-body' }, group.date ? dateRow() : null, ...group.choices.map(choiceRow)),
+      h('div', { class: 'group-body' }, group.date ? dateRow() : null, ...group.choices.map((def) => (def.slider ? durationRow(def) : choiceRow(def)))),
     );
   }
 
@@ -305,6 +304,61 @@ export function createFlow({ app, globe, finder, surface, api }) {
         { class: 'choice-options', role: 'group', 'aria-label': def.label },
         options.map(([value, text]) => h('button', { type: 'button', 'aria-pressed': String(same(value, current)), onClick: () => set(value) }, text)),
       ),
+    );
+  }
+
+  /**
+   * Mission length: a slider from 1 hour to 1 year with the clean lengths evenly spaced under it as big buttons
+   * (the scale is in src/mission.js). Dragging shows the length; letting go applies it.
+   */
+  function durationRow(def) {
+    const current = valueOf(def);
+    const SCALE = 1000;
+    const readout = h('span', { class: 'duration-value' }, formatDuration(current));
+    const set = (hours) => {
+      if (same(hours, valueOf(def))) return;
+      api.setMission({ durationHours: hours });
+      drawSetup();
+      save();
+    };
+    const marks = DURATION_MARKS.map((mark, i) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'duration-mark',
+          style: `left: ${((100 * i) / (DURATION_MARKS.length - 1)).toFixed(3)}%`,
+          'aria-pressed': String(same(mark.hours, current)),
+          'aria-label': formatDuration(mark.hours),
+          onClick: () => set(mark.hours),
+        },
+        mark.label,
+      ),
+    );
+    const slider = h('input', {
+      type: 'range',
+      class: 'duration-slider',
+      min: '0',
+      max: String(SCALE),
+      step: '1',
+      value: String(Math.round(positionOf(current) * SCALE)),
+      'aria-label': 'Duration',
+      'aria-valuetext': formatDuration(current),
+      onInput: (e) => {
+        const hours = tidyDuration(Number(e.target.value) / SCALE);
+        readout.textContent = formatDuration(hours);
+        e.target.setAttribute('aria-valuetext', formatDuration(hours));
+        marks.forEach((button, i) => button.setAttribute('aria-pressed', String(same(DURATION_MARKS[i].hours, hours))));
+        // Near a clean length the thumb jumps onto it, so it is easy to hit.
+        if (DURATION_MARKS.some((mark) => same(mark.hours, hours))) e.target.value = String(Math.round(positionOf(hours) * SCALE));
+      },
+      onChange: (e) => set(tidyDuration(Number(e.target.value) / SCALE)),
+    });
+    return h(
+      'div',
+      { class: 'choice' },
+      h('div', { class: 'choice-label duration-label' }, def.label, readout),
+      h('div', { class: 'duration' }, slider, h('div', { class: 'duration-marks' }, marks)),
     );
   }
 
@@ -516,7 +570,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const passing = done.filter((entry) => entry.result.sites.length).length;
     $('regionsLede').textContent =
       `Each region is searched for 10 km around the point named, on real terrain, for a landing on ${formatUTC(mission.start)} and ${formatHours(mission.durationHours)} on the Moon. ` +
-      (scan.done ? `${passing} of ${REGIONS.length} can take this mission.` : `${done.length} of ${REGIONS.length} searched so far.`);
+      (scan.done ? `${passing} of ${REGIONS.length} can take this mission.` : `${done.length} of ${REGIONS.length} searched so far.`) +
+      // A long mission is checked in longer steps (src/finder/client.js), which can miss short darkness.
+      (done[0] && done[0].result.stepHours > 1
+        ? ` Over a mission this long, sunlight is checked every ${formatHours(done[0].result.stepHours)}, so darkness shorter than that can be missed.`
+        : '');
     // Once every region is in, the ones that pass come first, most room first.
     const rank = (region) => {
       const result = scan.results.get(region.id)?.result;
