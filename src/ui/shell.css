@@ -145,6 +145,8 @@ details.more[open] summary::before { content: '▾ '; }
 /* The Ride tab keeps the mission's name only: its panel is short of height, and "Change mission" is in the top bar. */
 .app[data-step='5'] .mission-line .change,
 .app[data-step='5'] .mission-line .more { display: none; }
+/* The Site tab's mission card is the name alone, without the "lands … · 2 weeks · slopes under …" line (Daniel, 2026-11-15). */
+.app[data-step='3'] .mission-line .mission-sub { display: none; }
 /* The Moon tab's small close-up: the landing sites key is the blue ramp alone (Daniel, 2026-11-15). */
 .app[data-step='2'] .map-legend[data-layer='result'] .legend-swatches { display: none; }
 .app[data-step='2'] .topbar-change { display: none; }

@@ -257,23 +257,14 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
       flash('Pick a region with room to land first: the street view opens at its landing spot.');
       return false;
     }
-    const result = finder.getResult?.();
-    const items = [];
-    if (result) {
-      const km2 = (result.counts.passing * result.cellM * result.cellM) / 1e6;
-      items.push({ value: km2.toFixed(km2 < 10 ? 1 : 0), unit: 'km²', label: 'Ground that passes every check' });
-      items.push({ value: String(result.sites.length), label: result.sites.length === 1 ? 'Landing site found' : 'Landing sites found' });
-    }
-    const v = finder.values;
-    items.push({ value: String(v.maxLandingSlopeDeg), unit: '°', label: 'Steepest it may land on' });
-    items.push({ value: String(v.maxDarknessHours), unit: 'h', label: 'Darkness the rover survives' });
+    // No summary numbers are passed any more: the street view shows no numbers panel when it is opened from the
+    // app (Daniel, 2026-11-15).
     const q = new URLSearchParams({
       lat: start.lat.toFixed(5),
       lon: start.lon.toFixed(5),
       name: region ? `${region.name} · landing spot` : 'Landing spot',
       start: getMission().start.toISOString(),
       app: location.pathname + location.search + location.hash,
-      sum: JSON.stringify({ items }), // the numbers alone, no "Why <region>" title (Daniel, 2026-11-15)
     });
     if (location.search.includes('vr-test')) q.set('vr-test', '');
     location.href = `/Street-view/index.html?${q}`;

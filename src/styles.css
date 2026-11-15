@@ -1526,7 +1526,7 @@ input.big {
 /* 5 Credits: a slow roll, like the end of a film. */
 .credits {
   /* As tall as the panel has room for (Daniel, 2026-11-15): the Ride tab's panel holds little else. */
-  --credits-h: clamp(230px, calc(100vh - 330px), 640px);
+  --credits-h: clamp(230px, calc(100vh - 250px), 700px);
   position: relative;
   height: var(--credits-h);
   overflow: hidden;

@@ -15,7 +15,7 @@ import sitesData from '../../data/sites.json';
 import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
 import { missionRegions } from '../finder/regions.js';
-import { STATE_STORY, milestoneLabel } from '../finder/plan-text.js';
+import { milestoneLabel } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
 import { clear, h } from './dom.js';
 import { createDateScan } from './date-scan-panel.js';
@@ -600,7 +600,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const result = finder.getResult();
     if (!track || !result) return;
     // Play from an hour before it sets off until it arrives (or an hour after it is lost), in 10 to 16
-    // seconds. Each frame moves on from clock.hours, so "Next change" can move the clock while it plays.
+    // seconds. Each frame moves on from clock.hours, so the time bar can move the clock while it plays.
     // The Ride step is far slower (Daniel, 2026-11-15): the ground passes at about 25 m a second, so it reads
     // as a drive, not a fast-forward. A 5 km drive takes a little over three minutes; the time bar still jumps.
     const from = Math.max(track.startHours - 1, 0);
@@ -632,13 +632,6 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function playEnd(result) {
     if (track.arrivalHours != null) return Math.min(track.arrivalHours, result.windowHours);
     return Math.min(Math.max(track.endHours, track.changes.at(-1) ?? 0) + 1, result.windowHours);
-  }
-
-  /** Jump to the next time the rover starts doing something else; it keeps playing if it was. */
-  function nextChange() {
-    const at = track?.nextChange(clock.hours);
-    if (at == null) return;
-    setHours(at);
   }
 
   function pause() {
@@ -735,10 +728,8 @@ export function createFlow({ app, globe, finder, surface, api }) {
     }
     clockParts = {
       text: h('p', { class: 'clock-text' }),
-      story: h('p', { class: 'clock-story' }),
       fill: h('i'),
       dark: h('span', { class: 'dark-text' }),
-      next: h('button', { type: 'button', class: 'next-change', onClick: nextChange }, 'Next change'),
       rows: null,
       current: -1,
     };
@@ -755,7 +746,6 @@ export function createFlow({ app, globe, finder, surface, api }) {
           'div',
           { class: 'play-row' },
           h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : 'Play the drive'),
-          clockParts.next,
         ),
       );
     }
@@ -781,7 +771,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
         h('ol', { class: 'tl-list', 'aria-label': 'What the rover does, from touchdown' }, clockParts.rows.map((r) => r.row)),
       );
     } else {
-      el.append(clockParts.story, meter, clockParts.text);
+      // The Ride tab: the clock line only (Daniel, 2026-11-15). No sentence about what the rover is doing and no
+      // darkness bar; the Site tab's timeline keeps the bar.
+      el.append(clockParts.text);
     }
     updateClockText();
   }
@@ -792,16 +784,12 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const km = (m) => (m / 1000).toFixed(1);
     // The date and time are on the time bar under the map; this line keeps the day and the distance.
     clockParts.text.textContent = `${dayText(clock.hours)} · ${km(now.distanceM)} of ${km(track.lengthM)} km driven`;
-    const story = STATE_STORY[now.state] ?? '';
-    if (clockParts.story.textContent !== story) clockParts.story.textContent = story;
-    clockParts.story.hidden = !story; // a state with no sentence (arrived) leaves no gap
     const max = route?.rover?.maxDarknessHours;
     const share = max > 0 ? Math.min(now.darkH / max, 1) : 0;
     clockParts.fill.style.width = `${(share * 100).toFixed(1)}%`;
     clockParts.fill.className = share >= 1 ? 'lost' : share > 0.8 ? 'near' : share > 0.5 ? 'half' : '';
     // Whole hours, in the same unit as the "Max darkness" choice (24 / 50 / 100 h).
     clockParts.dark.textContent = max > 0 ? `In the dark ${Math.round(now.darkH)} h of the ${max} h it survives` : `In the dark ${Math.round(now.darkH)} h`;
-    clockParts.next.disabled = track.nextChange(clock.hours) == null;
     if (clockParts.rows) {
       // The row now playing: the last one at or before the clock. Rows before it are done, rows after it to come.
       let current = 0;
