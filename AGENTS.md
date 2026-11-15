@@ -34,8 +34,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
   runs the playback clock; it computes nothing. A new ready-made mission or region: `data/missions.json`, each
   number with a source. What the address keeps: `src/ui/flow-state.js`. Credits: `data/credits.json`.
 - The education page (`/learn`): `education/`. `npm run dev` serves it with its data through
-  `server/learn-plugin.mjs` (no Python); the Python app in `lunar-planner/` serves it too. The plugin also
-  pulls origin/main every minute on branch `main` (live sync; `LUNAR_SYNC=0` turns it off).
+  `server/learn-plugin.mjs` (no Python); the Python app in `lunar-planner/` serves it too. Started with
+  `LUNAR_SYNC=1`, the plugin also pulls origin/main every minute on branch `main` (live sync: off by default,
+  and leave it off while presenting). The main page links to `/learn` only with `?tools` in the address.
 - A new lens (a way to colour the ground in the surface view): one entry in `src/surface/lenses.js`, which
   also states the colour rules every lens follows. The switch and legend appear by themselves.
 
