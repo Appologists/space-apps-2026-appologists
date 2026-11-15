@@ -30,7 +30,28 @@ export function coverageText(info, sourceId = 'auto') {
  * @param {string} [sourceId] a dataset id, or 'auto' for the best available
  * @returns {Promise<import('./polar-grid.js').TerrainPatch>}
  */
-export async function fetchTerrainPatch(lat, lon, sourceId = 'auto') {
+export function fetchTerrainPatch(lat, lon, sourceId = 'auto') {
+  // Kept for a while: the landing-date scan, the drive's start and the surface view often ask for the same spot.
+  const key = `${(+lat).toFixed(5)},${(+lon).toFixed(5)},${sourceId}`;
+  if (patchCache.has(key)) {
+    const kept = patchCache.get(key);
+    patchCache.delete(key); // most recently used goes to the back
+    patchCache.set(key, kept);
+    return kept;
+  }
+  const promise = loadPatch(lat, lon, sourceId).catch((error) => {
+    patchCache.delete(key);
+    throw error;
+  });
+  patchCache.set(key, promise);
+  while (patchCache.size > PATCH_CACHE_SIZE) patchCache.delete(patchCache.keys().next().value);
+  return promise;
+}
+
+const PATCH_CACHE_SIZE = 24; // about 2 MB each
+const patchCache = new Map();
+
+async function loadPatch(lat, lon, sourceId) {
   const response = await fetch(`/api/terrain/polar?lat=${lat}&lon=${lon}&source=${encodeURIComponent(sourceId)}`);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));

@@ -22,6 +22,54 @@ export function createSurfaceMode({ app, getState, setStatus }) {
   let current = null; // { site, patch, sky, profiles }
   let eyeHeightM = 1.7;
   let request = 0;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- Camera moves for the arrival and the departure (see open() and close()) ------------------------------
+  const DESCENT_FROM_M = 3500; // the arrival starts this high above the ground, looking down
+  let tween = null;
+  const easeInOut = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+  /**
+   * Move the eye from one height and look to another. Heights change in log space, so the ground rushes up
+   * at the end like a landing. Resolves at the end, or at once if cut short.
+   */
+  function moveEye(from, to, duration) {
+    tween?.stop();
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      let raf = 0;
+      const yawTurn = ((((to.yaw - from.yaw) % 360) + 540) % 360) - 180; // the short way round
+      const step = (now) => {
+        const k = Math.min((now - t0) / duration, 1);
+        const e = easeInOut(k);
+        view.setEyeHeight(Math.exp(Math.log(from.height) + (Math.log(to.height) - Math.log(from.height)) * e));
+        view.setLook({ yaw: from.yaw + yawTurn * e, pitch: from.pitch + (to.pitch - from.pitch) * e, fov: from.fov + (to.fov - from.fov) * e });
+        if (k < 1) raf = requestAnimationFrame(step);
+        else finish();
+      };
+      const finish = () => {
+        cancelAnimationFrame(raf);
+        if (tween) clearTimeout(tween.guard);
+        tween = null;
+        resolve();
+      };
+      tween = {
+        // Cut short (the user grabbed the view): jump to the end height and keep whatever look they have.
+        stop: () => {
+          view.setEyeHeight(to.height);
+          finish();
+        },
+      };
+      raf = requestAnimationFrame(step);
+      // If the browser stops drawing frames (a hidden tab), land anyway rather than hang half-way.
+      const guard = setTimeout(() => {
+        if (tween?.guard !== guard) return;
+        view.setEyeHeight(to.height);
+        view.setLook({ yaw: to.yaw, pitch: to.pitch, fov: to.fov });
+        finish();
+      }, duration + 1500);
+      tween.guard = guard;
+    });
+  }
 
   // ---- Lenses: switch, legend and the read-out under the pointer ----------------------------------------
   let lensId = 'natural';
@@ -73,8 +121,14 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     $('hudHeading').textContent = `Looking ${compass(yaw)} · ${String(Math.round(yaw) % 360).padStart(3, '0')}° · ${pitch >= 0 ? '+' : '−'}${Math.abs(pitch).toFixed(0)}°`;
   };
 
-  /** @returns {Promise<boolean>} true if the view opened */
-  async function open(site) {
+  /**
+   * @param {object} site
+   * @param {{intro?: {revealAfter?: Promise<unknown>, onReveal?: () => void}}} [options]  intro: arrive from
+   *        above. The view stays invisible until the terrain is in and `revealAfter` settles (the globe's
+   *        fly-in); then `onReveal` runs and the view fades in while the eye comes down.
+   * @returns {Promise<boolean>} true if the view opened
+   */
+  async function open(site, { intro = null } = {}) {
     const mine = ++request;
     setStatus('Loading terrain…');
     let patch;
@@ -86,6 +140,8 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     }
     if (mine !== request) return false; // a newer request replaced this one
     setStatus(null);
+    const arriving = !!intro && !reduceMotion;
+    $('surface').classList.toggle('surface-intro', arriving);
     app.classList.add('surface-open');
     $('surface').hidden = false;
     $('surfaceTip').hidden = true;
@@ -110,16 +166,44 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     const { viewIndex } = getState();
     const { sky } = current;
     const yaw = sky.sunEl[viewIndex] > -2 ? sky.sunAz[viewIndex] : sky.earthEl[viewIndex] > -2 ? sky.earthAz[viewIndex] : 0;
-    view.setLook({ yaw, pitch: 4, fov: 60 });
+    const landed = { height: eyeHeightM, yaw, pitch: 4, fov: 60 };
+    if (!arriving) {
+      view.setLook({ yaw, pitch: 4, fov: 60 });
+      $('surfaceCanvas').focus({ preventScroll: true });
+      return true;
+    }
+    // Arrival: start high up, looking down, a little to one side; wait for the globe; then fade in and come down.
+    const above = { height: DESCENT_FROM_M, yaw: yaw - 40, pitch: -70, fov: 72 };
+    view.setEyeHeight(above.height);
+    view.setLook({ yaw: above.yaw, pitch: above.pitch, fov: above.fov });
+    await intro.revealAfter;
+    if (mine !== request) return false;
+    intro.onReveal?.();
+    void $('surface').offsetWidth; // let the invisible state paint first, so the fade runs
+    $('surface').classList.remove('surface-intro');
+    await moveEye(above, landed, 2600);
+    if (mine !== request) return false;
     $('surfaceCanvas').focus({ preventScroll: true });
     return true;
   }
 
-  function close() {
-    request++;
+  /**
+   * @param {{outro?: boolean}} [options]  outro: lift off and fade out first (resolves when done)
+   */
+  async function close({ outro = false } = {}) {
+    const mine = ++request;
+    if (outro && current && view && !reduceMotion && !$('surface').hidden) {
+      const look = view.getLook();
+      $('surface').classList.add('surface-leaving');
+      await moveEye({ height: eyeHeightM, ...look }, { height: DESCENT_FROM_M * 0.6, yaw: look.yaw + 25, pitch: -65, fov: 72 }, 750);
+      if (mine !== request) return;
+    }
+    tween?.stop();
     current = null;
     app.classList.remove('surface-open');
     $('surface').hidden = true;
+    $('surface').classList.remove('surface-leaving', 'surface-intro');
+    if (view) view.setEyeHeight(eyeHeightM);
   }
 
   /** The mission (or the eye height) changed: redo the paths, the horizons and the mission numbers. */
@@ -232,7 +316,10 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     current.profiles.eye = horizonProfile(current.patch, value);
     timeChanged();
   });
-  $('surfaceBack')?.addEventListener('click', close);
+  $('surfaceBack')?.addEventListener('click', () => close({ outro: true }));
+  // Grabbing the view during the arrival ends it: the user is in charge from then on.
+  $('surfaceCanvas').addEventListener('pointerdown', () => tween?.stop());
+  $('surfaceCanvas').addEventListener('wheel', () => tween?.stop(), { passive: true });
 
   return {
     open,
