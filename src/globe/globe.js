@@ -144,14 +144,16 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     updateCamera();
     requestRender();
   }
+  // Sized to the canvas, not the stage: on the Regions step the canvas shares the stage with the finder's map.
   function resize() {
-    const rect = stage.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
     renderer.setSize(rect.width, rect.height, false);
     camera.aspect = rect.width / Math.max(rect.height, 1);
     updateCamera();
     requestRender();
   }
-  new ResizeObserver(resize).observe(stage);
+  new ResizeObserver(resize).observe(canvas);
 
   // ---- Orientation ------------------------------------------------------------------------------
   /** Rotation that puts (lat, lon) at the centre of the view with `upLocal` pointing up the screen. */
@@ -226,7 +228,7 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
   }
   function updateLabels() {
     for (const label of labels) {
-      const p = poleLabels.includes(label) && zoom > ROD_MAX_ZOOM ? null : screenOf(label.local);
+      const p = label.off || (poleLabels.includes(label) && zoom > ROD_MAX_ZOOM) ? null : screenOf(label.local);
       if (!p) {
         label.el.style.visibility = 'hidden';
         continue;
@@ -240,6 +242,10 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
   /** @type {{site: any, marker: THREE.Group, local: THREE.Vector3, label: any}[]} */
   let siteEntries = [];
   let selectedId = null;
+  // The mission steps' regions (src/ui/flow.js). While there are any, they are drawn instead of the sites.
+  /** @type {{site: any, marker: THREE.Group, local: THREE.Vector3, label: any}[]} */
+  let regionEntries = [];
+  let onRegionPick = null;
 
   /**
    * Replace the site markers.
@@ -259,14 +265,50 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
       const label = site.label ? addLabel(site.label, local.clone().multiplyScalar(1.01), 'site', -15) : null;
       return { site, marker, local, label };
     });
+    showSites(regionEntries.length === 0);
     setSelected(selectedId);
   }
-  function setSelected(id) {
-    selectedId = id;
-    const entry = siteEntries.find((e) => e.site.id === id);
+  function showSites(on) {
+    for (const entry of siteEntries) {
+      entry.marker.visible = on;
+      if (entry.label) entry.label.off = !on;
+    }
+  }
+  /** The pin marks the chosen region while regions are shown, otherwise the selected site. */
+  function placePin() {
+    const entry = regionEntries.length ? regionEntries.find((e) => e.site.selected) : siteEntries.find((e) => e.site.id === selectedId);
     pin.visible = !!entry;
     if (entry) placeOnSurface(pin, entry.local, 1.002);
     requestRender();
+  }
+  function setSelected(id) {
+    selectedId = id;
+    placePin();
+  }
+
+  /**
+   * Markers for the mission's regions, drawn instead of the site markers; an empty list brings the sites back.
+   * While regions are shown, a tap on one calls `onPick(id)` and taps elsewhere on the Moon do nothing.
+   * @param {{id: string, name: string, lat: number, lon: number, color: string, selected?: boolean, label?: boolean}[]} regions
+   *        `label: false` draws the marker without its name.
+   * @param {{onPick?: (id: string) => void}} [options]
+   */
+  function setRegions(regions, { onPick: pick = null } = {}) {
+    for (const entry of regionEntries) {
+      moon.remove(entry.marker);
+      entry.marker.children.forEach((child) => child.material.dispose());
+      if (entry.label) removeLabel(entry.label);
+    }
+    regionEntries = regions.map((region) => {
+      const local = localOf(region.lat, region.lon);
+      const marker = makeMarker(region.color, '#0b0f15', 0.009);
+      placeOnSurface(marker, local, 1.003);
+      const label = region.label === false ? null : addLabel(region.name, local.clone().multiplyScalar(1.01), `site region-lbl${region.selected ? ' on' : ''}`, -18);
+      return { site: region, marker, local, label };
+    });
+    onRegionPick = pick;
+    showSites(regionEntries.length === 0);
+    placePin();
   }
   /** Turn the globe so a point faces the viewer, north up where that makes sense. */
   function focus(lat, lon, targetZoom) {
@@ -276,10 +318,11 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     const up = nearPole ? localOf(0, lat < 0 ? 0 : 180) : new V3(0, 1, 0);
     animateTo(quatFacing(lat, lon, up), targetZoom);
   }
-  function siteNear(clientX, clientY, tolerancePx = 11) {
+  /** The site marker (or, while regions are shown, the region marker) nearest the pointer, if close enough. */
+  function siteNear(clientX, clientY, tolerancePx = regionEntries.length ? 18 : 11) {
     const rect = canvas.getBoundingClientRect();
     let best = null;
-    for (const entry of siteEntries) {
+    for (const entry of regionEntries.length ? regionEntries : siteEntries) {
       const p = screenOf(entry.local);
       if (!p) continue;
       const d = Math.hypot(p.x - (clientX - rect.left), p.y - (clientY - rect.top));
@@ -360,7 +403,10 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
       if (pointers.size < 2) pinch = null;
       return;
     }
-    if (drag && drag.moved < 5 && e.type === 'pointerup') {
+    if (drag && drag.moved < 5 && e.type === 'pointerup' && regionEntries.length) {
+      const entry = siteNear(e.clientX, e.clientY);
+      if (entry) onRegionPick?.(entry.site.id);
+    } else if (drag && drag.moved < 5 && e.type === 'pointerup') {
       const entry = siteNear(e.clientX, e.clientY);
       if (entry) onPick?.({ siteId: entry.site.id, lat: entry.site.lat, lon: entry.site.lon });
       else if (drag.hit) onPick?.(latLonOfLocal(worldToLocal(spherePointAt(e.clientX, e.clientY).point)));
@@ -370,6 +416,7 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
   }
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('dblclick', (e) => {
+    if (regionEntries.length) return; // regions are chosen with a single tap
     const entry = siteNear(e.clientX, e.clientY);
     if (entry) return onDoublePick?.({ siteId: entry.site.id, lat: entry.site.lat, lon: entry.site.lon });
     const sp = spherePointAt(e.clientX, e.clientY);
@@ -438,7 +485,7 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     needsRender = false;
     // Keep markers a sensible size on screen as you zoom in.
     const markerScale = 1 / Math.sqrt(zoom);
-    for (const entry of siteEntries) entry.marker.scale.setScalar(entry.marker.userData.size * markerScale);
+    for (const entry of [...siteEntries, ...regionEntries]) entry.marker.scale.setScalar(entry.marker.userData.size * markerScale);
     sunMarker.scale.setScalar(sunMarker.userData.size * markerScale);
     earthMarker.scale.setScalar(earthMarker.userData.size * markerScale);
     pin.scale.setScalar(markerScale);
@@ -456,6 +503,7 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     setSunEarth,
     setSites,
     setSelected,
+    setRegions,
     focus,
     view: (name) => VIEWS[name]?.(),
     zoomBy: (factor) => setZoom(zoom * factor),
