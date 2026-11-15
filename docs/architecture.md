@@ -245,3 +245,12 @@ the saved one; with kept searches that takes about two seconds.
 (keys sorted), the terrain data the search can read, and the modified dates of the search code. Answers live
 in memory and in `node_modules/.cache/landing-search` (about 7 MB each, never committed). `npm run demo:warm`
 asks every profile's seven searches of a running app, so a talk starts with them all kept.
+
+**Stored sunlight and Earth maps.** Most of a search's time is the shadow sweep: which cells see the Sun and
+which see Earth at every time step (`lightMaps` in `server/landing-search.mjs`). That depends only on the place,
+the radius, the panel and antenna heights, the terrain and the times, not on any landing limit. `npm run
+data:light` (`tools/precompute-light.mjs`) computes it hourly for every mission region over a stretch of dates
+and writes one file per region to `data/raw/light/` (`server/light-store.mjs` has the layout). A search whose
+place, radius, heights, terrain data and code fingerprint match, and whose times fall on whole hours inside the
+stretch, reads its rows from there instead (the answer's header says `lightStored`), and computes everything
+after the maps exactly as before. `npm run check:light` runs one region both ways and compares every number.

@@ -9,7 +9,7 @@ import { STATE, hopLength } from './schedule.js';
  * @param {object} plan    from planMission(): needs `path` and `drive`
  * @returns {null | {
  *   at: (hours: number) => {east: number, north: number, elevationM: number, headingDeg: number, distanceM: number, step: number, state: number, lit: boolean, earth: boolean, darkH: number},
- *   points: {east: number, north: number}[], lengthM: number, startHours: number, endHours: number,
+ *   points: {east: number, north: number}[], lengthM: number, startHours: number, endHours: number, arrivalHours: number|null,
  *   changes: number[], milestones: {hours: number, state: number|null, destination?: number}[], nextChange: (hours: number) => number|null}}
  *   null without a route. `east`/`north` are metres from the middle of the search area. `startHours` to
  *   `endHours` is the stretch from the first step it drives in to the end of the last one. `darkH` is the
@@ -107,6 +107,7 @@ export function createTrack(result, plan) {
     lengthM,
     startHours: first < 0 ? 0 : first * H,
     endHours: first < 0 ? 0 : (last + 1) * H,
+    arrivalHours: drive.arrived ? drive.arrivalHours : null,
     changes,
     milestones,
     nextChange,

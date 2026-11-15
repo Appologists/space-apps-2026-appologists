@@ -6,7 +6,7 @@ export const FAIL = Object.freeze({ SLOPE: 1, NO_SUN_AT_LANDING: 2, DARK_TOO_LON
 
 const FAIL_TEXT = [
   [FAIL.OUTSIDE, 'outside the search area, or no terrain data'],
-  [FAIL.SLOPE, 'ground too steep somewhere in the landing ellipse'],
+  [FAIL.SLOPE, 'ground too steep somewhere in the landing area'],
   [FAIL.NO_SUN_AT_LANDING, 'no sunlight at touchdown'],
   [FAIL.DARK_TOO_LONG, 'darkness lasts too long'],
   [FAIL.NO_EARTH_AT_LANDING, 'Earth not in view at touchdown'],

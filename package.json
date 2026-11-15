@@ -13,9 +13,11 @@
     "data:list": "node tools/fetch-data.mjs --list",
     "data:check": "node tools/fetch-data.mjs --check",
     "data:fetch": "node tools/fetch-data.mjs",
+    "data:light": "node tools/precompute-light.mjs",
     "check:horizons": "node tools/check-horizons.mjs",
     "check:landing": "node tools/check-landing-search.mjs",
     "check:tiles": "node tools/check-tiles.mjs",
+    "check:light": "node tools/check-light.mjs",
     "demo:warm": "node tools/warm-demo.mjs"
   },
   "engines": {

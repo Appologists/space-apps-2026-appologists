@@ -55,6 +55,11 @@ describe('data/missions.json', () => {
       expect(site.lon).toBeGreaterThan(-180);
       expect(site.lon).toBeLessThanOrEqual(180);
       expect(region.site ? sitesData.sources[site.source] : missions.sources[region.source], `source of region ${region.id}`).toBeTruthy();
+      if (region.searchRadiusKm != null) {
+        expect(region.searchRadiusKm).toBeGreaterThanOrEqual(10);
+        expect(region.searchRadiusKm).toBeLessThanOrEqual(40); // the finder searches 10 to 40 km
+        expect(missions.sources[region.searchRadiusSource], `source of ${region.id}'s search radius`).toBeTruthy();
+      }
     }
   });
 });
@@ -71,5 +76,16 @@ describe('data/credits.json', () => {
         expect(item.who, JSON.stringify(item)).toBeTruthy();
       }
     }
+  });
+});
+
+describe('the search question', () => {
+  it('uses a region\'s own search radius when it has one, the form\'s otherwise', async () => {
+    const { searchQuestion } = await import('../src/finder/client.js');
+    const { defaultFinder } = await import('../src/finder/score.js');
+    const mission = { start: new Date('2026-11-21T00:00Z'), durationHours: 336, panelHeightM: 2, antennaHeightM: 2 };
+    const values = { ...defaultFinder(), radiusKm: 10 };
+    expect(searchQuestion({ center: { lat: -89, lon: 0 }, values, mission, weights: {} }).radiusKm).toBe(10);
+    expect(searchQuestion({ center: { lat: -89, lon: 0, searchRadiusKm: 20 }, values, mission, weights: {} }).radiusKm).toBe(20);
   });
 });
