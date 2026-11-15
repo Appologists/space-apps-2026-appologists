@@ -1,5 +1,6 @@
 # Lunar Site Planner: set up (first time) and start. Run from this folder:
-#   powershell -ExecutionPolicy Bypass -File .\start.ps1
+#   powershell -ExecutionPolicy Bypass -File .\start.ps1          (add -NoSync to turn off live sync)
+param([switch]$NoSync)
 $ErrorActionPreference = 'Continue'
 Set-Location $PSScriptRoot
 $port = 8002
@@ -93,5 +94,11 @@ Write-Host "  http://127.0.0.1:$port/classic   our planner (street view, south p
 Write-Host "  http://127.0.0.1:$port/learn     education section"
 Write-Host "  http://127.0.0.1:$port/          the team app (needs the team's src/ from main)"
 Write-Host 'Keep this window open while you use the app. Press Ctrl+C to stop.'
-Start-Process "http://127.0.0.1:$port/classic"
+# 5. Live sync: a second window pulls the team's newest main from GitHub every minute, and open pages
+#    reload themselves. Start with -NoSync to leave it out.
+if (-not $NoSync -and (Get-Command git -ErrorAction SilentlyContinue)) {
+    Start-Process powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'sync.ps1') -WindowStyle Minimized
+    Write-Host 'Live sync is on: a minimized window pulls from GitHub every minute.'
+}
+Start-Process "http://127.0.0.1:$port/learn"
 Wait-Process -Id $server.Id

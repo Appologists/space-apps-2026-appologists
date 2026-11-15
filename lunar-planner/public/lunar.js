@@ -3262,6 +3262,16 @@ loadSites().then(() => {
         flyTo(upAt(8, 25).multiplyScalar(3.1), new T.Vector3());
     }
     $('analyze').click();
+    // Deep link from the education page: /classic?view=surface&lat=..&lon=..&name=.. opens the street view there.
+    const deep = new URLSearchParams(window.location.search);
+    if (deep.get('view') === 'surface') {
+        const lat = Number(deep.get('lat'));
+        const lon = Number(deep.get('lon'));
+        if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 360) {
+            nextSurface = {lat, lon, name: (deep.get('name') || 'Selected site').slice(0, 60), elevation: true};
+            leaveHome('surface');
+        }
+    }
 });
 
 
