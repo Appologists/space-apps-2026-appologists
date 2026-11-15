@@ -4,6 +4,7 @@
 import { ephemerisSeries } from '../astro/ephemeris.js';
 import { skySeries } from '../astro/sky.js';
 import { EARTH_LINK_RULES, REASON, REASON_TEXT, dailySummary, landingWindows, scanLandings } from '../finder/date-scan.js';
+import { EXAMPLE_PANEL, MOUNTS, energySummary, hoursUntilBelow, powerSeries } from '../finder/power.js';
 import { formatHours, formatLatLon } from '../format.js';
 import { fetchTerrainPatch } from '../terrain/client.js';
 import { clearanceSeries, horizonProfile } from '../terrain/polar-grid.js';
@@ -17,6 +18,17 @@ const REASON_CLASS = { [REASON.DARK]: 'dark', [REASON.NO_SUN]: 'nosun', [REASON.
 const dayLabel = (date) => date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 const timeLabel = (date) => `${date.toISOString().slice(11, 16)} UTC`;
 const pct = (f) => `${Math.round(f * 100)}%`;
+const PANEL_KEY = 'lunar.panel.v1';
+const watts = (w) => (w >= 1000 ? `${(w / 1000).toFixed(1)} kW` : `${Math.round(w)} W`);
+const wattHours = (wh) => (wh >= 1000 ? `${(wh / 1000).toFixed(wh >= 10_000 ? 0 : 1)} kWh` : `${Math.round(wh)} Wh`);
+
+function loadPanel() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PANEL_KEY) ?? 'null');
+    if (saved && typeof saved === 'object') return { ...EXAMPLE_PANEL, ...saved };
+  } catch { /* storage unavailable: use the example */ }
+  return { ...EXAMPLE_PANEL };
+}
 
 /**
  * @param {{ el: HTMLElement, onUse: (date: Date) => void, setStatus?: (message: string|null) => void }} options
@@ -28,6 +40,7 @@ export function createDateScan({ el, onUse }) {
   let earthRule = 'centre';
   let last = null; // { input, rows, best } of the latest finished scan
   let picked = null; // { row, start } chosen in the strip
+  let panel = loadPanel(); // the user's panel and load (starts as the example)
 
   const patchFor = (lat, lon, source) => fetchTerrainPatch(lat, lon, source); // kept by terrain/client.js
 
@@ -80,16 +93,18 @@ export function createDateScan({ el, onUse }) {
         const patch = await patchFor(spot.lat, spot.lon, q.source ?? 'auto');
         if (mine !== job) return;
         const sky = skySeries({ lat: spot.lat, lon: spot.lon }, series);
+        const sunClear = clearanceSeries(sky.sunEl, sky.sunAz, horizonProfile(patch, q.panelHeightM));
+        const earthClear = clearanceSeries(sky.earthEl, sky.earthAz, horizonProfile(patch, q.antennaHeightM));
         const scan = scanLandings({
-          sunClear: clearanceSeries(sky.sunEl, sky.sunAz, horizonProfile(patch, q.panelHeightM)),
-          earthClear: clearanceSeries(sky.earthEl, sky.earthAz, horizonProfile(patch, q.antennaHeightM)),
+          sunClear,
+          earthClear,
           stepHours: 1,
           scanHours,
           missionHours,
           rules,
           weights: q.weights,
         });
-        spotRows.push({ spot, scan, windows: landingWindows(scan), days: dailySummary(scan, 24) });
+        spotRows.push({ spot, scan, light: { sunClear, earthClear, sunEl: sky.sunEl }, windows: landingWindows(scan), days: dailySummary(scan, 24) });
       } catch (error) {
         spotRows.push({ spot, error: error.message });
       }
@@ -106,7 +121,8 @@ export function createDateScan({ el, onUse }) {
       })
       .filter(Boolean)
       .sort((a, b) => b.win.best.score - a.win.best.score);
-    last = { input, rows: regions, ranked, missionHours, rules };
+    const sunAU = Float64Array.from(series.samples, (sample) => sample.sunDistanceAU);
+    last = { input, rows: regions, ranked, missionHours, rules, sunAU };
     picked = ranked[0] ? { row: ranked[0].row, start: ranked[0].win.best } : null;
     draw();
   }
@@ -135,8 +151,80 @@ export function createDateScan({ el, onUse }) {
       h('ul', { class: 'when-facts' },
         h('li', {}, `${formatHours(start.longestLitH)} of unbroken sunlight (lit ${pct(start.litFraction)} of the stay)`),
         h('li', {}, `Earth in view ${pct(start.earthFraction)} of the stay`),
+        ...skyFacts(row, start),
         h('li', {}, start.longestDarkH > 0 ? `Longest darkness ${formatHours(start.longestDarkH)}${Number.isFinite(last.rules.maxDarknessHours) ? ` (limit ${formatHours(last.rules.maxDarknessHours)})` : ''}` : 'Never dark during the stay')),
+      powerBlock(row, start),
       h('button', { type: 'button', class: 'primary when-use', onClick: () => onUse(date) }, 'Use this landing time'));
+  }
+
+  /** Sun height at touchdown, and how long until the Sun and Earth go behind the terrain. */
+  function skyFacts(row, start) {
+    const light = row.light;
+    if (!light) return [];
+    const i = start.index;
+    const stay = last.missionHours;
+    const margin = last.rules.minEarthClearDeg;
+    const until = (hrs, body, goes) => (hrs === null || hrs >= stay ? `${body} stays ${goes === 'set' ? 'up' : 'in view'} for the whole stay` : `${body} goes behind the terrain ${formatHours(hrs)} after landing`);
+    return [
+      h('li', {}, `Sun ${light.sunEl[i].toFixed(1)}° above the level horizon at landing, ${light.sunClear[i].toFixed(1)}° above the terrain`),
+      h('li', {}, `${until(hoursUntilBelow(light.sunClear, i, 0, 1), 'Sun', 'set')}; ${until(hoursUntilBelow(light.earthClear, i, margin, 1), 'Earth', 'earthset')}`),
+    ];
+  }
+
+  /** Estimated panel output for the chosen landing, with the panel settings beside it. */
+  function powerBlock(row, start, open = false) {
+    const light = row.light;
+    if (!light) return '';
+    const power = powerSeries({ sunClear: light.sunClear, sunEl: light.sunEl, sunDistanceAU: last.sunAU, panel });
+    const stay = energySummary(power, start.index, Math.round(last.missionHours), 1, panel.loadW);
+    const atLanding = power[start.index];
+    const lines = [
+      h('li', {}, `About ${watts(atLanding)} at landing; ${watts(stay.averageW)} on average over the stay (most ${watts(stay.peakW)})`),
+      h('li', {}, `About ${wattHours(stay.energyWh)} collected over the stay${stay.zeroHours > 0 ? `; no power for ${formatHours(stay.zeroHours)} in all` : ''}`),
+      h('li', {}, stay.batteryWh > 0
+        ? `With a steady ${watts(panel.loadW)} load, the battery must hold at least ${wattHours(stay.batteryWh)} to keep it running through the stay${stay.coversLoad ? '' : ' (and the panel does not make enough over the stay to keep up)'}`
+        : `The panel alone covers a steady ${watts(panel.loadW)} load for the whole stay`),
+    ];
+    return h('div', { class: 'when-power' },
+      h('div', { class: 'when-power-head' }, 'Solar power (estimate)'),
+      h('ul', { class: 'when-facts' }, lines),
+      panelSettings(open));
+  }
+
+  /** Redraw only the power block (keeps the settings open and the rest of the card as it is). */
+  function redrawPower() {
+    const old = el.querySelector('.when-power');
+    if (old && picked) old.replaceWith(powerBlock(picked.row, picked.start, true));
+  }
+
+  function panelSettings(open) {
+    const set = (field, value) => {
+      if (field !== 'mount' && !(Number.isFinite(value) && value >= 0)) return;
+      panel = { ...panel, [field]: value };
+      try { localStorage.setItem(PANEL_KEY, JSON.stringify(panel)); } catch { /* not kept */ }
+      redrawPower();
+    };
+    const number = (label, field, value, { min, max, step, toValue = (v) => v }) =>
+      h('label', {}, label, h('input', { type: 'number', min, max, step, value: String(value), onChange: (e) => set(field, toValue(Number(e.target.value))) }));
+    const isExample = ['areaM2', 'efficiency', 'mount', 'otherLosses', 'loadW'].every((k) => panel[k] === EXAMPLE_PANEL[k]);
+    return h('details', { class: 'when-panel', open },
+      h('summary', {}, isExample
+        ? `For an example panel: ${panel.areaM2} m², ${Math.round(panel.efficiency * 100)}% efficient, ${MOUNTS[panel.mount].label}. Change to yours`
+        : `For your panel: ${panel.areaM2} m², ${Math.round(panel.efficiency * 100)}% efficient, ${MOUNTS[panel.mount].label}`),
+      h('div', { class: 'when-panel-form' },
+        number('Area (m²)', 'areaM2', panel.areaM2, { min: '0.01', max: '100', step: '0.1' }),
+        number('Efficiency (%)', 'efficiency', Math.round(panel.efficiency * 100), { min: '1', max: '50', step: '1', toValue: (v) => v / 100 }),
+        number('Other losses (%)', 'otherLosses', Math.round(panel.otherLosses * 100), { min: '0', max: '90', step: '1', toValue: (v) => v / 100 }),
+        number('Steady load (W)', 'loadW', panel.loadW, { min: '0', max: '10000', step: '5' }),
+        h('label', {}, 'Mounted',
+          h('select', { onChange: (e) => set('mount', e.target.value) },
+            Object.entries(MOUNTS).map(([id, m]) => h('option', { value: id, selected: id === panel.mount }, m.label))))),
+      h('p', { class: 'caveats' },
+        'Power = 1361 W/m² ÷ (distance to the Sun in AU)² × area × efficiency × how squarely the Sun hits the panel × the share of the Sun\'s disc above the terrain × (1 − other losses). ' +
+        'The Sun is a disc about 0.53° wide, so while it slides behind a ridge (about an hour near the pole) part of it still gives power. ' +
+        'Left out: panel temperature, dust, ageing, light bounced off nearby slopes (a few percent at most), and eclipses by Earth. ' +
+        'The battery figure assumes it starts full at landing and counts only the stay. An estimate to compare landings, not a design figure.'),
+      isExample ? '' : h('button', { type: 'button', class: 'linklike', onClick: () => { panel = { ...EXAMPLE_PANEL }; try { localStorage.removeItem(PANEL_KEY); } catch { /* fine */ } redrawPower(); } }, 'Back to the example panel'));
   }
 
   function draw() {
@@ -218,7 +306,7 @@ export function createDateScan({ el, onUse }) {
       h('summary', {}, 'How this is worked out'),
       h('p', {}, 'For each spot the terrain is turned once into its horizon: how high the land rises in every direction, out to 300 km, seen from the solar panel and from the antenna. The Sun and Earth are then followed hour by hour; each hour is one comparison, the body\'s height against the horizon in its direction. A landing hour passes if the Sun and Earth are in view at touchdown (when your mission asks for that) and the rover is never dark for longer than it survives, darkness counted from touchdown until the light comes back, even after the stay ends. Landings that pass are ranked by the same score as the region search: unbroken sunlight and Earth in view, with your weights.'),
       h('div', { class: 'when-rule' }, h('span', {}, 'Earth counts as in view when '), h('span', { class: 'lensbuttons two' }, ruleButtons)),
-      h('p', { class: 'caveats' }, `Earth looks about 1.9° wide from the Moon, so its edge can show over a ridge while its centre is hidden; radio also bends a little over a sharp ridge. "Any part" is closer to how a radio link behaves; "its centre" is what the region search uses. The Sun counts as up while the centre of its disc clears the terrain. Terrain is NASA LOLA at about 80 m per pixel, so rocks and small craters are not seen. Times are checked every hour. The spots are the best ones the search found for your current landing time; on other dates other spots nearby may do better.`));
+      h('p', { class: 'caveats' }, `Earth looks about 1.9° wide from the Moon, so its edge can show over a ridge while its centre is hidden; radio also bends a little over a sharp ridge. "Any part" is closer to how a radio link behaves; "its centre" is what the region search uses. The Sun counts as up while the centre of its disc clears the terrain; for power, whatever part of its disc shows counts. "Earth in view" means the geometry allows a direct-to-Earth link: the app does not check antennas, transmitter power or ground-station schedules, and where Earth is hidden by terrain a relay would be needed. Terrain is NASA LOLA at about 80 m per pixel, so rocks and small craters are not seen. Times are checked every hour. The spots are the best ones the search found for your current landing time; on other dates other spots nearby may do better.`));
   }
 
   return { update, resetWindow, getLast: () => last };
