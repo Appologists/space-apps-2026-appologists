@@ -116,10 +116,10 @@ console.log(`cells differing by more than 0.10 in either fraction: ${over} of ${
 console.log('\n=== Scenario B: start 2026-11-18T19:00:00Z');
 const b = searchLanding(dem, { ...base, start: '2026-11-18T19:00:00Z' });
 console.log(`compute ${b.header.computeMs} ms; counts`, JSON.stringify(b.header.counts));
-console.log('rank      lat        lon   score  sunF  darkH  earthF  ellipseSlope');
+console.log('rank      lat        lon  roomM  sunF  darkH  earthF  ellipseSlope');
 for (const s of b.header.sites) {
   console.log(
-    `${String(s.rank).padStart(4)} ${fmt(s.lat, 4).padStart(9)} ${fmt(s.lon, 3).padStart(10)} ${fmt(s.score, 3)} ${fmt(s.sunFraction, 2)} ${fmt(s.longestDarkH, 0).padStart(5)} ${fmt(s.earthFraction, 2).padStart(7)} ${fmt(s.ellipseSlopeDeg, 1).padStart(8)}`,
+    `${String(s.rank).padStart(4)} ${fmt(s.lat, 4).padStart(9)} ${fmt(s.lon, 3).padStart(10)} ${fmt(s.roomM, 0).padStart(5)} ${fmt(s.sunFraction, 2)} ${fmt(s.longestDarkH, 0).padStart(5)} ${fmt(s.earthFraction, 2).padStart(7)} ${fmt(s.ellipseSlopeDeg, 1).padStart(8)}`,
   );
 }
 if (!b.header.sites.length) console.log('(no sites)');

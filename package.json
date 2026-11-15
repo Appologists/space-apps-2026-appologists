@@ -18,7 +18,10 @@
     "check:landing": "node tools/check-landing-search.mjs",
     "check:tiles": "node tools/check-tiles.mjs",
     "check:light": "node tools/check-light.mjs",
-    "demo:warm": "node tools/warm-demo.mjs"
+    "demo:warm": "node tools/warm-demo.mjs",
+    "dev:quest": "sh tools/quest-cert.sh && vite --config vite.quest.config.js --port 5443 --strictPort",
+    "export:static": "node tools/export-static.mjs",
+    "build:site": "vite build && node tools/copy-learn.mjs"
   },
   "engines": {
     "node": ">=22.12"

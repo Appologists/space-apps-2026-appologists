@@ -1,0 +1,20 @@
+[
+ {
+  "key": "shackleton",
+  "name": "Shackleton crater rim",
+  "lat": -89.76205,
+  "lon": -157.0749
+ },
+ {
+  "key": "ridge",
+  "name": "Shackleton-de Gerlache connecting ridge",
+  "lat": -89.46235,
+  "lon": -137.0871
+ },
+ {
+  "key": "malapert",
+  "name": "Malapert massif",
+  "lat": -85.98768,
+  "lon": 2.0681
+ }
+]

@@ -1,6 +1,6 @@
 // The mission steps: the five views a planner walks through, one after another.
 //
-//   1 Mission   choose a ready-made mission, or set the lander and the rover yourself
+//   1 Mission   choose a ready-made mission, or set the lander and the rover yourself (the questions: mission-questions.js)
 //   2 Regions   which candidate regions that mission can land in (a real terrain search of each)
 //   3 Drive     where the rover starts and where it goes, and the trip played back with day and night
 //   4 Surface   stand at the landing spot and look around
@@ -14,12 +14,13 @@ import missions from '../../data/missions.json';
 import sitesData from '../../data/sites.json';
 import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
+import { missionRegions } from '../finder/regions.js';
 import { STATE_STORY, milestoneLabel } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
-import { DURATION_MARKS, formatDuration, positionOf, tidyDuration } from '../mission.js';
 import { clear, h } from './dom.js';
 import { createDateScan } from './date-scan-panel.js';
 import { decodeFlow, encodeFlow } from './flow-state.js';
+import { GROUPS, choiceRow, dateRow, durationRow, groupSummary } from './mission-questions.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -32,56 +33,14 @@ const STEPS = [
 ];
 
 /** The regions every mission is checked against, with their coordinates and sources resolved. */
-const REGIONS = missions.regions.map((region) => {
-  const site = region.site ? sitesData.sites.find((s) => s.id === region.site) : region;
-  const sources = region.site ? sitesData.sources : missions.sources;
-  // A named crater stands for its middle (a reference point, not a vetted landing site); missions.json says so.
-  // searchRadiusKm: the crater regions are searched 20 km round their centres, to reach the rims (our choice).
-  return { id: region.id, name: site.name, lat: site.lat, lon: site.lon, searchRadiusKm: region.searchRadiusKm, source: sources[site.source] };
-});
-
-// The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
-// `custom` adds an "Other" button for any value in its range (a rover that survives 7 h of darkness, say).
-const yes = (when) => (v) => (v ? when[0] : when[1]);
-const GROUPS = [
-  {
-    id: 'mission',
-    title: 'Mission',
-    date: true, // the landing date comes first, with its own row
-    choices: [
-      { on: 'mission', key: 'durationHours', label: 'Duration', slider: true, summary: (v) => `for ${formatDuration(v)}` },
-    ],
-  },
-  {
-    id: 'lander',
-    title: 'Lander',
-    choices: [
-      // 100 m is NASA's figure for the Artemis lander (missions.json, hls-2024); 200 m and 2 km are our choices, the
-      // last for an older-style lander (decision V). 50 m was dropped: the search's 80 m cells make it the same as
-      // 100 m. On the seven demo regions 100 m finds 8.4 km² that can take a landing, 200 m 1.8 km², 2 km none.
-      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[100, '100 m', 'NASA: Artemis Human Landing System (2024)'], [200, '200 m', 'Our choice'], [2000, '2 km', 'Our choice: an older-style lander']], format: (v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`), custom: { min: 50, max: 10000, step: 10, unit: 'm' }, summary: (v) => `within ${v >= 1000 ? `${v / 1000} km` : `${v} m`}` },
-      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, custom: { min: 1, max: 30, step: 0.5, unit: '°' }, summary: (v) => `slopes up to ${v}°` },
-      { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['Earth in view', null]) },
-      { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['in sunlight', null]) },
-    ],
-  },
-  {
-    id: 'rover',
-    title: 'Rover',
-    choices: [
-      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, custom: { min: 1, max: 720, step: 1, unit: 'h' }, summary: (v) => `survives ${v} h dark` },
-      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, custom: { min: 1, max: 35, step: 0.5, unit: '°' }, summary: (v) => `slopes up to ${v}°` },
-      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, custom: { min: 1, max: 5000, step: 1, unit: 'm/hr' }, summary: (v) => `${v} m/hr` },
-      { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['needs Earth to drive', null]) },
-    ],
-  },
-];
+const REGIONS = missionRegions(missions, sitesData);
 
 // Region markers on the globe, coloured like the verdicts in the list (styles.css, .region .verdict).
 const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
-// How close the globe comes on step 2. Daniel (2026-11-14) asked for it further out, so the view shows which part
-// of the Moon this is; in its narrower pane that needs the Moon's curved edge in view, which is about 2.5 (our choice).
-const REGION_ZOOM = 2.5;
+// How close the globe comes on step 2 (the Moon tab). 1.1 shows the whole Moon, with the region's map popped out
+// beside it (ui/shell.js). It was 2.5, which Daniel asked for on 2026-11-14 when the globe shared the stage with the
+// map; the team's front replaced that layout (docs/decisions.md, AA).
+const REGION_ZOOM = 1.1;
 const WIDE_KM = Math.max(...REGIONS.map((r) => r.searchRadiusKm ?? 0));
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
@@ -94,6 +53,9 @@ const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at to
  * @param {Object} options.api   what main.js lends: getMission(), setMission(patch), stepHours(), viewIndex(),
  *                               setViewIndex(i), standAt(site) and setStatus(message, hideAfterMs)
  */
+/** What ride() answers when the ground did not load: the surface view has already said why on the screen. */
+export const RIDE_FAILED = Symbol('the ride did not open');
+
 export function createFlow({ app, globe, finder, surface, api }) {
   let step = 1;
   let furthest = 1; // the last step reached, so the step bar can jump back and forth among visited steps
@@ -106,9 +68,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
   let track = null; // where the rover is at any hour of the plan (playback.js)
   // One clock for the map and the surface view: hours after landing. `fromHere` stops an echo when this file moves the app's time slider.
   const openGroups = new Set(); // which groups of the custom form are open; all start closed
-  const typing = new Set(); // choices whose "Other" number box is open
   let searchFirst = null; // a region to search before the others (the one a saved address was showing)
   let restoring = false; // while a saved address is being acted on, nothing is written back to it
+  let stepListener = null; // told of every change of step (the front's tabs follow it: ui/shell.js)
   const clock = { hours: 0, playing: false, frame: 0, rate: 0, showTime: false, freeLook: false, yaw: null, fromHere: false, sunAt: 0 };
 
   // ---- Step bar and Back / Next ---------------------------------------------------------------------------
@@ -131,7 +93,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       if (!result.sites.length) return 'No landing passes in this region. Choose another, or go back and change the mission.';
     }
     if (from === 3 && !route?.start) return 'Tap the map to choose where the rover starts.';
-    if (from === 4 && !track) return 'No drive is planned yet. Go back a step and add a destination.';
+    if (from === 4 && !track) return 'No drive is planned yet. On the map, add a destination or press "Suggest a drive".';
     return null;
   }
 
@@ -161,6 +123,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     step = next;
     furthest = Math.max(furthest, step);
     app.dataset.step = String(step);
+    stepListener?.(step);
     for (const section of sections) section.hidden = !section.dataset.steps.split(' ').includes(String(step));
     $('flowBody').scrollTop = 0;
     drawNav();
@@ -181,7 +144,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         // The globe and the region's map share the stage (styles.css): where on the Moon, and where it can land.
         if (result) finder.open();
         const region = REGIONS.find((r) => r.id === regionId);
-        if (region) globe.focus(region.lat, region.lon, REGION_ZOOM);
+        if (region) focusRegion(region);
         else globe.view('southClose');
       } else if (result) finder.open();
       applyMapView();
@@ -214,6 +177,32 @@ export function createFlow({ app, globe, finder, surface, api }) {
     if (leavingSurface) setTimeout(() => app.classList.remove('flying'), 40); // the map fades in (styles.css)
   }
 
+  /** True when the surface view is open at the drive's start, which the Surface and Ride steps need. */
+  function standing() {
+    const here = surface.getSite();
+    const { start } = finder.getRoute();
+    return !!(here && start && here.lat === start.lat && here.lon === start.lon);
+  }
+
+  /**
+   * Straight from the drive to the ride, without a stop at the Surface step (the Ride tab in ui/shell.js).
+   * Answers why it cannot, in words for the person (or RIDE_FAILED when the screen already says why), or null
+   * once the ride is on the stage.
+   */
+  async function ride() {
+    if (step === 5) return null;
+    if (step < 3) return 'Pick a region with room to land first.';
+    const why = blocked(3) ?? blocked(4);
+    if (why) return why;
+    furthest = STEPS.length;
+    await go(5);
+    // The ride stands on the ground around the landing spot. If that could not be read (the hosted website
+    // saves it only at each region's first landing sites), go back to the drive; the reason is on the screen.
+    if (step === 5 && standing()) return null;
+    await go(3);
+    return RIDE_FAILED;
+  }
+
   // ---- The address: a reload or a bookmark comes back to the same step (flow-state.js) -----------------------
   function save() {
     if (restoring) return;
@@ -229,6 +218,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       region: regionId,
       startAt: onMap ? start : null,
       targets: onMap ? targets : [],
+      routeChoice: finder.getRouteChoice(),
     });
     history.replaceState(null, '', `#${text}`);
   }
@@ -260,7 +250,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
         await go(3);
         if (saved.startAt) finder.pick(saved.startAt.lat, saved.startAt.lon, 'start');
         for (const target of saved.targets ?? []) finder.pick(target.lat, target.lon, 'dest');
+        if (saved.routeChoice) finder.chooseRoute(saved.routeChoice);
         for (let next = 4; next <= saved.step && !blocked(next - 1); next++) await go(next);
+        if (step >= 4 && !standing()) await go(3); // the ground there could not be read: back to the drive
       }
     } finally {
       restoring = false;
@@ -280,224 +272,31 @@ export function createFlow({ app, globe, finder, surface, api }) {
     save();
   }
 
-  const same = (a, b) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 1e-6 : a === b);
-
   const valueOf = (def) => (def.on === 'mission' ? api.getMission()[def.key] : finder.values[def.key]);
 
   /** One group of the custom form: a header that shows the current values, and its questions when open. */
   function groupBlock(group) {
-    const date = (d) => `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}, ${d.toISOString().slice(11, 16)} UTC`;
-    const said = [group.date ? date(api.getMission().start) : null, ...group.choices.map((def) => def.summary(valueOf(def)))].filter(Boolean);
+    const said = groupSummary(group, valueOf, api.getMission().start);
     return h(
       'details',
       { class: 'group', open: openGroups.has(group.id), onToggle: (e) => (e.target.open ? openGroups.add(group.id) : openGroups.delete(group.id)) },
       h('summary', {}, h('span', { class: 'group-title' }, group.title), h('span', { class: 'group-summary' }, said.join(' · '))),
-      h('div', { class: 'group-body' }, group.date ? dateRow() : null, ...group.choices.map((def) => (def.slider ? durationRow(def) : choiceRow(def)))),
+      h('div', { class: 'group-body' }, group.date ? landingTimeRow() : null, ...group.choices.map(questionRow)),
     );
   }
 
-  function choiceRow(def) {
-    const current = valueOf(def);
-    const preset = def.options.some(([value]) => same(value, current));
-    // A value set elsewhere (the exact-number boxes under "More tools") gets a button of its own, unless the
-    // choice has an "Other" button, which then shows it.
-    const options = preset || def.custom ? def.options : [...def.options, [current, def.format ? def.format(current) : String(current)]];
-    const set = (value) => {
-      if (def.on === 'mission') api.setMission({ [def.key]: value });
-      else {
-        finder.values[def.key] = value;
-        finder.drawForm();
-      }
-      drawSetup();
-      save();
-    };
-    const open = def.custom && (typing.has(def.key) || !preset);
-    const other = def.custom
-      ? h('button', {
-          type: 'button',
-          class: 'choice-other',
-          'aria-pressed': String(!preset),
-          'aria-expanded': String(open),
-          onClick: () => {
-            if (typing.has(def.key)) typing.delete(def.key);
-            else typing.add(def.key);
-            drawSetup();
-            requestAnimationFrame(() => document.querySelector(`[data-custom="${def.key}"]`)?.focus());
-          },
-        }, preset ? 'Other' : def.format(current))
-      : null;
-    const box = open ? customBox(def, current, set) : null;
-    return h(
-      'div',
-      { class: 'choice' },
-      h('div', { class: 'choice-label' }, def.label, def.hint ? h('small', {}, def.hint) : null),
-      h(
-        'div',
-        { class: 'choice-options', role: 'group', 'aria-label': def.label },
-        // A third entry, where given, is the value's source, shown on hover.
-        options.map(([value, text, source]) => h('button', { type: 'button', title: source ?? '', 'aria-pressed': String(same(value, current)), onClick: () => { typing.delete(def.key); set(value); } }, text)),
-        other,
-      ),
-      box,
-    );
+  /** Applies an answer to the app at once: the Mission step has no draft (the pop-up in shell.js keeps one). */
+  function answer(def, value) {
+    if (def.on === 'mission') api.setMission({ [def.key]: value });
+    else {
+      finder.values[def.key] = value;
+      finder.drawForm();
+    }
+    drawSetup();
+    save();
   }
-
-  /** The "Other" number box: any value in the choice's range, applied when the box is left or Enter is pressed. */
-  function customBox(def, current, set) {
-    const { min, max, step: stepBy, unit } = def.custom;
-    const note = h('small', { class: 'choice-custom-note' }, `${min}–${max} ${unit}`);
-    const apply = (input) => {
-      const value = Number(input.value);
-      if (!Number.isFinite(value) || value < min || value > max) {
-        note.textContent = `Enter a number from ${min} to ${max} ${unit}`;
-        note.classList.add('bad');
-        return;
-      }
-      if (!same(value, valueOf(def))) set(value);
-    };
-    return h('label', { class: 'choice-custom' },
-      h('input', {
-        type: 'number',
-        class: 'big',
-        min: String(min),
-        max: String(max),
-        step: String(stepBy),
-        value: String(current),
-        inputMode: 'decimal',
-        'data-custom': def.key,
-        'aria-label': `${def.label} (${unit})`,
-        onChange: (e) => apply(e.target),
-        onKeydown: (e) => { if (e.key === 'Enter') apply(e.target); },
-      }),
-      h('span', { class: 'choice-unit' }, unit),
-      note);
-  }
-
-  /**
-   * Mission length: a slider from 1 hour to 1 year with the clean lengths evenly spaced under it as big buttons
-   * (the scale is in src/mission.js). Dragging shows the length; letting go applies it.
-   */
-  function durationRow(def) {
-    const current = valueOf(def);
-    const SCALE = 1000;
-    const readout = h('span', { class: 'duration-value' }, formatDuration(current));
-    const set = (hours) => {
-      if (same(hours, valueOf(def))) return;
-      api.setMission({ durationHours: hours });
-      drawSetup();
-      save();
-    };
-    const marks = DURATION_MARKS.map((mark, i) =>
-      h(
-        'button',
-        {
-          type: 'button',
-          class: 'duration-mark',
-          style: `left: ${((100 * i) / (DURATION_MARKS.length - 1)).toFixed(3)}%`,
-          'aria-pressed': String(same(mark.hours, current)),
-          'aria-label': formatDuration(mark.hours),
-          onClick: () => set(mark.hours),
-        },
-        mark.label,
-      ),
-    );
-    const slider = h('input', {
-      type: 'range',
-      class: 'duration-slider',
-      min: '0',
-      max: String(SCALE),
-      step: '1',
-      value: String(Math.round(positionOf(current) * SCALE)),
-      'aria-label': 'Duration',
-      'aria-valuetext': formatDuration(current),
-      onInput: (e) => {
-        const hours = tidyDuration(Number(e.target.value) / SCALE);
-        readout.textContent = formatDuration(hours);
-        e.target.setAttribute('aria-valuetext', formatDuration(hours));
-        marks.forEach((button, i) => button.setAttribute('aria-pressed', String(same(DURATION_MARKS[i].hours, hours))));
-        // Near a clean length the thumb jumps onto it, so it is easy to hit.
-        if (DURATION_MARKS.some((mark) => same(mark.hours, hours))) e.target.value = String(Math.round(positionOf(hours) * SCALE));
-      },
-      onChange: (e) => set(tidyDuration(Number(e.target.value) / SCALE)),
-    });
-    return h(
-      'div',
-      { class: 'choice' },
-      h('div', { class: 'choice-label duration-label' }, def.label, readout),
-      h('div', { class: 'duration' }, slider, h('div', { class: 'duration-marks' }, marks)),
-    );
-  }
-
-  /** The landing time: big in the middle, with steps of a week, a day and an hour back on the left and forward on the right. */
-  function dateRow() {
-    const mission = api.getMission();
-    const move = (hours) => {
-      api.setMission({ start: new Date(mission.start.getTime() + hours * 3_600_000) });
-      drawSetup();
-      save();
-    };
-    const STEPS = [
-      [24 * 7, 'week'],
-      [24, 'day'],
-      [1, 'hour'],
-    ];
-    const side = (sign) =>
-      h(
-        'div',
-        { class: 'date-steps', role: 'group', 'aria-label': sign < 0 ? 'Earlier' : 'Later' },
-        STEPS.map(([hours, unit]) =>
-          h('button', { type: 'button', 'aria-label': `One ${unit} ${sign < 0 ? 'earlier' : 'later'}`, onClick: () => move(sign * hours) }, `${sign < 0 ? '−' : '+'}1 ${unit}`),
-        ),
-      );
-    // The date box itself is hidden: tapping the big date opens its picker, for a jump of more than a few weeks.
-    const input = h('input', {
-      id: 'setupStart',
-      class: 'date-input',
-      type: 'datetime-local',
-      step: '3600',
-      tabIndex: -1,
-      'aria-hidden': 'true',
-      value: mission.start.toISOString().slice(0, 16),
-      onChange: (e) => {
-        const date = new Date(`${e.target.value}Z`);
-        if (Number.isNaN(date.getTime())) return;
-        api.setMission({ start: date });
-        drawSetup();
-        save();
-      },
-    });
-    const day = mission.start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-    return h(
-      'div',
-      { class: 'choice' },
-      h('div', { class: 'choice-label' }, 'Landing datetime'),
-      h(
-        'div',
-        { class: 'date-row' },
-        side(-1),
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'date-now',
-            title: 'Choose a date',
-            onClick: () => {
-              try {
-                input.showPicker();
-              } catch {
-                input.focus();
-              }
-            },
-          },
-          h('span', { class: 'date-day' }, day),
-          h('span', { class: 'date-time' }, `${mission.start.toISOString().slice(11, 16)} UTC`),
-          input,
-        ),
-        side(1),
-      ),
-    );
-  }
-
+  const questionRow = (def) => (def.slider ? durationRow : choiceRow)(def, valueOf(def), (value) => answer(def, value));
+  const landingTimeRow = () => dateRow(api.getMission().start, (start) => answer({ on: 'mission', key: 'start' }, start));
 
   // The mission cards are built once and then only updated, so the change to the compact row can slide.
   const profileButtons = missions.profiles.map((profile) =>
@@ -568,6 +367,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
   }
 
   // ---- 2 Regions ----------------------------------------------------------------------------------------
+  /** The whole Moon seen at an angle, the south pole low in the view, turned so the region faces you (ui/shell.js pops its map out beside it). */
+  const focusRegion = (region) => globe.focus(-58, region.lon, REGION_ZOOM);
+
   const passingKm2 = (result) => (result.counts.passing * result.cellM * result.cellM) / 1e6;
 
   /** Search every region for the mission as it stands now. Does nothing if that search is done or under way. */
@@ -613,7 +415,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     regionId = id;
     const region = REGIONS.find((r) => r.id === id);
     if (step === 2 || step === 3) finder.showResult(result, region.name, { startAt: result.sites[0] ?? null });
-    if (step === 2) globe.focus(region.lat, region.lon, REGION_ZOOM);
+    if (step === 2) focusRegion(region);
     drawRegions();
     drawNav();
     save();
@@ -841,13 +643,17 @@ export function createFlow({ app, globe, finder, surface, api }) {
 
   // ---- What the map is coloured by: a small toggle on the map itself (Daniel, 2026-11-14) ----------------------
   // Day/night is the sunlight at the clock's moment; the others are finder layers (map-layers.js). Each step
-  // keeps its own choice: the Regions step opens on the landing sites, the Drive step on day and night.
+  // keeps its own choice: the Regions step opens on the landing sites, the Drive step on the one map.
+  // "All" is the one map (map-layers.js ALL_LAYER): sunlight at the clock's moment, steep ground and landing
+  // ground together. The other three show one of them alone.
   const MAP_VIEWS = [
+    ['all', 'All'],
     ['time', 'Day/night'],
     ['slope', 'Slope'],
     ['result', 'Landing sites'],
   ];
-  const mapViewFor = { 2: 'result', 3: 'time' };
+  const showsTime = (id) => id === 'time' || id === 'all';
+  const mapViewFor = { 2: 'result', 3: 'all' };
   const mapViewButtons = MAP_VIEWS.map(([id, label]) => h('button', { type: 'button', onClick: () => setMapView(id) }, label));
   $('mapViews').append(...mapViewButtons);
   function setMapView(id) {
@@ -860,15 +666,15 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function applyMapView() {
     const id = mapViewFor[step] ?? 'result';
     pressMapView(id);
-    clock.showTime = id === 'time';
-    if (id !== 'time') finder.chooseLayer(id);
+    finder.chooseLayer(id);
+    clock.showTime = showsTime(id);
     showMoment();
   }
   // The "why no drive works" box can show another layer (Darkness, Reach…): the toggle follows it.
   finder.listenLayer((id) => {
     if (step !== 2 && step !== 3) return;
     mapViewFor[step] = id;
-    clock.showTime = false;
+    clock.showTime = showsTime(id);
     pressMapView(id);
   });
   $('surfaceCanvas').addEventListener('pointerdown', () => {
@@ -1016,7 +822,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
   // ---- Start --------------------------------------------------------------------------------------------
   globe.view('south');
   const saved = decodeFlow(location.hash); // read before go(1) writes the address
-  go(1).then(() => restore(saved));
+  const ready = go(1).then(() => restore(saved)); // settles once a saved address has been acted on
 
-  return { go, routeChanged, timeChanged, getStep: () => step, debug: { scan: () => scan, clock, play, pause, useProfile } };
+  // The step a saved address asks for (1 on a first visit). The address itself is no use for this once go(1) has
+  // run: it has already been rewritten.
+  const savedStep = missions.profiles.some((p) => p.id === saved.profile) ? saved.step ?? 1 : 1;
+
+  return { go, ride, ready, savedStep, listenStep: (fn) => (stepListener = fn), routeChanged, timeChanged, getStep: () => step, getRegion: () => REGIONS.find((r) => r.id === regionId) ?? null, debug: { scan: () => scan, clock, play, pause, useProfile } };
 }

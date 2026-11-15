@@ -18,6 +18,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
   checks that stored and computed answers are the same.
 - `npm run demo:warm` (with the app running) asks every search the ready-made missions need, so they are kept
   and the steps open at once. Run it before showing the app to anyone.
+- `npm run export:static` (with the app running), then `npm run build:site`, make the website that runs with no
+  server (`dist/`): the ready-made missions' searches, and the street view and ride at each region's first landing
+  sites, are saved ahead of time in `public/static/` (not in git). Rerun both after changing the search or a mission.
 - `npm run check:landing` after changing the landing search; `npm run check:tiles` after changing how the
   59 m whole-Moon tiles are read (it compares them with the other terrain datasets you have downloaded).
 
@@ -38,7 +41,12 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 - The drive planner: the rover's rules and the step-by-step replay in `src/finder/schedule.js`, the search in
   `src/finder/planner.js`, its words in `src/finder/plan-text.js`. All three are pure (no browser code) and
   tested; `tests/finder-planner.test.js` checks the search against an exhaustive one on small maps.
-- The mission steps (the five views in the left panel): `src/ui/flow.js` says which view is on the stage and
+- The front (top tabs Moon, Site, Street view, Ride; the "Plan a mission" pop-up; the close-up that pops out of the
+  globe): `src/ui/shell.js` with `src/ui/shell.css`. It shows nothing of its own: it drives the mission steps below.
+  Which tab stands for which step: `src/ui/flow-state.js`. The mission questions (one definition for the pop-up and
+  the Mission step): `src/ui/mission-questions.js`. The street view page: `public/Street-view/`, its terrain from
+  `server/streetview-bake.mjs`.
+- The mission steps (the five views the front drives; Moon is step 2, Site step 3, Ride step 5): `src/ui/flow.js` says which view is on the stage and
   runs the playback clock; it computes nothing. A new ready-made mission or region: `data/missions.json`, each
   number with a source. What the address keeps: `src/ui/flow-state.js`. Credits: `data/credits.json`.
 - The education page (`/learn`): `education/`. `npm run dev` serves it with its data through

@@ -97,8 +97,8 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
 
   /** The whole question for a search centred on a point: the form's values and the mission. */
   function paramsFor(center) {
-    const { mission, weights, terrainSource } = getState();
-    return searchQuestion({ center, values, mission, weights, source: terrainSource });
+    const { mission, terrainSource } = getState();
+    return searchQuestion({ center, values, mission, source: terrainSource });
   }
 
   async function run() {
@@ -314,11 +314,11 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
             'button',
             { type: 'button', class: 'found-site', onClick: () => pick(site.lat, site.lon, 'start') },
             h('span', { class: 'num' }, `${site.rank}`),
-            h('span', {}, formatLatLon(site.lat, site.lon, 3), h('span', { class: 'rank-score' }, ` ${Math.round(site.score * 100)}`)),
+            h('span', {}, formatLatLon(site.lat, site.lon, 3), h('span', { class: 'rank-score', title: 'Room to miss: how far the nearest ground that fails a check is' }, ` ${Math.round(site.roomM)} m`)),
             h(
               'small',
               {},
-              `Sunlit ${percent(site.sunFraction)}, longest dark ${formatHours(site.longestDarkH)}, Earth in view ${percent(site.earthFraction)}, slope up to ${site.ellipseSlopeDeg.toFixed(0)}°`,
+              `Room to miss ${Math.round(site.roomM)} m, longest dark ${formatHours(site.longestDarkH)}, slope up to ${site.ellipseSlopeDeg.toFixed(0)}°, sunlit ${percent(site.sunFraction)}, Earth in view ${percent(site.earthFraction)}`,
             ),
           ),
         ),
@@ -328,6 +328,8 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       `Landing accuracy is treated as a circle of ${params.ellipseRadiusM >= 1000 ? `${params.ellipseRadiusM / 1000} km` : `${params.ellipseRadiusM} m`} radius round each site, and every ${cellM} m cell inside it must pass. ` +
       `That screens the slope of the whole landing area; boulders, and slopes only a few metres across, are not seen. The terrain data is ${result.sourceLabel ?? 'NASA LOLA'} at about ${Math.round(result.terrainPixelM ?? cellM)} m per pixel. ${result.sourceNote ? `${result.sourceNote} ` : ''}` +
       'The Sun and Earth count as visible when the centre of their disc clears the terrain. Darkness at the very start or end of the mission may be longer than shown. ' +
+      `Sites are listed by room to miss: the distance from a spot to the nearest ground that fails a check, measured between ${cellM} m cells, so it moves in steps of about a cell and knows nothing of hazards smaller than one. Equal room goes to the shorter darkness, then the gentler ground (our choice). ` +
+      'On the map\'s "All" view the soft shading and the slope colours are smoothed between cells, as a drawing aid; sunlight and landing ground keep the cells\' edges, and Earth in view is not drawn. ' +
       'Click the map or a site, then "Look around from here" to stand there.';
   }
 
@@ -366,6 +368,13 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       updateRoute();
     },
     getRoute: () => ({ start, targets, reach, plan }),
+    /** Which of the three route choices is asked for: 'safest' | 'fastest' | 'shortest' (the address keeps it). */
+    getRouteChoice: () => routeChoice,
+    chooseRoute: (id) => {
+      if (id === routeChoice) return;
+      routeChoice = id;
+      updateRoute();
+    },
     getMap: () => map,
     debug: { pick, route: () => ({ start, targets, reach, plan, options, routeChoice }) },
   };

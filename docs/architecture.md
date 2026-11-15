@@ -156,7 +156,7 @@ grid between 80° and 88° S: correlation 1.0000, mean difference at most 0.1 m,
 - **Checks.** Slope at the cell, Sun and Earth at touchdown, longest run of darkness. Then every cell takes
   the worst result found anywhere within the landing accuracy, because the lander may come down anywhere
   in that circle.
-- **Score and sites.** Passing cells are scored like the ranked list; the ten best, kept apart, are listed.
+- **Room to miss and sites.** Each cell's room to miss is its distance to the nearest ground that fails a check on its own; the ten passing cells with the most room, kept apart, are listed (decision Z).
 
 Check we ran (2026-11-14, `npm run check:landing`): at 16 places round Shackleton's rim, over 14 days, the
 finder and the slower point-by-point horizon method agreed to within 0.012 on the share of time sunlit,

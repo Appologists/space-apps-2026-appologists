@@ -1,0 +1,23 @@
+{
+ "key": "apollo11",
+ "name": "Tranquility Base (Apollo 11)",
+ "lat": 0.67416,
+ "lon": 23.47314,
+ "heightM": 0,
+ "pick": "Apollo 11 lunar module position as located in LRO camera images (LROC team)",
+ "sources": [
+  "Sun and Earth: computed with Astronomy Engine (the team repo checks it against NASA JPL Horizons)"
+ ],
+ "sky": {
+  "file": "sky.bin",
+  "startUTC": "2026-11-14T00:00:00.000Z",
+  "stepHours": 1,
+  "count": 8785,
+  "fields": [
+   "sunAz",
+   "sunEl",
+   "earthAz",
+   "earthEl"
+  ]
+ }
+}

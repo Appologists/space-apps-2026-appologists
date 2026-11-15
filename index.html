@@ -8,12 +8,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
     />
     <!-- Linked here, not imported from main.js, so the page is laid out before the app's script has loaded. -->
     <link rel="stylesheet" href="/src/styles.css" />
+    <!-- The app's look (same as the street view) and its top bar, survey and pop-out: src/ui/shell.js. -->
+    <link rel="stylesheet" href="/src/ui/shell.css" />
   </head>
   <body>
+    <header class="topbar">
+      <div class="brand"><b>◉</b> Lunar Landing Site Navigator</div>
+      <nav class="tabs" aria-label="Views">
+        <button type="button" id="tabMoon">Moon</button>
+        <button type="button" id="tabSite">Site</button>
+        <button type="button" id="tabStreet">Street view</button>
+        <button type="button" id="tabRide">Ride</button>
+        <a href="/learn/" target="_blank" rel="noopener">Learn ↗</a>
+      </nav>
+      <div class="sp"></div>
+      <button type="button" id="changeMission" class="ghost">Change mission</button>
+      <button type="button" id="notesBtn" class="ghost" title="Presenter notes (N)">Notes</button>
+    </header>
     <div class="app">
       <aside class="panel" aria-label="Mission steps">
         <header class="flow-head">
@@ -22,6 +37,7 @@
         </header>
 
         <div class="flow-body" id="flowBody">
+          <section class="mission-line" id="missionLine"></section>
           <section data-steps="1" id="missionSection">
             <h2 class="step-title">Plan a mission</h2>
             <div id="profiles" class="profiles"></div>
@@ -172,13 +188,16 @@
         </div>
 
         <div class="finder" id="finder" hidden>
+          <div class="pop-head"><span class="eyebrow">Close-up · landing sites and the rover's drive</span><strong id="popTitle"></strong></div>
+          <div class="pop-actions"><button type="button" id="popOpen">Open site ↗</button><button type="button" id="popStand" class="primary">Stand here →</button></div>
+          <!-- What the map is coloured by, and its key (flow.js). On the Site tab it sits on the map's top left corner;
+               in the Moon tab's small pop-out it is a row above the map, so it covers none of it (shell.css). -->
+          <div class="map-key">
+            <div class="map-views" id="mapViews" role="group" aria-label="Colour the map by"></div>
+            <div class="legend map-legend" id="finderLegend" hidden></div>
+          </div>
           <div class="finder-map" id="finderMap">
             <canvas id="finderCanvas" aria-label="Map of the search area, north up. Point at it to read values; click to select a spot."></canvas>
-            <!-- What the map is coloured by, and its key: on the map itself (flow.js). -->
-            <div class="map-key">
-              <div class="map-views" id="mapViews" role="group" aria-label="Colour the map by"></div>
-              <div class="legend map-legend" id="finderLegend" hidden></div>
-            </div>
             <div class="tip" id="finderTip" hidden></div>
           </div>
           <!-- The drive's timeline, beside the map rather than over it (step 3; see flow.js and styles.css). -->
@@ -199,11 +218,36 @@
           </div>
         </div>
 
+        <svg class="lead-line" id="leadLine" aria-hidden="true"></svg>
         <div class="status" id="status">Loading the Moon map…</div>
       </main>
 
       <section class="detail" id="detail" aria-live="polite" hidden></section>
     </div>
+    <!-- The street view (public/Street-view/) at the landing spot, inside the app. -->
+    <div class="sv-wrap" id="svWrap" hidden><iframe id="svFrame" title="Street view" allow="xr-spatial-tracking; fullscreen"></iframe></div>
+    <!-- The mission survey: four questions; "More options" has the exact numbers. -->
+    <div class="survey" id="survey" hidden>
+      <div class="survey-card" role="dialog" aria-modal="true" aria-labelledby="surveyCount">
+        <div class="survey-top"><span class="eyebrow" id="surveyCount"></span><button type="button" id="surveyClose" aria-label="Close">✕</button></div>
+        <div class="survey-dots" id="surveyDots"></div>
+        <div id="surveyBody"></div>
+        <div class="survey-nav"><button type="button" id="surveyBack">Back</button><button type="button" id="surveyNext" class="primary">Next</button></div>
+      </div>
+    </div>
+    <!-- Presenter notes: only for whoever is presenting (press N). -->
+    <aside class="notes" id="notes" hidden>
+      <div class="eyebrow">Presenter notes · 2 minutes</div>
+      <ol>
+        <li><b>The question.</b> Where near the south pole can this mission land, with sunlight and a line to Earth?</li>
+        <li><b>Mission.</b> Four questions set it; the details stay one click away.</li>
+        <li><b>Moon.</b> Regions ranked on real NASA terrain; the close-up pops out of the globe.</li>
+        <li><b>Site.</b> Where a landing passes every check, and the rover's safest drive with day and night.</li>
+        <li><b>Street view.</b> Stand at the landing spot: real terrain, real Sun and Earth. Same spot in VR on a Quest.</li>
+        <li><b>Ride.</b> The rover's view along the planned drive, speeded up, with the credits.</li>
+      </ol>
+      <p>Press N to hide.</p>
+    </aside>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

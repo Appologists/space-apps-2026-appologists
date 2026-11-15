@@ -3,6 +3,7 @@
 //   GET  /api/terrain/info                    which terrain datasets exist, and which are downloaded
 //   GET  /api/terrain/polar?lat=&lon=&source= the ground around a point, as a polar grid (binary; see
 //                                             encodePatch/decodePatch in src/terrain/polar-grid.js)
+//   GET  /api/terrain/streetview?lat=&lon=  terrain and sky for the street view at a point (streetview-bake.mjs)
 //   POST /api/terrain/landing-search          the landing-site finder (JSON in: see src/finder/types.js;
 //                                             rasters out: src/finder/wire.js). Takes several seconds.
 //
@@ -17,10 +18,12 @@ import { searchLanding } from './landing-search.mjs';
 import { createLightStore, lightCodeKey, lightDir, terrainDataKey } from './light-store.mjs';
 import { samplePolarPatch } from './lola-polar.mjs';
 import { createTerrainStore } from './terrain-sources.mjs';
+import { createStreetView } from './streetview-bake.mjs';
 
 export function terrainApi({ root = process.cwd() } = {}) {
   const store = createTerrainStore(root);
   const lightStore = createLightStore(lightDir(root)); // maps from tools/precompute-light.mjs, when there are any
+  const streetView = createStreetView(root, store);
 
   // ---- Kept answers ---------------------------------------------------------------------------------------
   // A search takes 10 to 20 seconds and the same question comes back whenever someone steps back or reloads,
@@ -120,6 +123,13 @@ export function terrainApi({ root = process.cwd() } = {}) {
         // With "best available", far rings are read from coarser data; the app's notes say so.
         const sourceNote = found.dem.detailVaries ? 'Ground far from you is read from coarser data, in step with how sparsely it is sampled.' : undefined;
         return binary(res, encodePatch({ ...patch, sourceLabel: found.source.label, sourceNote }));
+      }
+      if (url.pathname === '/streetview') {
+        // Terrain and sky for the street view at any point (server/streetview-bake.mjs). JSON, about 2 MB.
+        const lat = parseFloat(url.searchParams.get('lat'));
+        const lon = parseFloat(url.searchParams.get('lon'));
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return json(res, 400, { error: 'lat and lon are required' });
+        return json(res, 200, await streetView.bake(lat, lon, url.searchParams.get('name')));
       }
       if (url.pathname === '/landing-search' && req.method === 'POST') {
         const params = JSON.parse(await readBody(req));

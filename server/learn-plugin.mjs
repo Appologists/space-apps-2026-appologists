@@ -317,138 +317,152 @@ export function wantsTools(ctx) {
   }
 }
 
+// ---------- The requests ----------
+/** Answers the education page's requests; passes everything else on. Used by the dev and the preview server. */
+async function handle(req, res, next) {
+  // An address that cannot be read (a broken %-escape, say) is not ours: pass it on. Throwing here would
+  // be an unhandled rejection, which stops the dev server.
+  let url;
+  let path;
+  try {
+    url = new URL(req.url, 'http://x');
+    path = decodeURIComponent(url.pathname);
+  } catch {
+    return next();
+  }
+  const q = url.searchParams;
+  try {
+    // Education page and its files (served as they are: they use their own import map, not Vite's).
+    if (path === '/learn' || path === '/learn/') return sendFile(res, join(EDU, 'index.html'));
+    if (path.startsWith('/learn/') && !path.startsWith('/learn/api')) {
+      const f = fileIn(EDU, path.slice(7));
+      return f ? sendFile(res, f, path.includes('/fonts/') ? 'max-age=86400' : 'no-store') : next();
+    }
+    // Shared files from the Python app's public folder.
+    if (path === '/lunar-game.js' || path === '/live-sync.js' || path.startsWith('/vendor/')) {
+      const f = fileIn(join(LP, 'public'), path.slice(1));
+      return f ? sendFile(res, f, path.startsWith('/vendor/') ? 'max-age=86400' : 'no-store') : next();
+    }
+    if (path === '/textures/moon-hd.jpg') return sendFile(res, join(ROOT, 'public', 'textures', 'moon_lroc_color_4k.jpg'), 'max-age=86400');
+    if (['/textures/moon-elevation-grid.bin', '/textures/moon-elevation.png', '/textures/moon-elevation.json'].includes(path)) {
+      const f = fileIn(join(LP, 'public'), path.slice(1));
+      if (f) return sendFile(res, f, 'max-age=3600');
+      // The heights file is made by lunar-planner/build_terrain.py. Without it the page uses the picture;
+      // "no content" tells it so without an error in the console.
+      return send(res, path.endsWith('.bin') ? 204 : 404, '', 'text/plain');
+    }
+    if (path === '/classic' || path.startsWith('/classic/')) {
+      const port = await explorerPort();
+      if (port) {
+        res.statusCode = 302;
+        res.setHeader('Location', `http://127.0.0.1:${port}${path}${url.search}`);
+        return res.end();
+      }
+      return send(res, 200, EXPLORER_HELP, 'text/html; charset=utf-8');
+    }
+    if (!path.startsWith('/api/')) return next();
+    // Data for the page.
+    if (path === '/api/health') return json(res, 200, { status: 'ok', app: 'Lunar Navigator dev server', commit: gitCommit() });
+    if (path === '/api/site') {
+      const lat = number(q, 'lat', -90, 90);
+      const lon = number(q, 'lon', -180, 360);
+      const days = Math.min(7, Math.max(1, Number(q.get('days')) || 1));
+      const site = { lat, lon: ((lon + 180) % 360 + 360) % 360 - 180 };
+      const start = new Date(Math.floor(Date.now() / 1_800_000) * 1_800_000);
+      const samples = [];
+      for (let t = 0; t <= days * 48; t++) {
+        const date = new Date(start.getTime() + t * 1_800_000);
+        const sky = skyAt(site, date);
+        samples.push({
+          t: date.toISOString().slice(0, 16) + 'Z',
+          sun_az: +sky.sun.azimuth.toFixed(4), sun_el: +sky.sun.elevation.toFixed(4), sun_au: +sky.sunDistanceAU.toFixed(8),
+          earth_az: +sky.earth.azimuth.toFixed(4), earth_el: +sky.earth.elevation.toFixed(4), earth_km: +sky.earth.rangeKm.toFixed(1),
+          sun_ok: sky.sun.elevation > 0, earth_ok: sky.earth.elevation > 0,
+        });
+      }
+      return json(res, 200, {
+        site, samples, window: { start: samples[0].t, days, step_minutes: 30 },
+        source: 'Astronomy Engine (the team checks it against NASA/JPL Horizons)',
+        model: 'Directions of body centres over a smooth Moon. No terrain shadowing.',
+      });
+    }
+    if (path === '/api/diviner/point') {
+      const d = divinerMaps();
+      if (!d) return json(res, 404, { error: 'Diviner data missing.' });
+      const lat = number(q, 'lat', -90, 90);
+      const lon = ((number(q, 'lon', -180, 360) + 180) % 360 + 360) % 360 - 180;
+      const subs = Array.from({ length: 24 }, (_, i) => i * 15);
+      const temp = subs.map((s) => Math.round(divinerTemp(d, lat, lon, s) * 10) / 10);
+      return json(res, 200, {
+        subsolar_lon: subs, temp_k: temp, min_k: Math.min(...temp), max_k: Math.max(...temp),
+        local_time_h: subs.map((s) => Math.round(((((12 + (lon - s) / 15) % 24) + 24) % 24) * 100) / 100),
+        source: 'NASA LRO Diviner bolometric temperature snapshots, 0.5 deg grid (Williams et al. 2017)',
+      });
+    }
+    if (path === '/api/diviner/map') {
+      const d = divinerMaps();
+      const kind = q.get('kind') || 'max';
+      if (!d) return json(res, 404, { error: 'Diviner data missing.' });
+      if (kind !== 'max' && kind !== 'min') return json(res, 400, { error: 'kind must be max or min here' });
+      return send(res, 200, divinerMapPng(d, kind), 'image/png', 'max-age=86400');
+    }
+    if (path === '/api/epic') return json(res, 200, await epicLatest());
+    if (path === '/api/learn/epic.jpg') return relay(res, 'epic', (await epicLatest()).url, 3600);
+    const sdo = /^\/api\/learn\/sdo\/(0171|0193|0304|HMIIC)\.jpg$/.exec(path);
+    if (sdo) return relay(res, `sdo-${sdo[1]}`, `https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_${sdo[1]}.jpg`, 900);
+    if (path === '/api/learn/leaderboard') {
+      const game = q.get('game') || 'quiz';
+      if (!GAMES[game]) return json(res, 400, { error: 'Unknown game.' });
+      const board = loadBoard();
+      return json(res, 200, { game, title: GAMES[game], top: top(board, game), players: new Set(board.filter((r) => r.game === game).map((r) => r.name.toLowerCase())).size });
+    }
+    if (path === '/api/learn/score' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = String(body.name ?? '').trim();
+      const game = body.game;
+      const score = Number(body.score);
+      if (!Number.isInteger(score)) return json(res, 400, { error: 'Score must be a whole number.' });
+      if (!GAMES[game]) return json(res, 400, { error: 'Unknown game.' });
+      if (!NAME_RE.test(name)) return json(res, 400, { error: 'Use 1 to 20 letters, numbers, spaces, dots, dashes or underscores.' });
+      if (score < 0 || score > MAX_SCORE[game]) return json(res, 400, { error: 'That score is out of range.' });
+      const board = loadBoard();
+      board.push({ name, game, score, at: new Date().toISOString().slice(0, 16).replace('T', ' ') });
+      board.sort(order);
+      const per = new Map();
+      const kept = board.filter((r) => {
+        const key = `${r.game}|${r.name.toLowerCase()}`;
+        per.set(key, (per.get(key) ?? 0) + 1);
+        return per.get(key) <= 5;
+      }).slice(0, 1000);
+      mkdirSync(dirname(BOARD), { recursive: true });
+      writeFileSync(BOARD + '.tmp', JSON.stringify(kept));
+      renameSync(BOARD + '.tmp', BOARD);
+      const rank = 1 + kept.filter((r) => r.game === game && r.score > score).length;
+      return json(res, 200, { rank, top: top(kept, game), title: GAMES[game] });
+    }
+    return next();
+  } catch (error) {
+    return json(res, 400, { error: error.message });
+  }
+}
+
 // ---------- The plugin ----------
 export function learnPages() {
   return {
     name: 'learn-pages',
     configureServer(server) {
       startSync((text) => server.config.logger.info(`\n  ${text}`));
-      server.middlewares.use(async (req, res, next) => {
-        // An address that cannot be read (a broken %-escape, say) is not ours: pass it on. Throwing here would
-        // be an unhandled rejection, which stops the dev server.
-        let url;
-        let path;
-        try {
-          url = new URL(req.url, 'http://x');
-          path = decodeURIComponent(url.pathname);
-        } catch {
-          return next();
-        }
-        const q = url.searchParams;
-        try {
-          // Education page and its files (served as they are: they use their own import map, not Vite's).
-          if (path === '/learn' || path === '/learn/') return sendFile(res, join(EDU, 'index.html'));
-          if (path.startsWith('/learn/') && !path.startsWith('/learn/api')) {
-            const f = fileIn(EDU, path.slice(7));
-            return f ? sendFile(res, f, path.includes('/fonts/') ? 'max-age=86400' : 'no-store') : next();
-          }
-          // Shared files from the Python app's public folder.
-          if (path === '/lunar-game.js' || path === '/live-sync.js' || path.startsWith('/vendor/')) {
-            const f = fileIn(join(LP, 'public'), path.slice(1));
-            return f ? sendFile(res, f, path.startsWith('/vendor/') ? 'max-age=86400' : 'no-store') : next();
-          }
-          if (path === '/textures/moon-hd.jpg') return sendFile(res, join(ROOT, 'public', 'textures', 'moon_lroc_color_4k.jpg'), 'max-age=86400');
-          if (['/textures/moon-elevation-grid.bin', '/textures/moon-elevation.png', '/textures/moon-elevation.json'].includes(path)) {
-            const f = fileIn(join(LP, 'public'), path.slice(1));
-            if (f) return sendFile(res, f, 'max-age=3600');
-            // The heights file is made by lunar-planner/build_terrain.py. Without it the page uses the picture;
-            // "no content" tells it so without an error in the console.
-            return send(res, path.endsWith('.bin') ? 204 : 404, '', 'text/plain');
-          }
-          if (path === '/classic' || path.startsWith('/classic/')) {
-            const port = await explorerPort();
-            if (port) {
-              res.statusCode = 302;
-              res.setHeader('Location', `http://127.0.0.1:${port}${path}${url.search}`);
-              return res.end();
-            }
-            return send(res, 200, EXPLORER_HELP, 'text/html; charset=utf-8');
-          }
-          if (!path.startsWith('/api/')) return next();
-          // Data for the page.
-          if (path === '/api/health') return json(res, 200, { status: 'ok', app: 'Lunar Navigator dev server', commit: gitCommit() });
-          if (path === '/api/site') {
-            const lat = number(q, 'lat', -90, 90);
-            const lon = number(q, 'lon', -180, 360);
-            const days = Math.min(7, Math.max(1, Number(q.get('days')) || 1));
-            const site = { lat, lon: ((lon + 180) % 360 + 360) % 360 - 180 };
-            const start = new Date(Math.floor(Date.now() / 1_800_000) * 1_800_000);
-            const samples = [];
-            for (let t = 0; t <= days * 48; t++) {
-              const date = new Date(start.getTime() + t * 1_800_000);
-              const sky = skyAt(site, date);
-              samples.push({
-                t: date.toISOString().slice(0, 16) + 'Z',
-                sun_az: +sky.sun.azimuth.toFixed(4), sun_el: +sky.sun.elevation.toFixed(4), sun_au: +sky.sunDistanceAU.toFixed(8),
-                earth_az: +sky.earth.azimuth.toFixed(4), earth_el: +sky.earth.elevation.toFixed(4), earth_km: +sky.earth.rangeKm.toFixed(1),
-                sun_ok: sky.sun.elevation > 0, earth_ok: sky.earth.elevation > 0,
-              });
-            }
-            return json(res, 200, {
-              site, samples, window: { start: samples[0].t, days, step_minutes: 30 },
-              source: 'Astronomy Engine (the team checks it against NASA/JPL Horizons)',
-              model: 'Directions of body centres over a smooth Moon. No terrain shadowing.',
-            });
-          }
-          if (path === '/api/diviner/point') {
-            const d = divinerMaps();
-            if (!d) return json(res, 404, { error: 'Diviner data missing.' });
-            const lat = number(q, 'lat', -90, 90);
-            const lon = ((number(q, 'lon', -180, 360) + 180) % 360 + 360) % 360 - 180;
-            const subs = Array.from({ length: 24 }, (_, i) => i * 15);
-            const temp = subs.map((s) => Math.round(divinerTemp(d, lat, lon, s) * 10) / 10);
-            return json(res, 200, {
-              subsolar_lon: subs, temp_k: temp, min_k: Math.min(...temp), max_k: Math.max(...temp),
-              local_time_h: subs.map((s) => Math.round(((((12 + (lon - s) / 15) % 24) + 24) % 24) * 100) / 100),
-              source: 'NASA LRO Diviner bolometric temperature snapshots, 0.5 deg grid (Williams et al. 2017)',
-            });
-          }
-          if (path === '/api/diviner/map') {
-            const d = divinerMaps();
-            const kind = q.get('kind') || 'max';
-            if (!d) return json(res, 404, { error: 'Diviner data missing.' });
-            if (kind !== 'max' && kind !== 'min') return json(res, 400, { error: 'kind must be max or min here' });
-            return send(res, 200, divinerMapPng(d, kind), 'image/png', 'max-age=86400');
-          }
-          if (path === '/api/epic') return json(res, 200, await epicLatest());
-          if (path === '/api/learn/epic.jpg') return relay(res, 'epic', (await epicLatest()).url, 3600);
-          const sdo = /^\/api\/learn\/sdo\/(0171|0193|0304|HMIIC)\.jpg$/.exec(path);
-          if (sdo) return relay(res, `sdo-${sdo[1]}`, `https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_${sdo[1]}.jpg`, 900);
-          if (path === '/api/learn/leaderboard') {
-            const game = q.get('game') || 'quiz';
-            if (!GAMES[game]) return json(res, 400, { error: 'Unknown game.' });
-            const board = loadBoard();
-            return json(res, 200, { game, title: GAMES[game], top: top(board, game), players: new Set(board.filter((r) => r.game === game).map((r) => r.name.toLowerCase())).size });
-          }
-          if (path === '/api/learn/score' && req.method === 'POST') {
-            const body = await readBody(req);
-            const name = String(body.name ?? '').trim();
-            const game = body.game;
-            const score = Number(body.score);
-            if (!Number.isInteger(score)) return json(res, 400, { error: 'Score must be a whole number.' });
-            if (!GAMES[game]) return json(res, 400, { error: 'Unknown game.' });
-            if (!NAME_RE.test(name)) return json(res, 400, { error: 'Use 1 to 20 letters, numbers, spaces, dots, dashes or underscores.' });
-            if (score < 0 || score > MAX_SCORE[game]) return json(res, 400, { error: 'That score is out of range.' });
-            const board = loadBoard();
-            board.push({ name, game, score, at: new Date().toISOString().slice(0, 16).replace('T', ' ') });
-            board.sort(order);
-            const per = new Map();
-            const kept = board.filter((r) => {
-              const key = `${r.game}|${r.name.toLowerCase()}`;
-              per.set(key, (per.get(key) ?? 0) + 1);
-              return per.get(key) <= 5;
-            }).slice(0, 1000);
-            mkdirSync(dirname(BOARD), { recursive: true });
-            writeFileSync(BOARD + '.tmp', JSON.stringify(kept));
-            renameSync(BOARD + '.tmp', BOARD);
-            const rank = 1 + kept.filter((r) => r.game === game && r.score > score).length;
-            return json(res, 200, { rank, top: top(kept, game), title: GAMES[game] });
-          }
-          return next();
-        } catch (error) {
-          return json(res, 400, { error: error.message });
-        }
+      server.middlewares.use(handle);
+    },
+    // `npm run preview` (the built app on a local server) gets the same page and data. No live sync there.
+    configurePreviewServer(server) {
+      // The page reads the app's sites and missions. The dev server serves them from the project folder by itself
+      // (and must: the app imports them as modules); the preview server only has the built files.
+      server.middlewares.use((req, res, next) => {
+        const path = req.url.split('?')[0];
+        return path === '/data/sites.json' || path === '/data/missions.json' ? sendFile(res, join(ROOT, path.slice(1))) : next();
       });
+      server.middlewares.use(handle);
     },
     // Links from the main page to Education and the Explorer (index.html itself is not changed). Like the main
     // page's other extras they show only with ?tools in the address, so the demo page stays clean.

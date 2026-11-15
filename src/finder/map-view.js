@@ -2,7 +2,7 @@
 // ranked sites, a scale bar, a hover read-out and click-to-pick. Browser only (see map-layers.js for the pure parts).
 import { h } from '../ui/dom.js';
 import { cellToLatLon, latLonToCell } from './grid.js';
-import { MAP_LAYERS, TIME_LAYER, describeCell, hillshade, layerLegend, layerPixel } from './map-layers.js';
+import { ALL_LAYER, MAP_LAYERS, TIME_LAYER, allPictures, composeAll, describeCell, hillshade, layerLegend, layerPixel } from './map-layers.js';
 import { slopeBand } from './route-options.js';
 import { WHY_COLOURS } from './why-not.js';
 
@@ -19,6 +19,8 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   let layer = MAP_LAYERS[0].id;
   let selected = null; // { lat, lon }
   let shade = null;
+  let pictures = null; // the one map's sunlit and shadowed pictures of this result, built when first shown
+  let allImage = null; // the ImageData the one map is composed into, kept between time steps
   let reach = null;
   let route = null; // { path, stops: [{ row, col, label }], waits: [{ row, col }], alternatives?: path[], bySlope? }
   let timeStep = null; // while a drive plays back: the time step whose sunlight the map shows instead of the layer
@@ -29,12 +31,26 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   function paintRaster() {
     if (!result) return;
     const { n } = result;
+    if (shown() === ALL_LAYER) {
+      // The one map: finer than the cells, and only the sunlight changes with time (see map-layers.js).
+      pictures ??= allPictures(result, shade);
+      const { size } = pictures;
+      if (raster.width !== size || raster.height !== size) {
+        raster.width = size;
+        raster.height = size;
+      }
+      const rctx = raster.getContext('2d');
+      if (!allImage || allImage.width !== size) allImage = rctx.createImageData(size, size);
+      composeAll(pictures, result, timeStep ?? 0, allImage.data);
+      rctx.putImageData(allImage, 0, 0);
+      return;
+    }
     raster.width = n;
     raster.height = n;
     const rctx = raster.getContext('2d');
     const img = rctx.createImageData(n, n);
     for (let i = 0; i < n * n; i++) {
-      const [r, g, b] = layerPixel(shown(), result, i, shade[i], { reach, step: timeStep });
+      const [r, g, b] = layerPixel(shown(), result, i, shade[i], { reach, step: timeStep ?? 0 });
       img.data[i * 4] = r;
       img.data[i * 4 + 1] = g;
       img.data[i * 4 + 2] = b;
@@ -43,7 +59,9 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     rctx.putImageData(img, 0, 0);
   }
 
-  const shown = () => (timeStep == null ? layer : TIME_LAYER);
+  // The one map and day/night show one moment: the time step, or the landing hour when none is set. Any other
+  // layer gives way to day/night while a time step is set.
+  const shown = () => (layer === ALL_LAYER || timeStep == null ? layer : TIME_LAYER);
 
   /** Centre of a lat/lon on screen, or null if it is off the raster. */
   function toScreen(p) {
@@ -74,7 +92,9 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     if (!result) return;
     const size = Math.max(0, Math.min(w, hgt) - 2 * MARGIN);
     box = { x: (w - size) / 2, y: (hgt - size) / 2, size };
-    ctx.imageSmoothingEnabled = false;
+    // The one map is a smooth picture, so it is scaled smoothly; the other layers keep their cells' hard edges.
+    ctx.imageSmoothingEnabled = shown() === ALL_LAYER;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(raster, box.x, box.y, size, size);
 
     const centre = { x: box.x + size / 2, y: box.y + size / 2 };
@@ -119,12 +139,14 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       // start marker.
       if (path && path.length > 1) {
         trace(path);
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
         ctx.strokeStyle = '#06080c';
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 9; // thick enough to read when the map is small (the app's pop-out)
         ctx.stroke();
         if (bySlope) {
           // Each hop coloured by the steeper of its two cells.
-          ctx.lineWidth = 3.5;
+          ctx.lineWidth = 5;
           for (let k = 1; k < path.length; k++) {
             const a = cellCentre(Math.floor(path[k - 1] / result.n), path[k - 1] % result.n);
             const b = cellCentre(Math.floor(path[k] / result.n), path[k] % result.n);
@@ -370,6 +392,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       timeStep = null;
       rover = null;
       hideTip();
+      pictures = null;
       if (result) {
         shade = hillshade(result.elevation, result.n, result.cellM);
         paintRaster();

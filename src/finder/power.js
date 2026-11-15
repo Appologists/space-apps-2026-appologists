@@ -1,7 +1,7 @@
 // Solar power at a landing spot: how much of the Sun clears the terrain, how strong sunlight is at that
 // distance, and how squarely it hits the panel. Pure functions, no DOM.
 //
-// The model, in one line (see decision Z in docs/decisions.md):
+// The model, in one line (see decision AC in docs/decisions.md):
 //
 //   P = 1361 W/m² / d² × area × efficiency × cos(angle to panel) × share of the Sun's disc in view × other losses
 //

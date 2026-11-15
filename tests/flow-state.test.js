@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultFinder } from '../src/finder/score.js';
-import { decodeFlow, encodeFlow } from '../src/ui/flow-state.js';
+import { TAB_STEPS, decodeFlow, encodeFlow, tabOfStep } from '../src/ui/flow-state.js';
 
 const state = {
   step: 3,
@@ -42,5 +42,37 @@ describe('the mission steps in the address', () => {
   it('writes no drive when there is none', () => {
     const text = encodeFlow({ ...state, region: null, startAt: null, targets: [] });
     expect(text).not.toMatch(/region|from|to=/);
+  });
+});
+
+describe("the front's tabs", () => {
+  it('open the step they stand for, and that step shows them', () => {
+    expect(TAB_STEPS).toEqual({ moon: 2, site: 3, ride: 5 });
+    for (const [tab, step] of Object.entries(TAB_STEPS)) expect(tabOfStep(step)).toBe(tab);
+  });
+
+  it('have no tab before the first search, and count the old Surface step as Ride', () => {
+    expect(tabOfStep(1)).toBeNull();
+    expect(tabOfStep(undefined)).toBeNull();
+    expect(tabOfStep(4)).toBe('ride');
+  });
+
+  it('come back to the Ride from a saved address', () => {
+    expect(tabOfStep(decodeFlow(encodeFlow({ ...state, step: TAB_STEPS.ride })).step)).toBe('ride');
+  });
+});
+
+describe('the route choice', () => {
+  it('is kept with the drive, so the ride follows the route that was chosen', () => {
+    const drive = { ...state, startAt: { lat: -89, lon: 122.7 }, targets: [{ lat: -88.8, lon: 123.7 }] };
+    expect(decodeFlow(encodeFlow({ ...drive, routeChoice: 'fastest' })).routeChoice).toBe('fastest');
+    expect(decodeFlow(encodeFlow({ ...drive, routeChoice: 'shortest' })).routeChoice).toBe('shortest');
+  });
+
+  it('is left out when it is the default, when there is no drive, and when it is not one of the three', () => {
+    const drive = { ...state, startAt: { lat: -89, lon: 122.7 }, targets: [{ lat: -88.8, lon: 123.7 }] };
+    expect(encodeFlow({ ...drive, routeChoice: 'safest' })).not.toContain('route=');
+    expect(encodeFlow({ ...state, targets: [], routeChoice: 'fastest' })).not.toContain('route=');
+    expect(decodeFlow(`${encodeFlow(drive)}&route=scenic`).routeChoice).toBeUndefined();
   });
 });
