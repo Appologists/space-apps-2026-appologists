@@ -63,6 +63,39 @@ describe('createTrack', () => {
     expect(track.at(0.5).lit).toBe(false);
     expect(track.at(1.5).lit).toBe(true);
   });
+
+  it('counts the unbroken time in the dark the way the replay does, and lists each change of what it does', () => {
+    const r = fake();
+    const path = [50, 51, 52, 53, 54];
+    r.sunMask.fill(0, 2 * r.maskStride, 5 * r.maskStride); // dark everywhere from 2 h to 5 h
+    const drive = simulatePlan(r, path, rover);
+    const track = createTrack(r, { path, drive });
+    expect(track.at(1.5).darkH).toBe(0);
+    expect(track.at(2.5).darkH).toBe(1);
+    expect(track.at(4.5).darkH).toBe(3);
+    expect(track.at(5.5).darkH).toBe(0);
+    expect(drive.longestDarkH).toBe(3);
+    // Every change in the replay's timeline, and nothing else.
+    const expected = [];
+    for (let s = 1; s < r.steps; s++) if (drive.timeline[s] !== drive.timeline[s - 1]) expected.push(s);
+    expect(track.changes).toEqual(expected);
+    expect(track.at(2.5).state).toBe(STATE.WAIT_SUN);
+    expect(track.nextChange(0)).toBe(2);
+    expect(track.nextChange(2)).toBe(expected[1]);
+    expect(track.at(track.changes.at(-1)).state).toBe(STATE.ARRIVED);
+    expect(track.nextChange(track.changes.at(-1))).toBeNull();
+  });
+
+  it('shows a rover lost in the dark with more darkness than it survives', () => {
+    const r = fake();
+    const path = [50, 51, 52, 53, 54];
+    r.sunMask.fill(0, 2 * r.maskStride); // dark from 2 h to the end
+    const short = { ...rover, maxDarknessHours: 5 };
+    const track = createTrack(r, { path, drive: simulatePlan(r, path, short) });
+    const lostAt = track.changes.find((hours) => track.at(hours).state === STATE.LOST);
+    expect(lostAt).toBeGreaterThan(0);
+    expect(track.at(lostAt).darkH).toBeGreaterThan(short.maxDarknessHours);
+  });
 });
 
 describe('the map at one moment', () => {

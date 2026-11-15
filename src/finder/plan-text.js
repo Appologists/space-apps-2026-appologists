@@ -5,6 +5,17 @@ import { STATE } from './schedule.js';
 /** Destinations are named A, B, C … in the order they were added. */
 export const destinationName = (index) => String.fromCharCode(65 + index);
 
+/** One sentence on what the rover is doing and why, for each state of the replay. From Khiem's drive story (PR #7). */
+export const STATE_STORY = Object.freeze({
+  [STATE.PARKED]: 'The rover sits at its start, waiting for its moment to leave.',
+  [STATE.DRIVING]: 'Its spot is sunlit, so it drives on along the route.',
+  [STATE.WAIT_SUN]: 'Its spot has fallen into shadow. It must stop and wait for the light while the time in the dark counts up.',
+  [STATE.WAIT_EARTH]: 'It has sunlight, but Earth is below the horizon and it needs Earth in view to drive. It waits.',
+  [STATE.HOLD]: 'It waits on purpose in sunlight: the ground ahead is still dark, and setting off now would strand it there.',
+  [STATE.ARRIVED]: 'It has arrived and stays there for the rest of the mission.',
+  [STATE.LOST]: 'It sat in the dark for longer than it can survive. The mission is lost here.',
+});
+
 const km = (m) => {
   const v = m / 1000;
   return `${v.toFixed(v < 10 ? 1 : 0)} km`;

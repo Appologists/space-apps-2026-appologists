@@ -14,7 +14,7 @@ import missions from '../../data/missions.json';
 import sitesData from '../../data/sites.json';
 import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
-import { STATE } from '../finder/schedule.js';
+import { STATE_STORY } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
 import { DURATION_MARKS, formatDuration, positionOf, tidyDuration } from '../mission.js';
 import { clear, h } from './dom.js';
@@ -72,15 +72,6 @@ const GROUPS = [
   },
 ];
 
-const STATE_WORDS = {
-  [STATE.PARKED]: 'parked at the landing spot',
-  [STATE.DRIVING]: 'driving',
-  [STATE.WAIT_SUN]: 'waiting for sunlight',
-  [STATE.WAIT_EARTH]: 'waiting for Earth to come into view',
-  [STATE.HOLD]: 'waiting in sunlight for the way ahead to light up',
-  [STATE.ARRIVED]: 'arrived',
-  [STATE.LOST]: 'lost: too long in the dark',
-};
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
 /**
@@ -674,10 +665,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function play() {
     const result = finder.getResult();
     if (!track || !result) return;
-    // Play from an hour before it sets off to an hour after it stops, in 10 to 16 seconds.
+    // Play from an hour before it sets off to an hour after it stops (or is lost after arriving), in 10 to 16
+    // seconds. Each frame moves on from clock.hours, so "Next change" can move the clock while it plays.
     const from = Math.max(track.startHours - 1, 0);
-    const to = Math.min(track.endHours + 1, result.windowHours);
-    let hours = clock.hours >= from && clock.hours < to - 0.05 ? clock.hours : from;
+    const to = playEnd(result);
+    if (!(clock.hours >= from && clock.hours < to - 0.05)) setHours(from);
     clock.rate = (to - from) / Math.min(Math.max((to - from) * 0.5, 10), 16);
     clock.playing = true;
     clock.showTime = true;
@@ -685,7 +677,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     let last = performance.now();
     const tick = (now) => {
       if (!clock.playing) return;
-      hours += ((now - last) / 1000) * clock.rate;
+      const hours = clock.hours + ((now - last) / 1000) * clock.rate;
       last = now;
       if (hours >= to) {
         pause(); // first, so the last moment is not held back by the ride's slower Sun
@@ -697,6 +689,19 @@ export function createFlow({ app, globe, finder, surface, api }) {
     };
     clock.frame = requestAnimationFrame(tick);
     drawClock();
+  }
+
+  /** Where playing stops: an hour after the last change of what the rover does. */
+  function playEnd(result) {
+    return Math.min(Math.max(track.endHours, track.changes.at(-1) ?? 0) + 1, result.windowHours);
+  }
+
+  /** Jump to the next time the rover starts doing something else; it keeps playing if it was. */
+  function nextChange() {
+    const at = track?.nextChange(clock.hours);
+    if (at == null) return;
+    clock.showTime = true;
+    setHours(at);
   }
 
   function pause() {
@@ -714,42 +719,69 @@ export function createFlow({ app, globe, finder, surface, api }) {
     clock.freeLook = true;
   });
 
-  let clockText = null; // the line under the Play button, rewritten every frame
+  // The parts of the player rewritten every frame: the clock line, the sentence, the darkness bar.
+  let clockParts = null;
   function drawClock() {
     const el = clear(step === 5 ? $('driveNow') : $('playback'));
     clear(step === 5 ? $('playback') : $('driveNow'));
-    clockText = null;
+    clockParts = null;
     if (step !== 3 && step !== 5) return;
     if (!track) {
       if (step === 5) el.append(h('p', { class: 'caveats' }, 'No drive is planned. Go back to "Drive" and add a destination.'));
       return;
     }
-    clockText = h('p', { class: 'clock-text' });
+    clockParts = {
+      text: h('p', { class: 'clock-text' }),
+      story: h('p', { class: 'clock-story' }),
+      fill: h('i'),
+      dark: h('span', { class: 'dark-text' }),
+      next: h('button', { type: 'button', class: 'next-change', onClick: nextChange }, 'Next change'),
+    };
     el.append(
       ...[
-      h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
-      clockText,
-      step === 5
-        ? h(
-            'p',
-            { class: 'caveats' },
-            'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.',
-          )
-        : null,
-    ].filter(Boolean), // append() would write a null out as the word "null"
+        h(
+          'div',
+          { class: 'play-row' },
+          h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
+          clockParts.next,
+        ),
+        clockParts.story,
+        h(
+          'div',
+          { class: 'dark-meter' },
+          h('div', { class: 'dark-bar', title: 'Unbroken time in the dark so far. Full means the rover is lost.' }, clockParts.fill),
+          clockParts.dark,
+        ),
+        clockParts.text,
+        step === 5
+          ? h(
+              'p',
+              { class: 'caveats' },
+              'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.',
+            )
+          : null,
+      ].filter(Boolean), // append() would write a null out as the word "null"
     );
     updateClockText();
   }
 
   function updateClockText() {
-    if (!clockText || !track) return;
+    if (!clockParts || !track) return;
     const now = track.at(clock.hours);
     const when = new Date(api.getMission().start.getTime() + clock.hours * 3_600_000);
     const km = (m) => (m / 1000).toFixed(1);
-    clockText.textContent =
-      `${formatHours(clock.hours)} after landing · ${formatUTC(when)} · ${STATE_WORDS[now.state] ?? ''} · ${now.lit ? 'in sunlight' : 'in the dark'} · ` +
-      `${km(now.distanceM)} of ${km(track.lengthM)} km` +
+    clockParts.text.textContent =
+      `${formatHours(clock.hours)} after landing · ${formatUTC(when)} · ${km(now.distanceM)} of ${km(track.lengthM)} km` +
       (clock.playing ? ` · one second shows ${formatHours(clock.rate)}` : '');
+    const story = STATE_STORY[now.state] ?? '';
+    if (clockParts.story.textContent !== story) clockParts.story.textContent = story;
+    const max = route?.rover?.maxDarknessHours;
+    const share = max > 0 ? Math.min(now.darkH / max, 1) : 0;
+    clockParts.fill.style.width = `${(share * 100).toFixed(1)}%`;
+    clockParts.fill.className = share >= 1 ? 'lost' : share > 0.8 ? 'near' : share > 0.5 ? 'half' : '';
+    // Whole hours, in the same unit as the "Max darkness" choice (24 / 50 / 100 h).
+    clockParts.dark.textContent = max > 0 ? `In the dark ${Math.round(now.darkH)} h of the ${max} h it survives` : `In the dark ${Math.round(now.darkH)} h`;
+    clockParts.next.disabled = track.nextChange(clock.hours) == null;
   }
 
   $('suggestDrive').addEventListener('click', () => {

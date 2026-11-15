@@ -8,10 +8,12 @@ import { STATE, hopLength } from './schedule.js';
  * @param {object} result  a FinderResult (see types.js)
  * @param {object} plan    from planMission(): needs `path` and `drive`
  * @returns {null | {
- *   at: (hours: number) => {east: number, north: number, elevationM: number, headingDeg: number, distanceM: number, step: number, state: number, lit: boolean, earth: boolean},
- *   points: {east: number, north: number}[], lengthM: number, startHours: number, endHours: number}}
+ *   at: (hours: number) => {east: number, north: number, elevationM: number, headingDeg: number, distanceM: number, step: number, state: number, lit: boolean, earth: boolean, darkH: number},
+ *   points: {east: number, north: number}[], lengthM: number, startHours: number, endHours: number,
+ *   changes: number[], nextChange: (hours: number) => number|null}}
  *   null without a route. `east`/`north` are metres from the middle of the search area. `startHours` to
- *   `endHours` is the stretch from the first step it drives in to the end of the last one.
+ *   `endHours` is the stretch from the first step it drives in to the end of the last one. `darkH` is the
+ *   unbroken time in the dark so far; `changes` are the hours at which the rover starts doing something else.
  */
 export function createTrack(result, plan) {
   const path = plan?.path;
@@ -30,6 +32,16 @@ export function createTrack(result, plan) {
     if (first < 0) first = s;
     last = s;
   }
+
+  // Unbroken hours in the dark at the end of each step, counted the way the replay counts them (schedule.js),
+  // and the hours at which the rover starts doing something else. From Khiem's drive story (PR #7).
+  const darkH = new Float32Array(steps);
+  for (let s = 0, run = 0; s < steps; s++) {
+    run = drive.lit[s] ? 0 : run + H;
+    darkH[s] = run;
+  }
+  const changes = [];
+  for (let s = 1; s < steps; s++) if (drive.timeline[s] !== drive.timeline[s - 1]) changes.push(s * H);
 
   /** Metres along the route at a time: the replay's value at each step's end, blended in between. */
   function along(hours) {
@@ -66,8 +78,20 @@ export function createTrack(result, plan) {
       state: drive.timeline[step],
       lit: drive.lit[step] === 1,
       earth: drive.earth[step] === 1,
+      darkH: darkH[step],
     };
   }
 
-  return { at, points, lengthM, startHours: first < 0 ? 0 : first * H, endHours: first < 0 ? 0 : (last + 1) * H };
+  /** The first change of what the rover does after `hours`, or null if nothing changes again. */
+  const nextChange = (hours) => changes.find((c) => c > hours + 1e-6) ?? null;
+
+  return {
+    at,
+    points,
+    lengthM,
+    startHours: first < 0 ? 0 : first * H,
+    endHours: first < 0 ? 0 : (last + 1) * H,
+    changes,
+    nextChange,
+  };
 }
