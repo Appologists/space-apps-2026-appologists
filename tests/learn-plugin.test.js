@@ -55,10 +55,18 @@ describe('requests', () => {
 });
 
 describe('the built app on a local server (npm run preview)', () => {
+  /** Every middleware the preview server is given, tried in order like the server does. */
   function middleware() {
-    let handler;
-    learnPages().configurePreviewServer({ middlewares: { use: (fn) => (handler = fn) } });
-    return handler;
+    const chain = [];
+    learnPages().configurePreviewServer({ middlewares: { use: (fn) => chain.push(fn) } });
+    return async (req, res, next) => {
+      for (const fn of chain) {
+        let passed = false;
+        await fn(req, res, () => (passed = true));
+        if (!passed) return;
+      }
+      next();
+    };
   }
   function reply() {
     const res = { headers: {}, setHeader: (k, v) => (res.headers[k] = v), end: (body) => (res.body = body) };
@@ -78,6 +86,16 @@ describe('the built app on a local server (npm run preview)', () => {
   it('passes on what is not its own', async () => {
     const next = vi.fn();
     await middleware()({ url: '/assets/index.js', method: 'GET' }, reply(), next);
+    expect(next).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the dev server', () => {
+  it('leaves the app\'s data files to Vite, which serves them as modules', async () => {
+    let handler;
+    learnPages().configureServer({ config: { logger: { info() {} } }, middlewares: { use: (fn) => (handler = fn) } });
+    const next = vi.fn();
+    await handler({ url: '/data/missions.json?import', method: 'GET' }, {}, next);
     expect(next).toHaveBeenCalledOnce();
   });
 });

@@ -343,9 +343,6 @@ async function handle(req, res, next) {
       const f = fileIn(join(LP, 'public'), path.slice(1));
       return f ? sendFile(res, f, path.startsWith('/vendor/') ? 'max-age=86400' : 'no-store') : next();
     }
-    // The page reads the app's sites and missions. The dev server serves them from the project folder by itself;
-    // the preview server only has the built files, so they are answered here for both.
-    if (path === '/data/sites.json' || path === '/data/missions.json') return sendFile(res, join(ROOT, path.slice(1)));
     if (path === '/textures/moon-hd.jpg') return sendFile(res, join(ROOT, 'public', 'textures', 'moon_lroc_color_4k.jpg'), 'max-age=86400');
     if (['/textures/moon-elevation-grid.bin', '/textures/moon-elevation.png', '/textures/moon-elevation.json'].includes(path)) {
       const f = fileIn(join(LP, 'public'), path.slice(1));
@@ -459,6 +456,12 @@ export function learnPages() {
     },
     // `npm run preview` (the built app on a local server) gets the same page and data. No live sync there.
     configurePreviewServer(server) {
+      // The page reads the app's sites and missions. The dev server serves them from the project folder by itself
+      // (and must: the app imports them as modules); the preview server only has the built files.
+      server.middlewares.use((req, res, next) => {
+        const path = req.url.split('?')[0];
+        return path === '/data/sites.json' || path === '/data/missions.json' ? sendFile(res, join(ROOT, path.slice(1))) : next();
+      });
       server.middlewares.use(handle);
     },
     // Links from the main page to Education and the Explorer (index.html itself is not changed). Like the main
