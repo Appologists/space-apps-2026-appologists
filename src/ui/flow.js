@@ -1,6 +1,6 @@
 // The mission steps: the five views a planner walks through, one after another.
 //
-//   1 Mission   choose a ready-made mission, or set the lander and the rover yourself
+//   1 Mission   choose a ready-made mission, or set the lander and the rover yourself (the questions: mission-questions.js)
 //   2 Regions   which candidate regions that mission can land in (a real terrain search of each)
 //   3 Drive     where the rover starts and where it goes, and the trip played back with day and night
 //   4 Surface   stand at the landing spot and look around
@@ -16,9 +16,9 @@ import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
 import { STATE_STORY, milestoneLabel } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
-import { DURATION_MARKS, formatDuration, positionOf, tidyDuration } from '../mission.js';
 import { clear, h } from './dom.js';
 import { decodeFlow, encodeFlow } from './flow-state.js';
+import { GROUPS, choiceRow, dateRow, durationRow, groupSummary } from './mission-questions.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -38,42 +38,6 @@ const REGIONS = missions.regions.map((region) => {
   // searchRadiusKm: the crater regions are searched 20 km round their centres, to reach the rims (our choice).
   return { id: region.id, name: site.name, lat: site.lat, lon: site.lon, searchRadiusKm: region.searchRadiusKm, source: sources[site.source] };
 });
-
-// The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
-const yes = (when) => (v) => (v ? when[0] : when[1]);
-const GROUPS = [
-  {
-    id: 'mission',
-    title: 'Mission',
-    date: true, // the landing date comes first, with its own row
-    choices: [
-      { on: 'mission', key: 'durationHours', label: 'Duration', slider: true, summary: (v) => `for ${formatDuration(v)}` },
-    ],
-  },
-  {
-    id: 'lander',
-    title: 'Lander',
-    choices: [
-      // 100 m is NASA's figure for the Artemis lander (missions.json, hls-2024); 200 m and 2 km are our choices, the
-      // last for an older-style lander (decision V). 50 m was dropped: the search's 80 m cells make it the same as
-      // 100 m. On the seven demo regions 100 m finds 8.4 km² that can take a landing, 200 m 1.8 km², 2 km none.
-      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[100, '100 m', 'NASA: Artemis Human Landing System (2024)'], [200, '200 m', 'Our choice'], [2000, '2 km', 'Our choice: an older-style lander']], format: (v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`), summary: (v) => `within ${v >= 1000 ? `${v / 1000} km` : `${v} m`}` },
-      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
-      { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['Earth in view', null]) },
-      { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['in sunlight', null]) },
-    ],
-  },
-  {
-    id: 'rover',
-    title: 'Rover',
-    choices: [
-      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, summary: (v) => `survives ${v} h dark` },
-      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
-      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, summary: (v) => `${v} m/hr` },
-      { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['needs Earth to drive', null]) },
-    ],
-  },
-];
 
 // Region markers on the globe, coloured like the verdicts in the list (styles.css, .region .verdict).
 const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
@@ -271,173 +235,31 @@ export function createFlow({ app, globe, finder, surface, api }) {
     save();
   }
 
-  const same = (a, b) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 1e-6 : a === b);
-
   const valueOf = (def) => (def.on === 'mission' ? api.getMission()[def.key] : finder.values[def.key]);
 
   /** One group of the custom form: a header that shows the current values, and its questions when open. */
   function groupBlock(group) {
-    const date = (d) => `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}, ${d.toISOString().slice(11, 16)} UTC`;
-    const said = [group.date ? date(api.getMission().start) : null, ...group.choices.map((def) => def.summary(valueOf(def)))].filter(Boolean);
+    const said = groupSummary(group, valueOf, api.getMission().start);
     return h(
       'details',
       { class: 'group', open: openGroups.has(group.id), onToggle: (e) => (e.target.open ? openGroups.add(group.id) : openGroups.delete(group.id)) },
       h('summary', {}, h('span', { class: 'group-title' }, group.title), h('span', { class: 'group-summary' }, said.join(' · '))),
-      h('div', { class: 'group-body' }, group.date ? dateRow() : null, ...group.choices.map((def) => (def.slider ? durationRow(def) : choiceRow(def)))),
+      h('div', { class: 'group-body' }, group.date ? landingTimeRow() : null, ...group.choices.map(questionRow)),
     );
   }
 
-  function choiceRow(def) {
-    const current = valueOf(def);
-    // A value set elsewhere (the exact-number boxes under "More tools") gets a button of its own.
-    const options = def.options.some(([value]) => same(value, current)) ? def.options : [...def.options, [current, def.format ? def.format(current) : String(current)]];
-    const set = (value) => {
-      if (def.on === 'mission') api.setMission({ [def.key]: value });
-      else {
-        finder.values[def.key] = value;
-        finder.drawForm();
-      }
-      drawSetup();
-      save();
-    };
-    return h(
-      'div',
-      { class: 'choice' },
-      h('div', { class: 'choice-label' }, def.label, def.hint ? h('small', {}, def.hint) : null),
-      h(
-        'div',
-        { class: 'choice-options', role: 'group', 'aria-label': def.label },
-        // A third entry, where given, is the value's source, shown on hover.
-        options.map(([value, text, source]) => h('button', { type: 'button', title: source ?? '', 'aria-pressed': String(same(value, current)), onClick: () => set(value) }, text)),
-      ),
-    );
+  /** Applies an answer to the app at once: the Mission step has no draft (the pop-up in shell.js keeps one). */
+  function answer(def, value) {
+    if (def.on === 'mission') api.setMission({ [def.key]: value });
+    else {
+      finder.values[def.key] = value;
+      finder.drawForm();
+    }
+    drawSetup();
+    save();
   }
-
-  /**
-   * Mission length: a slider from 1 hour to 1 year with the clean lengths evenly spaced under it as big buttons
-   * (the scale is in src/mission.js). Dragging shows the length; letting go applies it.
-   */
-  function durationRow(def) {
-    const current = valueOf(def);
-    const SCALE = 1000;
-    const readout = h('span', { class: 'duration-value' }, formatDuration(current));
-    const set = (hours) => {
-      if (same(hours, valueOf(def))) return;
-      api.setMission({ durationHours: hours });
-      drawSetup();
-      save();
-    };
-    const marks = DURATION_MARKS.map((mark, i) =>
-      h(
-        'button',
-        {
-          type: 'button',
-          class: 'duration-mark',
-          style: `left: ${((100 * i) / (DURATION_MARKS.length - 1)).toFixed(3)}%`,
-          'aria-pressed': String(same(mark.hours, current)),
-          'aria-label': formatDuration(mark.hours),
-          onClick: () => set(mark.hours),
-        },
-        mark.label,
-      ),
-    );
-    const slider = h('input', {
-      type: 'range',
-      class: 'duration-slider',
-      min: '0',
-      max: String(SCALE),
-      step: '1',
-      value: String(Math.round(positionOf(current) * SCALE)),
-      'aria-label': 'Duration',
-      'aria-valuetext': formatDuration(current),
-      onInput: (e) => {
-        const hours = tidyDuration(Number(e.target.value) / SCALE);
-        readout.textContent = formatDuration(hours);
-        e.target.setAttribute('aria-valuetext', formatDuration(hours));
-        marks.forEach((button, i) => button.setAttribute('aria-pressed', String(same(DURATION_MARKS[i].hours, hours))));
-        // Near a clean length the thumb jumps onto it, so it is easy to hit.
-        if (DURATION_MARKS.some((mark) => same(mark.hours, hours))) e.target.value = String(Math.round(positionOf(hours) * SCALE));
-      },
-      onChange: (e) => set(tidyDuration(Number(e.target.value) / SCALE)),
-    });
-    return h(
-      'div',
-      { class: 'choice' },
-      h('div', { class: 'choice-label duration-label' }, def.label, readout),
-      h('div', { class: 'duration' }, slider, h('div', { class: 'duration-marks' }, marks)),
-    );
-  }
-
-  /** The landing time: big in the middle, with steps of a week, a day and an hour back on the left and forward on the right. */
-  function dateRow() {
-    const mission = api.getMission();
-    const move = (hours) => {
-      api.setMission({ start: new Date(mission.start.getTime() + hours * 3_600_000) });
-      drawSetup();
-      save();
-    };
-    const STEPS = [
-      [24 * 7, 'week'],
-      [24, 'day'],
-      [1, 'hour'],
-    ];
-    const side = (sign) =>
-      h(
-        'div',
-        { class: 'date-steps', role: 'group', 'aria-label': sign < 0 ? 'Earlier' : 'Later' },
-        STEPS.map(([hours, unit]) =>
-          h('button', { type: 'button', 'aria-label': `One ${unit} ${sign < 0 ? 'earlier' : 'later'}`, onClick: () => move(sign * hours) }, `${sign < 0 ? '−' : '+'}1 ${unit}`),
-        ),
-      );
-    // The date box itself is hidden: tapping the big date opens its picker, for a jump of more than a few weeks.
-    const input = h('input', {
-      id: 'setupStart',
-      class: 'date-input',
-      type: 'datetime-local',
-      step: '3600',
-      tabIndex: -1,
-      'aria-hidden': 'true',
-      value: mission.start.toISOString().slice(0, 16),
-      onChange: (e) => {
-        const date = new Date(`${e.target.value}Z`);
-        if (Number.isNaN(date.getTime())) return;
-        api.setMission({ start: date });
-        drawSetup();
-        save();
-      },
-    });
-    const day = mission.start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-    return h(
-      'div',
-      { class: 'choice' },
-      h('div', { class: 'choice-label' }, 'Landing datetime'),
-      h(
-        'div',
-        { class: 'date-row' },
-        side(-1),
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'date-now',
-            title: 'Choose a date',
-            onClick: () => {
-              try {
-                input.showPicker();
-              } catch {
-                input.focus();
-              }
-            },
-          },
-          h('span', { class: 'date-day' }, day),
-          h('span', { class: 'date-time' }, `${mission.start.toISOString().slice(11, 16)} UTC`),
-          input,
-        ),
-        side(1),
-      ),
-    );
-  }
-
+  const questionRow = (def) => (def.slider ? durationRow : choiceRow)(def, valueOf(def), (value) => answer(def, value));
+  const landingTimeRow = () => dateRow(api.getMission().start, (start) => answer({ on: 'mission', key: 'start' }, start));
 
   // The mission cards are built once and then only updated, so the change to the compact row can slide.
   const profileButtons = missions.profiles.map((profile) =>

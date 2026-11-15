@@ -4,40 +4,14 @@
 //   Site        flow step 3: the region's map full size, map layers and the rover's drive
 //   Street view the street view (public/Street-view/) at the landing spot, inside the app
 //   Learn       the education pages (education/)
-// The mission questions are the old "Mission" step's own (data/missions.json profiles, finder values).
+// The mission questions are the Mission step's own, not a copy: mission-questions.js (data/missions.json profiles).
 import missions from '../../data/missions.json';
-import { DURATION_MARKS, formatDuration } from '../mission.js';
+import { formatDuration } from '../mission.js';
 import { clear, h } from './dom.js';
+import { GROUPS, choiceRow, dateRow, durationRow, groupSummary } from './mission-questions.js';
 
 const $ = (id) => document.getElementById(id);
 
-// The mission questions are the old "Mission" step's, word for word (flow.js GROUPS, data/missions.json):
-// choose the Pre-set mission or a Custom one; a custom mission then asks about the mission, the lander and the rover.
-const GROUPS = [
-  {
-    title: 'Mission',
-    date: true,
-    choices: [],
-  },
-  {
-    title: 'Lander',
-    choices: [
-      { key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']] },
-      { key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']] },
-      { key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
-      { key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
-    ],
-  },
-  {
-    title: 'Rover',
-    choices: [
-      { key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']] },
-      { key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']] },
-      { key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']] },
-      { key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']] },
-    ],
-  },
-];
 const picture = (src) => (/^https?:/.test(src) ? src : `${import.meta.env.BASE_URL}${src}`);
 
 export function createShell({ app, flow, finder, globe, getMission, setMission }) {
@@ -104,17 +78,8 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
         h(
           'ul',
           { class: 'chips' },
-          [
-            `lands within ${v.ellipseRadiusM} m`,
-            `slopes under ${v.maxLandingSlopeDeg}°`,
-            `rover climbs ${v.roverMaxSlopeDeg}°`,
-            `survives ${v.maxDarknessHours} h dark`,
-            `${v.roverSpeedMPerHour} m/h`,
-            v.roverNeedsEarthToDrive ? 'needs Earth to drive' : null,
-            v.needSunAtLanding ? 'sunlit at touchdown' : null,
-            v.needEarthAtLanding ? 'Earth in view at touchdown' : null,
-          ]
-            .filter(Boolean)
+          GROUPS.filter((group) => !group.date)
+            .flatMap((group) => groupSummary(group, (def) => v[def.key], m.start).map((said) => `${group.title.toLowerCase()}: ${said}`))
             .map((t) => h('li', {}, t)),
         ),
       ),
@@ -123,7 +88,14 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
 
   // ---- mission questions (the old Mission step, as a short series of cards) -------------------------------------
   let q = 0;
+  // The draft: nothing is applied to the app until "Find regions that fit".
   const answer = { profile: 'nasa', start: null, hours: 336, values: {} };
+  const draftOf = (def) => (def.on === 'mission' ? answer.hours : answer.values[def.key]);
+  const draft = (def, value) => {
+    if (def.on === 'mission') answer.hours = value;
+    else answer.values[def.key] = value;
+    drawSurvey();
+  };
   function openSurvey() {
     const m = getMission();
     // before the first search, start from the Pre-set mission's own date (data/missions.json), not the app's default
@@ -143,13 +115,6 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     if (id === 'nasa') { answer.start = new Date(profile.mission.start); answer.hours = profile.mission.durationHours; }
     drawSurvey();
   };
-  const row = (label, hint, options, current, set) =>
-    h(
-      'div',
-      { class: 'exact' },
-      h('span', {}, label, hint ? h('small', {}, hint) : null),
-      h('div', { class: 'exact-opts' }, options.map(([value, text]) => h('button', { type: 'button', 'aria-pressed': String(current === value), onClick: () => { set(value); drawSurvey(); } }, text))),
-    );
   function missionCard(profile) {
     return h(
       'button',
@@ -176,13 +141,8 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
       for (const group of GROUPS) {
         pages.push(() => [
           h('h3', {}, group.title),
-          group.date
-            ? [
-                h('label', { class: 'date' }, 'Landing datetime (UTC)', h('input', { type: 'datetime-local', step: '3600', value: answer.start.toISOString().slice(0, 16), onChange: (e) => { const d = new Date(`${e.target.value}Z`); if (!Number.isNaN(d.getTime())) answer.start = d; } })),
-                row('Duration', null, DURATION_MARKS.map((mark) => [mark.hours, mark.label]), answer.hours, (v) => (answer.hours = v)),
-              ]
-            : null,
-          ...group.choices.map((c) => row(c.label, c.hint, c.options, answer.values[c.key], (v) => (answer.values[c.key] = v))),
+          group.date ? dateRow(answer.start, (start) => { answer.start = start; drawSurvey(); }) : null,
+          ...group.choices.map((def) => (def.slider ? durationRow : choiceRow)(def, draftOf(def), (value) => draft(def, value))),
         ]);
       }
     }
