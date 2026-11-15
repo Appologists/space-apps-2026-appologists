@@ -1186,16 +1186,22 @@ button:disabled {
 }
 .profile {
   display: grid;
-  gap: 4px;
-  min-height: 72px;
-  padding: 14px 16px;
+  gap: 2px;
+  min-height: 0;
+  padding: 8px 8px 10px;
   text-align: left;
+  line-height: 1.25;
+}
+/* Text sits a little in from the picture's edges. */
+.profile > strong,
+.profile > .profile-blurb {
+  padding-inline: 4px;
 }
 .profile-pictures {
   display: flex;
   gap: 4px;
   height: 120px;
-  margin: -6px -8px 6px;
+  margin: 0 0 6px;
   border-radius: 4px;
   overflow: hidden;
   background: #06080c;
@@ -1493,13 +1499,14 @@ input.big {
     gap: 14px;
   }
   .app[data-step='1'] .profile {
-    min-height: 110px;
-    padding: 14px 16px 18px;
+    min-height: 0;
+    padding: 8px 8px 10px;
+    gap: 2px;
     align-content: start;
   }
   .app[data-step='1'] .profile-pictures {
     height: clamp(140px, 22vh, 220px);
-    margin: 0 0 8px;
+    margin: 0 0 6px;
   }
   .app[data-step='1'] .profile strong {
     font-size: 26px;
