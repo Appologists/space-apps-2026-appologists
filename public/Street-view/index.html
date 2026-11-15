@@ -1008,9 +1008,15 @@ function makeHand(i){
 // wrist panel: a small canvas on the left hand, redrawn a few times a second
 const wcv=document.createElement('canvas'); wcv.width=640; wcv.height=400; const wctx=wcv.getContext('2d');
 const wtex=new THREE.CanvasTexture(wcv); wtex.encoding=THREE.sRGBEncoding;
-const wrist=new THREE.Mesh(new THREE.PlaneGeometry(0.2,0.125),new THREE.MeshBasicMaterial({map:wtex,transparent:true,toneMapped:false,side:THREE.DoubleSide}));
-wrist.position.set(0,0.07,0.03); wrist.rotation.x=-0.9;
-let wristAt=0;
+// smaller, on the back of the wrist, and hidden until you raise it to look (like a watch). Left stick click pins it.
+const wrist=new THREE.Mesh(new THREE.PlaneGeometry(0.14,0.0875),new THREE.MeshBasicMaterial({map:wtex,transparent:true,opacity:0,toneMapped:false,side:THREE.DoubleSide,depthTest:false}));
+wrist.renderOrder=20; wrist.position.set(0,0.035,0.09); wrist.rotation.x=-1.15; wrist.visible=false;
+let wristAt=0, wristPinned=false, wristShow=0;
+function updateWrist(dt){ const wp=_v.set(0,0,0); wrist.getWorldPosition(wp); const n=_v2; wrist.getWorldDirection(n);
+  const toHead=eye.clone().sub(wp), d=toHead.length(); toHead.multiplyScalar(1/(d||1));
+  const looking=n.dot(toHead)>0.85 && d<0.32;         // wrist raised to ~20-30 cm from your eyes and turned toward them
+  const target=(wristPinned||looking)?1:0; wristShow+=(target-wristShow)*Math.min(1,dt*10);
+  wrist.material.opacity=wristShow; wrist.visible=wristShow>0.02; }
 function drawWrist(){ const g=wctx, W=640, Hh=400, txt=id=>document.getElementById(id).textContent;
   g.clearRect(0,0,W,Hh); g.fillStyle='rgba(14,13,12,.92)'; g.fillRect(0,0,W,Hh); g.strokeStyle='#ff6a3d'; g.lineWidth=4; g.strokeRect(2,2,W-4,Hh-4);
   g.fillStyle='#ff6a3d'; g.font='500 20px IBM Plex Mono, monospace'; g.fillText('YOU ARE STANDING AT',24,40);
@@ -1018,7 +1024,7 @@ function drawWrist(){ const g=wctx, W=640, Hh=400, txt=id=>document.getElementBy
   const ft=fmtTime(t); g.font='22px IBM Plex Mono, monospace'; g.fillStyle='#a39d91'; g.fillText(`${ft.day} · ${ft.clock}${playing?'  ▶':''}`,24,114);
   const rows=[['Sun',txt('rSun'),'#f5b942'],['Earth',txt('rEarth'),'#7fb2ff'],['In sun?',txt('rLit')],['Call home?',txt('rComm')],['Height',txt('rElev')],['Slope',txt('rSlope')]];
   rows.forEach((r,k)=>{ const y=156+k*34; g.fillStyle=r[2]||'#a39d91'; g.font='22px IBM Plex Mono, monospace'; g.fillText(r[0],24,y); g.fillStyle='#efe9dd'; g.fillText(r[1],200,y); });
-  g.fillStyle='#a39d91'; g.font='17px IBM Plex Mono, monospace'; g.fillText('L stick walk · R stick turn · R trigger teleport',24,Hh-46); g.fillText('A play/pause · B +6 h · X −6 h · Y leave VR',24,Hh-20);
+  g.fillStyle='#a39d91'; g.font='17px IBM Plex Mono, monospace'; g.fillText('L stick walk · R stick turn · R trigger teleport',24,Hh-46); g.fillText(`A play · B +6h · X −6h · Y exit · L click ${wristPinned?'unpin':'pin'}`,24,Hh-20);
   wtex.needsUpdate=true; }
 
 function pressed(src,i){ const gp=src&&src.gamepad; return !!(gp&&gp.buttons[i]&&gp.buttons[i].pressed); }
@@ -1054,7 +1060,8 @@ function vrStep(dt,now){
   // stand on the ground under your head
   const off=rotXZ(headLocalXZ(),vrYaw), hx=cam.x+off.x, hz=cam.z+off.z;
   rig.position.set(cam.x,nearH(hx,hz),cam.z); rig.rotation.y=vrYaw;
-  if(now-wristAt>250){ wristAt=now; drawWrist(); }
+  if(edge('Lclick',pressed(L,3))) wristPinned=!wristPinned;
+  updateWrist(dt); if(wrist.visible&&now-wristAt>250){ wristAt=now; drawWrist(); }
   return {x:hx,z:hz,heading:((Math.atan2(lookDir.x,-lookDir.z)/DEG)+360)%360};
 }
 

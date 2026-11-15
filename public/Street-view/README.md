@@ -68,7 +68,7 @@ browser: open the page's https link (Netlify), go to a site, press Enter VR.
 | A | Play / pause time |
 | B / X | Time +6 h / −6 h |
 | Y | Leave VR |
-| Left wrist | Panel with the live readouts (Sun, Earth, in sun?, call home?, height, slope) |
+| Left wrist | Raise it to your face like a watch to see the live readouts (Sun, Earth, in sun?, call home?, height, slope). Click the left stick to pin it on |
 
 In VR the page uses lighter settings (fewer shadow steps, smaller shadow map) so the Quest can keep up.
 It has only been tested in an emulator so far; check speed and comfort on a real headset.
