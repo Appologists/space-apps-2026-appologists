@@ -401,6 +401,16 @@ input[type='range'] {
   border-radius: 3px;
   background: color-mix(in srgb, var(--panel) 80%, transparent);
 }
+/* The mission steps' regions on the globe (step 2): bigger, and the chosen one matches its beige button. */
+.lbl.region-lbl {
+  font-size: 15px;
+}
+.lbl.region-lbl.on {
+  z-index: 1; /* on top where neighbouring regions' names overlap */
+  color: var(--space);
+  background: var(--regolith);
+  text-shadow: none;
+}
 .tip {
   position: absolute;
   left: 0;
@@ -1095,7 +1105,8 @@ button:disabled {
 .route-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
 .route-card { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 7px 8px; background: var(--card); border: 1px solid var(--rule); color: var(--ink); font: 12px var(--font-ui); cursor: pointer; }
 .route-card:hover { border-color: var(--dim); }
-.route-card.on { border-color: var(--south); box-shadow: inset 0 0 0 1px var(--south); }
+/* Background and colour too, or the app-wide pressed-button style (beige) shows under the light text. */
+.route-card.on { background: var(--card); color: var(--ink); border-color: var(--south); box-shadow: inset 0 0 0 1px var(--south); }
 .route-card.warn .route-title { color: var(--warn); }
 .route-card.none { cursor: default; color: var(--dim); }
 .route-title { font-weight: 600; font-size: 13.5px; }
@@ -1346,8 +1357,7 @@ input.big {
   gap: 6px;
   font-size: 15px;
 }
-.facts a,
-.region-note a {
+.facts a {
   color: var(--earth);
 }
 .more {
@@ -1404,12 +1414,6 @@ input.big {
 }
 .region[aria-pressed='true'] .verdict {
   color: inherit;
-}
-.region-note {
-  display: block;
-  margin: 3px 2px 0;
-  font-size: 12.5px;
-  color: var(--dim);
 }
 
 /* The finder's map fills the stage; its lists and controls are in the left panel now. */
@@ -1929,4 +1933,35 @@ input[type='range'].duration-slider {
 }
 .group[open] > summary {
   min-height: 0;
+}
+
+/* 2 Regions: the globe (which part of the Moon) and the region's map (where it can land) share the stage.
+   The map gets the larger share: it carries the detail. The globe's view and zoom buttons step aside; it still
+   turns and zooms by dragging and scrolling. */
+@media (min-width: 901px) {
+  .app[data-step='2'] #globe,
+  .app[data-step='2'] #labels {
+    width: 40%;
+  }
+  .app[data-step='2'] .finder {
+    left: 40%;
+    border-left: 1px solid var(--rule);
+  }
+}
+@media (max-width: 900px) {
+  .app[data-step='2'] .stage {
+    height: 78vh;
+  }
+  .app[data-step='2'] #globe,
+  .app[data-step='2'] #labels {
+    height: 36%;
+  }
+  .app[data-step='2'] .finder {
+    top: 36%;
+    border-top: 1px solid var(--rule);
+  }
+}
+.app[data-step='2'] .views,
+.app[data-step='2'] .zoom {
+  display: none;
 }
