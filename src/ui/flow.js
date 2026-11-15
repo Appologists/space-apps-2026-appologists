@@ -41,6 +41,7 @@ const REGIONS = missions.regions.map((region) => {
 });
 
 // The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
+// `custom` adds an "Other" button for any value in its range (a rover that survives 7 h of darkness, say).
 const yes = (when) => (v) => (v ? when[0] : when[1]);
 const GROUPS = [
   {
@@ -58,8 +59,8 @@ const GROUPS = [
       // 100 m is NASA's figure for the Artemis lander (missions.json, hls-2024); 200 m and 2 km are our choices, the
       // last for an older-style lander (decision V). 50 m was dropped: the search's 80 m cells make it the same as
       // 100 m. On the seven demo regions 100 m finds 8.4 km² that can take a landing, 200 m 1.8 km², 2 km none.
-      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[100, '100 m', 'NASA: Artemis Human Landing System (2024)'], [200, '200 m', 'Our choice'], [2000, '2 km', 'Our choice: an older-style lander']], format: (v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`), summary: (v) => `within ${v >= 1000 ? `${v / 1000} km` : `${v} m`}` },
-      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[100, '100 m', 'NASA: Artemis Human Landing System (2024)'], [200, '200 m', 'Our choice'], [2000, '2 km', 'Our choice: an older-style lander']], format: (v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`), custom: { min: 50, max: 10000, step: 10, unit: 'm' }, summary: (v) => `within ${v >= 1000 ? `${v / 1000} km` : `${v} m`}` },
+      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, custom: { min: 1, max: 30, step: 0.5, unit: '°' }, summary: (v) => `slopes up to ${v}°` },
       { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['Earth in view', null]) },
       { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['in sunlight', null]) },
     ],
@@ -68,9 +69,9 @@ const GROUPS = [
     id: 'rover',
     title: 'Rover',
     choices: [
-      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, summary: (v) => `survives ${v} h dark` },
-      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
-      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, summary: (v) => `${v} m/hr` },
+      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, custom: { min: 1, max: 720, step: 1, unit: 'h' }, summary: (v) => `survives ${v} h dark` },
+      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, custom: { min: 1, max: 35, step: 0.5, unit: '°' }, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, custom: { min: 1, max: 5000, step: 1, unit: 'm/hr' }, summary: (v) => `${v} m/hr` },
       { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['needs Earth to drive', null]) },
     ],
   },
@@ -105,6 +106,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
   let track = null; // where the rover is at any hour of the plan (playback.js)
   // One clock for the map and the surface view: hours after landing. `fromHere` stops an echo when this file moves the app's time slider.
   const openGroups = new Set(); // which groups of the custom form are open; all start closed
+  const typing = new Set(); // choices whose "Other" number box is open
   let searchFirst = null; // a region to search before the others (the one a saved address was showing)
   let restoring = false; // while a saved address is being acted on, nothing is written back to it
   const clock = { hours: 0, playing: false, frame: 0, rate: 0, showTime: false, freeLook: false, yaw: null, fromHere: false, sunAt: 0 };
@@ -114,7 +116,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     h('li', {}, h('button', { type: 'button', onClick: () => go(i + 1) }, h('span', { class: 'n' }, String(i + 1)), s.short)),
   );
   $('steps').append(...stepButtons);
-  $('flowBack').addEventListener('click', () => go(step - 1));
+  $('flowBack').addEventListener('click', () => (step === 1 ? backToMissions() : go(step - 1)));
   $('flowNext').addEventListener('click', () => go(step === STEPS.length ? 1 : step + 1));
   const sections = [...document.querySelectorAll('[data-steps]')];
 
@@ -140,7 +142,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       button.disabled = i + 1 > furthest;
     });
     const why = blocked();
-    $('flowBack').disabled = step === 1;
+    $('flowBack').disabled = step === 1 && !profileId; // on step 1, Back returns to the choice of mission
     $('flowNext').disabled = !!why;
     $('flowNext').textContent = STEPS[step - 1].next;
     $('flowHint').hidden = !why;
@@ -296,8 +298,10 @@ export function createFlow({ app, globe, finder, surface, api }) {
 
   function choiceRow(def) {
     const current = valueOf(def);
-    // A value set elsewhere (the exact-number boxes under "More tools") gets a button of its own.
-    const options = def.options.some(([value]) => same(value, current)) ? def.options : [...def.options, [current, def.format ? def.format(current) : String(current)]];
+    const preset = def.options.some(([value]) => same(value, current));
+    // A value set elsewhere (the exact-number boxes under "More tools") gets a button of its own, unless the
+    // choice has an "Other" button, which then shows it.
+    const options = preset || def.custom ? def.options : [...def.options, [current, def.format ? def.format(current) : String(current)]];
     const set = (value) => {
       if (def.on === 'mission') api.setMission({ [def.key]: value });
       else {
@@ -307,6 +311,22 @@ export function createFlow({ app, globe, finder, surface, api }) {
       drawSetup();
       save();
     };
+    const open = def.custom && (typing.has(def.key) || !preset);
+    const other = def.custom
+      ? h('button', {
+          type: 'button',
+          class: 'choice-other',
+          'aria-pressed': String(!preset),
+          'aria-expanded': String(open),
+          onClick: () => {
+            if (typing.has(def.key)) typing.delete(def.key);
+            else typing.add(def.key);
+            drawSetup();
+            requestAnimationFrame(() => document.querySelector(`[data-custom="${def.key}"]`)?.focus());
+          },
+        }, preset ? 'Other' : def.format(current))
+      : null;
+    const box = open ? customBox(def, current, set) : null;
     return h(
       'div',
       { class: 'choice' },
@@ -315,9 +335,42 @@ export function createFlow({ app, globe, finder, surface, api }) {
         'div',
         { class: 'choice-options', role: 'group', 'aria-label': def.label },
         // A third entry, where given, is the value's source, shown on hover.
-        options.map(([value, text, source]) => h('button', { type: 'button', title: source ?? '', 'aria-pressed': String(same(value, current)), onClick: () => set(value) }, text)),
+        options.map(([value, text, source]) => h('button', { type: 'button', title: source ?? '', 'aria-pressed': String(same(value, current)), onClick: () => { typing.delete(def.key); set(value); } }, text)),
+        other,
       ),
+      box,
     );
+  }
+
+  /** The "Other" number box: any value in the choice's range, applied when the box is left or Enter is pressed. */
+  function customBox(def, current, set) {
+    const { min, max, step: stepBy, unit } = def.custom;
+    const note = h('small', { class: 'choice-custom-note' }, `${min}–${max} ${unit}`);
+    const apply = (input) => {
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < min || value > max) {
+        note.textContent = `Enter a number from ${min} to ${max} ${unit}`;
+        note.classList.add('bad');
+        return;
+      }
+      if (!same(value, valueOf(def))) set(value);
+    };
+    return h('label', { class: 'choice-custom' },
+      h('input', {
+        type: 'number',
+        class: 'big',
+        min: String(min),
+        max: String(max),
+        step: String(stepBy),
+        value: String(current),
+        inputMode: 'decimal',
+        'data-custom': def.key,
+        'aria-label': `${def.label} (${unit})`,
+        onChange: (e) => apply(e.target),
+        onKeydown: (e) => { if (e.key === 'Enter') apply(e.target); },
+      }),
+      h('span', { class: 'choice-unit' }, unit),
+      note);
   }
 
   /**
@@ -472,16 +525,19 @@ export function createFlow({ app, globe, finder, surface, api }) {
   );
   $('profiles').append(...profileButtons);
 
+  /** Back to the two mission cards (step 1's Back button, and the "← Back" card). */
+  function backToMissions() {
+    if (!profileId) return;
+    profileId = null;
+    drawSetup();
+    drawNav();
+    save();
+  }
+
   /** A tap on a mission card. With the custom form open, the other card is a "Back" to the choice of mission. */
   function chooseProfile(id) {
     if (id === profileId) return; // already chosen: keep whatever has been set
-    if (profileId === 'custom') {
-      profileId = null;
-      drawSetup();
-      drawNav();
-      save();
-      return;
-    }
+    if (profileId === 'custom') return backToMissions();
     useProfile(id);
   }
 

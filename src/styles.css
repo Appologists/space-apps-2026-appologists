@@ -1296,6 +1296,27 @@ button:disabled {
   padding-inline: 4px;
   font-size: 16px;
 }
+.choice-options .choice-other[aria-pressed='false'] {
+  color: var(--dim);
+}
+.choice-custom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+}
+.choice-unit {
+  color: var(--dim);
+  font-size: 15px;
+}
+.choice-custom-note {
+  grid-column: 1 / -1;
+  color: var(--dim);
+  font-size: 12px;
+}
+.choice-custom-note.bad {
+  color: var(--warn);
+}
 input.big {
   width: 100%;
   min-height: 48px;
