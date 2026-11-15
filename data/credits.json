@@ -1,5 +1,5 @@
 {
-  "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed.",
+  "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed. `sections` lists only data and tools the app really uses (package.json, data/catalog.json, data/missions.json, data/sites.json, index.html).",
   "teamName": "Team Appologists",
   "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
   "team": [
@@ -10,26 +10,54 @@
     { "name": "Karley Browning" },
     { "name": "Daniel Blackburn" }
   ],
-  "thanks": [
+  "sections": [
     {
-      "what": "Terrain",
-      "who": "NASA Lunar Reconnaissance Orbiter, LOLA instrument"
+      "title": "Data sources",
+      "items": [
+        {
+          "what": "Terrain heights",
+          "who": "NASA Lunar Reconnaissance Orbiter, LOLA laser altimeter (NASA Planetary Data System, Geosciences Node)"
+        },
+        {
+          "what": "Moon colour map",
+          "who": "NASA Scientific Visualization Studio, CGI Moon Kit"
+        },
+        {
+          "what": "Sun and Earth positions checked against",
+          "who": "NASA JPL Horizons"
+        },
+        {
+          "what": "Candidate landing regions",
+          "who": "NASA, Artemis III candidate regions (2022)"
+        },
+        {
+          "what": "Proposed landing sites",
+          "who": "Gracy and Lee, Lunar and Planetary Science Conference 2024"
+        },
+        {
+          "what": "Crater positions",
+          "who": "IAU Gazetteer of Planetary Nomenclature, via Wikipedia"
+        },
+        {
+          "what": "Lander and rover figures",
+          "who": "NASA: Artemis Human Landing System update (2024), VIPER lunar operations and mission planning"
+        },
+        {
+          "what": "Pictures",
+          "who": "NASA artist's concepts of the Starship lander and of VIPER (NASA Ames, Daniel Rutter), via Wikimedia Commons"
+        }
+      ]
     },
     {
-      "what": "Sun and Earth positions",
-      "who": "Astronomy Engine by Don Cross, checked against NASA JPL Horizons"
-    },
-    {
-      "what": "Moon colour map",
-      "who": "NASA Scientific Visualization Studio, CGI Moon Kit"
-    },
-    {
-      "what": "Drawn with",
-      "who": "three.js, Vite and Vitest"
-    },
-    {
-      "what": "Pictures",
-      "who": "NASA artist's concepts of the Starship lander and of VIPER (NASA Ames, Daniel Rutter), via Wikimedia Commons"
+      "title": "Tools and technologies",
+      "items": [
+        { "what": "3D Moon and surface view", "who": "three.js" },
+        { "what": "Sun and Earth positions", "who": "Astronomy Engine by Don Cross" },
+        { "what": "Web app and terrain server", "who": "Vite and Node.js" },
+        { "what": "Tests", "who": "Vitest" },
+        { "what": "Written in", "who": "JavaScript, HTML and CSS" },
+        { "what": "Typefaces", "who": "Barlow Semi Condensed and IBM Plex Mono, from Google Fonts" }
+      ]
     }
   ]
 }

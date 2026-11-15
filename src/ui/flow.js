@@ -831,10 +831,15 @@ export function createFlow({ app, globe, finder, surface, api }) {
         h('div', { class: 'credit-title' }, credits.teamName),
         h('div', { class: 'credit-sub' }, credits.event),
         ...credits.team.map((person) => line(person.role ?? '', person.name)),
-        h('div', { class: 'credit-sub' }, 'Made with'),
-        ...credits.thanks.map((entry) => line(entry.what, entry.who)),
+        ...credits.sections.flatMap((section) => [
+          h('div', { class: 'credit-sub' }, section.title),
+          ...section.items.map((entry) => line(entry.what, entry.who)),
+        ]),
       ),
     );
+    // The same reading speed however long the list is: about 45 pixels a second.
+    const roll = $('credits').firstChild;
+    roll.style.animationDuration = `${Math.max(20, Math.round((roll.offsetHeight + 230) / 45))}s`;
   }
 
   // ---- Start --------------------------------------------------------------------------------------------
