@@ -217,3 +217,31 @@ agreed with the planner on whether a plan exists and on the arrival hour, every 
 steps) one destination took 35 to 290 ms and tours of three to five stops 0.5 to 3 s; every plan's replay
 matched. Not checked: other sites, the coarser whole-Moon terrain, missions longer than 14 days.
 
+## The mission steps
+
+`src/ui/flow.js` is the walk-through in the left panel: Mission, Regions, Drive, Surface, Ride. It computes
+nothing itself. It decides which view is on the stage and passes values between the pieces that do the work:
+
+| Step | What does the work |
+| --- | --- |
+| 1 Mission | Fills the finder's values and the mission from a profile in `data/missions.json`, or from the big custom choices |
+| 2 Regions | One landing search per region (`searchQuestion` in `src/finder/client.js` builds each question); the finder's map shows the chosen region |
+| 3 Drive | The finder's reach, route and drive planner, unchanged. `src/finder/playback.js` turns a plan into "where is the rover at hour t" |
+| 4 Surface | The surface view, opened at the rover's start |
+| 5 Ride | The same surface view with `setPosition()` moving the viewpoint along the route |
+
+Sections of `index.html` carry `data-steps="2 3"`; the flow shows the ones that list the current step.
+
+**One clock.** Playback keeps hours after landing. It moves the app's time slider (so the globe and the
+surface view's Sun follow), tells the map which time step's sunlight to draw (`setTime`, the `now` layer in
+`map-layers.js`) and where the rover is (`setRover`). Moving the app's own slider feeds back into it. In the
+ride the Sun steps three times a second, because each step redraws every shadow; the viewpoint moves every frame.
+
+**The address.** `src/ui/flow-state.js` writes the step, profile, date, limits, region, start and destinations
+into the part of the address after `#`, and reads them back on load. The flow then replays the steps up to
+the saved one; with kept searches that takes about two seconds.
+
+**Kept searches.** `server/terrain-plugin.mjs` keeps each search answer under a key made of the question
+(keys sorted), the terrain data the search can read, and the modified dates of the search code. Answers live
+in memory and in `node_modules/.cache/landing-search` (about 7 MB each, never committed). `npm run demo:warm`
+asks every profile's seven searches of a running app, so a talk starts with them all kept.

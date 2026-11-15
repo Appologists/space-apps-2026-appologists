@@ -2,7 +2,7 @@
 // ranked sites, a scale bar, a hover read-out and click-to-pick. Browser only (see map-layers.js for the pure parts).
 import { h } from '../ui/dom.js';
 import { cellToLatLon, latLonToCell } from './grid.js';
-import { MAP_LAYERS, describeCell, hillshade, layerLegend, layerPixel } from './map-layers.js';
+import { MAP_LAYERS, TIME_LAYER, describeCell, hillshade, layerLegend, layerPixel } from './map-layers.js';
 import { slopeBand } from './route-options.js';
 import { WHY_COLOURS } from './why-not.js';
 
@@ -21,6 +21,8 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   let shade = null;
   let reach = null;
   let route = null; // { path, stops: [{ row, col, label }], waits: [{ row, col }], alternatives?: path[], ellipseM?, bySlope? }
+  let timeStep = null; // while a drive plays back: the time step whose sunlight the map shows instead of the layer
+  let rover = null; // { east, north, headingDeg, lit }: metres from the middle of the search area
   let box = { x: 0, y: 0, size: 0 }; // raster rectangle in CSS pixels
   let sim = null; // simulation frame (simulation.js frameAt) or null
   const shadowCanvas = document.createElement('canvas');
@@ -56,7 +58,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     const rctx = raster.getContext('2d');
     const img = rctx.createImageData(n, n);
     for (let i = 0; i < n * n; i++) {
-      const [r, g, b] = layerPixel(layer, result, i, shade[i], { reach });
+      const [r, g, b] = layerPixel(shown(), result, i, shade[i], { reach, step: timeStep });
       img.data[i * 4] = r;
       img.data[i * 4 + 1] = g;
       img.data[i * 4 + 2] = b;
@@ -64,6 +66,8 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     }
     rctx.putImageData(img, 0, 0);
   }
+
+  const shown = () => (timeStep == null ? layer : TIME_LAYER);
 
   /** Centre of a lat/lon on screen, or null if it is off the raster. */
   function toScreen(p) {
@@ -248,7 +252,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     ctx.font = FONT;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    for (const site of [...result.sites].reverse()) {
+    for (const site of timeStep == null ? [...result.sites].reverse() : []) {
       const p = cellCentre(site.row, site.col);
       const r = site.rank === 1 ? 11 : 9;
       ctx.beginPath();
@@ -314,6 +318,28 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       }
     }
 
+    if (rover) {
+      // The rover during playback: an arrowhead pointing the way it drives, amber in sunlight, blue in the dark.
+      const half = result.n * result.cellM * 0.5;
+      const x = box.x + ((rover.east + half) / (2 * half)) * size;
+      const y = box.y + ((half - rover.north) / (2 * half)) * size;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((rover.headingDeg * Math.PI) / 180);
+      ctx.beginPath();
+      ctx.moveTo(0, -11);
+      ctx.lineTo(8, 8);
+      ctx.lineTo(0, 4);
+      ctx.lineTo(-8, 8);
+      ctx.closePath();
+      ctx.fillStyle = rover.lit ? '#ffd36b' : '#5aa8ff';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#06080c';
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Scale bar, bottom right.
     const km = niceLength(((size * 0.3) / size) * result.n * result.cellM);
     const barPx = metresToPx(km * 1000);
@@ -342,18 +368,21 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       legendEl.hidden = true;
       return;
     }
-    const legend = layerLegend(layer, result, { reach });
+    const legend = layerLegend(shown(), result, { reach });
     const last = legend.stops.length - 1;
     const ticks = legend.stops.map((stop, i) => ({ ...stop, at: i / last })).filter((stop) => stop.label);
-    legendEl.replaceChildren(
+    const parts = [
       h('div', { class: 'legend-title' }, legend.title),
-      h('div', { class: 'legend-ramp', style: `background: linear-gradient(to right, ${legend.stops.map((s) => s.hex).join(', ')})` }),
-      legend.positioned
-        ? h('div', { class: 'legend-ticks positioned' }, ticks.map((t) => h('span', { style: `left: ${(t.at * 100).toFixed(1)}%` }, t.label)))
-        : h('div', { class: 'legend-ticks' }, ticks.map((t) => h('span', {}, t.label))),
+      legend.stops.length ? h('div', { class: 'legend-ramp', style: `background: linear-gradient(to right, ${legend.stops.map((s) => s.hex).join(', ')})` }) : null,
+      !legend.stops.length
+        ? null
+        : legend.positioned
+          ? h('div', { class: 'legend-ticks positioned' }, ticks.map((t) => h('span', { style: `left: ${(t.at * 100).toFixed(1)}%` }, t.label)))
+          : h('div', { class: 'legend-ticks' }, ticks.map((t) => h('span', {}, t.label))),
       legend.swatches?.length ? h('ul', { class: 'legend-swatches' }, legend.swatches.map((s) => h('li', {}, h('i', { style: `background:${s.hex}` }), s.label))) : null,
       h('p', { class: 'legend-note' }, legend.note),
-    );
+    ];
+    legendEl.replaceChildren(...parts.filter(Boolean)); // a null here would be written out as the word "null"
     legendEl.hidden = false;
   }
 
@@ -418,6 +447,8 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       selected = null;
       reach = null;
       route = null;
+      timeStep = null;
+      rover = null;
       hideTip();
       if (result) {
         shade = hillshade(result.elevation, result.n, result.cellM);
@@ -445,6 +476,21 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     /** Show a simulation frame (simulation.js), or null to stop showing it. */
     setSim(frame) {
       sim = frame || null;
+      draw();
+    },
+    /** Show the sunlight of one time step instead of the chosen layer; null goes back to the layer. */
+    setTime(step) {
+      const next = step == null || !result ? null : Math.min(Math.max(Math.round(step), 0), result.steps - 1);
+      if (next === timeStep) return;
+      const legendChanges = (next == null) !== (timeStep == null);
+      timeStep = next;
+      paintRaster();
+      if (legendChanges) renderLegend();
+      draw();
+    },
+    /** The rover's marker during playback: { east, north, headingDeg, lit }, or null for none. */
+    setRover(next) {
+      rover = next || null;
       draw();
     },
     getLayer: () => layer,
