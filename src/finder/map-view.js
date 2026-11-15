@@ -3,6 +3,8 @@
 import { h } from '../ui/dom.js';
 import { cellToLatLon, latLonToCell } from './grid.js';
 import { MAP_LAYERS, TIME_LAYER, describeCell, hillshade, layerLegend, layerPixel } from './map-layers.js';
+import { slopeBand } from './route-options.js';
+import { WHY_COLOURS } from './why-not.js';
 
 export { MAP_LAYERS };
 
@@ -18,7 +20,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   let selected = null; // { lat, lon }
   let shade = null;
   let reach = null;
-  let route = null; // { path, stops: [{ row, col, label }], waits: [{ row, col }] }
+  let route = null; // { path, stops: [{ row, col, label }], waits: [{ row, col }], alternatives?: path[], ellipseM?, bySlope? }
   let timeStep = null; // while a drive plays back: the time step whose sunlight the map shows instead of the layer
   let rover = null; // { east, north, headingDeg, lit }: metres from the middle of the search area
   let box = { x: 0, y: 0, size: 0 }; // raster rectangle in CSS pixels
@@ -89,22 +91,63 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     ctx.stroke();
 
     if (route) {
-      const { path, stops = [], waits = [] } = route;
-      if (path && path.length > 1) {
+      const { path, stops = [], waits = [], alternatives = [], ellipseM = 0, bySlope = false, problems = [] } = route;
+      const trace = (cells) => {
         ctx.beginPath();
-        path.forEach((i, k) => {
+        cells.forEach((i, k) => {
           const p = cellCentre(Math.floor(i / result.n), i % result.n);
           if (k === 0) ctx.moveTo(p.x, p.y);
           else ctx.lineTo(p.x, p.y);
         });
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
+      };
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      // The other route choices, thin and dashed, under the chosen one.
+      for (const alt of alternatives) {
+        if (!alt || alt.length < 2) continue;
+        trace(alt);
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = 'rgba(6,8,12,0.8)';
+        ctx.lineWidth = 3.5;
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(230,233,239,0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // The landing area around the start (the finder's landing-ellipse radius).
+      if (ellipseM > 0 && path?.length) {
+        const p = cellCentre(Math.floor(path[0] / result.n), path[0] % result.n);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(metresToPx(ellipseM), 6), 0, Math.PI * 2);
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = '#8fc4ff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (path && path.length > 1) {
+        trace(path);
         ctx.strokeStyle = '#06080c';
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 6;
         ctx.stroke();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
+        if (bySlope) {
+          // Each hop coloured by the steeper of its two cells.
+          ctx.lineWidth = 3.5;
+          for (let k = 1; k < path.length; k++) {
+            const a = cellCentre(Math.floor(path[k - 1] / result.n), path[k - 1] % result.n);
+            const b = cellCentre(Math.floor(path[k] / result.n), path[k] % result.n);
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = slopeBand(Math.max(result.slope[path[k - 1]], result.slope[path[k]])).hex;
+            ctx.stroke();
+          }
+        } else {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
       }
       for (const wait of waits) {
         const p = cellCentre(wait.row, wait.col);
@@ -138,6 +181,44 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
           ctx.fillText(stop.label, p.x, p.y + 0.5);
         }
       }
+    }
+
+    // Why the drive fails: a coloured ring with a mark at each spot that is in the way.
+    for (const mark of route?.problems ?? []) {
+      const p = cellCentre(mark.row, mark.col);
+      const colour = WHY_COLOURS[mark.kind] ?? '#e04848';
+      if (mark.kind === 'lost') {
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#06080c';
+        for (const w of [4, 2.5]) {
+          ctx.lineWidth = w;
+          ctx.strokeStyle = w === 4 ? '#06080c' : colour;
+          ctx.beginPath();
+          ctx.moveTo(p.x - 7, p.y - 7);
+          ctx.lineTo(p.x + 7, p.y + 7);
+          ctx.moveTo(p.x + 7, p.y - 7);
+          ctx.lineTo(p.x - 7, p.y + 7);
+          ctx.stroke();
+        }
+        continue;
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#06080c';
+      ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = colour;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(p.x + 13, p.y - 13, 7, 0, Math.PI * 2);
+      ctx.fillStyle = colour;
+      ctx.fill();
+      ctx.font = 'bold 11px "IBM Plex Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#06080c';
+      ctx.fillText('!', p.x + 13, p.y - 12.5);
     }
 
     ctx.font = FONT;
