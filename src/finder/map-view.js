@@ -20,7 +20,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   let selected = null; // { lat, lon }
   let shade = null;
   let reach = null;
-  let route = null; // { path, stops: [{ row, col, label }], waits: [{ row, col }], alternatives?: path[], ellipseM?, bySlope? }
+  let route = null; // { path, stops: [{ row, col, label }], waits: [{ row, col }], alternatives?: path[], bySlope? }
   let timeStep = null; // while a drive plays back: the time step whose sunlight the map shows instead of the layer
   let rover = null; // { east, north, headingDeg, lit }: metres from the middle of the search area
   let box = { x: 0, y: 0, size: 0 }; // raster rectangle in CSS pixels
@@ -91,7 +91,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     ctx.stroke();
 
     if (route) {
-      const { path, stops = [], waits = [], alternatives = [], ellipseM = 0, bySlope = false, problems = [] } = route;
+      const { path, stops = [], waits = [], alternatives = [], bySlope = false, problems = [] } = route;
       const trace = (cells) => {
         ctx.beginPath();
         cells.forEach((i, k) => {
@@ -115,17 +115,8 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      // The landing area around the start (the finder's landing-ellipse radius).
-      if (ellipseM > 0 && path?.length) {
-        const p = cellCentre(Math.floor(path[0] / result.n), path[0] % result.n);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(metresToPx(ellipseM), 6), 0, Math.PI * 2);
-        ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = '#8fc4ff';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
+      // The landing-area ring around the start was taken off (Daniel, 2026-11-14): at 100 m it hid under the
+      // start marker.
       if (path && path.length > 1) {
         trace(path);
         ctx.strokeStyle = '#06080c';

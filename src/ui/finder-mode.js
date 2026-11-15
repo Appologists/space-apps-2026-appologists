@@ -253,7 +253,6 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
         stops: targets.map((t, i) => ({ row: t.row, col: t.col, label: destinationName(i) })),
         waits: plan.waits ?? [],
         alternatives: Object.entries(options).filter(([id, o]) => id !== shown && o && !o.sameAs && o.plan.path !== plan.path).map(([, o]) => o.plan.path),
-        ellipseM: values.ellipseRadiusM,
         bySlope: true,
         problems: why?.marks ?? [],
       });
