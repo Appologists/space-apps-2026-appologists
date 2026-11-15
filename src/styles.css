@@ -1255,22 +1255,49 @@ input.big {
   min-height: 48px;
   font-size: 16px;
 }
-/* The landing date: the date box and its two buttons on one row when they fit, the buttons below when not. */
+/* The landing time: the date big in the middle, a week, a day and an hour back on the left, forward on the right. */
 .date-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
   gap: 6px;
 }
-.date-row input {
-  flex: 2 1 270px;
-  width: auto;
-  min-width: 0;
+.date-steps {
+  display: grid;
+  gap: 6px;
 }
-.date-row button {
-  flex: 1 1 110px;
-  min-height: 48px;
+.date-steps button {
+  min-height: 44px;
   padding-inline: 4px;
   font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.date-now {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: var(--space);
+  border-color: var(--regolith);
+}
+.date-day {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+.date-time {
+  font: 500 18px var(--font-num);
+  color: var(--regolith);
+}
+.date-input {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 .facts {
   margin: 0;
@@ -1547,12 +1574,19 @@ input.big {
     min-height: 64px;
     font-size: 20px;
   }
-  .app[data-step='1'] .date-row {
-    gap: 10px;
+  .app[data-step='1'] .date-row,
+  .app[data-step='1'] .date-steps {
+    gap: 8px;
   }
-  .app[data-step='1'] .date-row button {
-    min-height: 64px;
-    font-size: 21px;
+  .app[data-step='1'] .date-steps button {
+    min-height: 56px;
+    font-size: 20px;
+  }
+  .app[data-step='1'] .date-day {
+    font-size: 26px;
+  }
+  .app[data-step='1'] .date-time {
+    font-size: 24px;
   }
   .app[data-step='1'] .facts {
     gap: 10px;
