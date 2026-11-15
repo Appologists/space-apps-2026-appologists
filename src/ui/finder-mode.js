@@ -2,7 +2,7 @@
 // sites. Like surface-mode.js, it owns its part of the page and talks to main.js through callbacks.
 import { searchLanding, searchQuestion } from '../finder/client.js';
 import { latLonToCell } from '../finder/grid.js';
-import { pathStats, reachFrom } from '../finder/route.js';
+import { reachFrom } from '../finder/route.js';
 import { MAX_DESTINATIONS, planMission } from '../finder/planner.js';
 import { destinationName, planText } from '../finder/plan-text.js';
 import { routeOptions } from '../finder/route-options.js';
@@ -192,13 +192,12 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       const stop = plan?.stops?.find((s) => s.destination === i);
       el.append(
         h('div', { class: 'dest-row' },
-          h('span', { class: 'dest-letter' }, destinationName(i)),
-          h('span', { class: 'dest-coords' }, formatLatLon(t.lat, t.lon, 3)),
-          h('span', { class: 'dest-arrival' }, stop ? `arrives ${formatHours(stop.arrivalHours)} after landing` : ''),
+          h('span', { class: 'dest-letter', title: formatLatLon(t.lat, t.lon, 3) }, destinationName(i)),
+          h('span', { class: 'dest-arrival' }, stop ? `Arrives ${formatHours(stop.arrivalHours)} after landing` : 'Not reached'),
           h('button', { type: 'button', onClick: () => removeTarget(i) }, 'Remove')),
       );
     }
-    el.append(h('button', { type: 'button', class: 'dest-clear', onClick: () => { targets = []; updateRoute(); } }, 'Clear destinations'));
+    if (targets.length > 1) el.append(h('button', { type: 'button', class: 'dest-clear', onClick: () => { targets = []; updateRoute(); } }, 'Clear all'));
   }
 
   /** Recompute what the rover can reach from the start, and the plan for the destinations if there are any. */
@@ -214,17 +213,13 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
     let text = null;
     let routeText = '';
     if (!start) {
-      routeText = 'Click the map to choose where the rover starts.';
+      routeText = '';
       map.setRoute(null);
     } else if (!targets.length) {
-      const limits = `${values.roverRangeKm > 0 ? `within ${values.roverRangeKm} km ` : ''}on slopes up to ${values.roverMaxSlopeDeg}°`;
       let cells = 0;
       for (let i = 0; i < reach.dist.length; i++) if (Number.isFinite(reach.dist[i])) cells++;
-      const area = (cells * result.cellM * result.cellM) / 1e6;
-      routeText =
-        cells <= 1
-          ? `From the start the rover cannot move: the ground there is steeper than ${values.roverMaxSlopeDeg}°, or off the map.`
-          : `From the start the rover can reach ${area.toFixed(area < 10 ? 1 : 0)} km² ${limits}. Choose "Add destination" and click the map to plan a drive. The "Reach" layer shows how far each spot is.`;
+      // Only the case that needs saying: the start is too steep to drive away from.
+      routeText = cells <= 1 ? `The rover cannot move from this start: steeper than ${values.roverMaxSlopeDeg}°.` : '';
       map.setRoute(null);
     } else {
       const fastest = planMission(result, start, targets, rover);
@@ -249,11 +244,6 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       }
       if (chosen && shownId === 'safest' && chosen.limits) {
         text.notes = `The safest route is the planner run again with stricter limits (slopes up to ${chosen.limits.maxSlopeDeg}°${chosen.limits.margin ? `, darkness up to ${formatHours(chosen.limits.maxDarknessHours)}` : ''}); the bands and the 30% margin are our estimate. ${text.notes}`;
-      }
-      if (plan.path) {
-        const s = pathStats(result, plan.path, { speedMPerHour: rover.speedMPerHour });
-        const km = s.distanceM / 1000;
-        routeText = `Route shown: ${km.toFixed(km < 10 ? 1 : 0)} km, steepest slope ${s.steepestDeg.toFixed(0)}°, climbing ${Math.round(s.climbM)} m and descending ${Math.round(s.descentM)} m.`;
       }
       const shown = shownId;
       map.setRoute({
