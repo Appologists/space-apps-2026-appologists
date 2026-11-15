@@ -53,14 +53,21 @@ describe('hillshade', () => {
 });
 
 describe('layerPixel', () => {
-  it('uses the background outside the search area on every layer', () => {
+  it('uses the background where there is no terrain data, on every layer', () => {
+    const r = fakeResult();
+    r.elevation[1] = NaN;
+    for (const { id } of MAP_LAYERS) expect(layerPixel(id, r, 1, 100)).toEqual([6, 8, 12]);
+  });
+  it('outside the search circle: dim relief for the landing verdict and reach, measured colours for the rest', () => {
     const r = fakeResult();
     r.fail[0] = FAIL.OUTSIDE;
-    r.elevation[1] = NaN;
-    for (const { id } of MAP_LAYERS) {
-      expect(layerPixel(id, r, 0, 100)).toEqual([6, 8, 12]);
-      expect(layerPixel(id, r, 1, 100)).toEqual([6, 8, 12]);
-    }
+    r.fail[1] = FAIL.SLOPE;
+    const notChecked = layerPixel('result', r, 0, 128);
+    const failing = layerPixel('result', r, 1, 128);
+    expect(notChecked[0]).toBe(notChecked[2]);
+    expect(notChecked[0]).toBeLessThan(failing[0]); // darker than ground that fails a check
+    expect(layerPixel('reach', r, 0, 128)).toEqual(notChecked);
+    for (const id of ['sun', 'dark', 'earth', 'slope']) expect(layerPixel(id, r, 0, 128)).toEqual(layerPixel(id, r, 2, 128));
   });
   it('draws failing result cells grey and passing cells blue, lighter for higher scores', () => {
     const r = fakeResult();
@@ -120,10 +127,13 @@ describe('describeCell', () => {
   it('says a passing cell passes', () => {
     expect(describeCell(fakeResult(), 3, 3)).toContain('passes every check');
   });
-  it('says outside cells are outside', () => {
+  it('says outside cells were not checked for landing, and still gives what was measured there', () => {
     const r = fakeResult();
     r.fail[0] = FAIL.OUTSIDE;
-    expect(describeCell(r, 0, 0)).toBe('outside the search area');
+    expect(describeCell(r, 0, 0)).toMatch(/not checked for landing/);
+    expect(describeCell(r, 0, 0)).toMatch(/sunlit 50%/);
+    r.elevation[0] = NaN;
+    expect(describeCell(r, 0, 0)).toBe('no terrain data here');
   });
 });
 
@@ -150,10 +160,10 @@ describe('reach layer', () => {
     const none = layerPixel('reach', r, 0, 100);
     expect(none[0]).toBe(none[1]);
   });
-  it('keeps the background outside the search area', () => {
+  it('draws ground outside the search area as dim relief, not as reachable', () => {
     const r = fakeResult();
     r.fail[0] = FAIL.OUTSIDE;
-    expect(layerPixel('reach', r, 0, 0, { reach: reachFor(r, { 0: 10 }) })).toEqual([6, 8, 12]);
+    expect(layerPixel('reach', r, 0, 0, { reach: reachFor(r, { 0: 10 }) })).toEqual(layerPixel('result', r, 0, 0));
   });
   it('has legend labels for the range and the grey swatch', () => {
     const r = fakeResult();
