@@ -18,6 +18,7 @@ import { STATE_STORY, milestoneLabel } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
 import { DURATION_MARKS, formatDuration, positionOf, tidyDuration } from '../mission.js';
 import { clear, h } from './dom.js';
+import { createDateScan } from './date-scan-panel.js';
 import { decodeFlow, encodeFlow } from './flow-state.js';
 
 const $ = (id) => document.getElementById(id);
@@ -144,6 +145,12 @@ export function createFlow({ app, globe, finder, surface, api }) {
   async function go(next) {
     if (next < 1 || next > STEPS.length || (next > step && next > furthest && (next !== step + 1 || blocked()))) return;
     pause();
+    // Leaving the surface for a map step: lift off and fade out first, then let the map fade back in.
+    const leavingSurface = next <= 3 && surface.isOpen();
+    if (leavingSurface) {
+      app.classList.add('flying'); // keeps the finder's map invisible until the surface has gone
+      await surface.close({ outro: true });
+    }
     step = next;
     furthest = Math.max(furthest, step);
     app.dataset.step = String(step);
@@ -197,6 +204,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     }
     drawNav();
     save();
+    if (leavingSurface) setTimeout(() => app.classList.remove('flying'), 40); // the map fades in (styles.css)
   }
 
   // ---- The address: a reload or a bookmark comes back to the same step (flow-state.js) -----------------------
@@ -565,7 +573,37 @@ export function createFlow({ app, globe, finder, surface, api }) {
     return ['fail', `No available sites. Cause: ${FAIL_WORDS[worst]}`];
   }
 
+  // ---- When can you land? (date-scan-panel.js): every landing hour for 30 days at each region's best spot --------
+  let lastMissionStart = null;
+  let startFromScan = false; // the landing time was just taken from the scan: keep its 30-day window
+  const when = createDateScan({
+    el: $('dateScan'),
+    onUse: (date) => {
+      startFromScan = true;
+      api.setMission({ start: date });
+      api.setStatus(`Landing time set to ${formatUTC(date)}. Searching the regions again for it…`, 6000);
+      searchRegions();
+      save();
+    },
+  });
+  function drawWhen() {
+    const start = api.getMission().start.getTime();
+    if (lastMissionStart !== null && start !== lastMissionStart && !startFromScan) when.resetWindow(); // a new plan: a new window
+    if (start !== lastMissionStart) startFromScan = false;
+    lastMissionStart = start;
+    // Up to three of the best spots the search found in each region (on another date another one may be the
+    // good one), or the region's named point where the search found none.
+    const spots = REGIONS.flatMap((region) => {
+      const sites = scan.results.get(region.id)?.result?.sites ?? [];
+      return sites.length
+        ? sites.slice(0, 3).map((site) => ({ region: region.name, name: region.name, lat: site.lat, lon: site.lon, fromSearch: true }))
+        : [{ region: region.name, name: region.name, lat: region.lat, lon: region.lon, fromSearch: false }];
+    });
+    when.update({ spots, question: finder.paramsFor({ lat: 0, lon: 0 }), ready: scan.done });
+  }
+
   function drawRegions() {
+    drawWhen();
     const mission = api.getMission();
     const done = [...scan.results.values()].filter((entry) => entry.result);
     const passing = done.filter((entry) => entry.result.sites.length).length;
