@@ -343,17 +343,10 @@ export function createFlow({ app, globe, finder, surface, api }) {
         h(
           'ul',
           { class: 'facts' },
-          profile.facts.map((fact) => {
-            const source = missions.sources[fact.source];
-            return h(
-              'li',
-              {},
-              `${fact.text} `,
-              source.url ? h('a', { href: source.url, target: '_blank', rel: 'noopener', title: source.title }, 'source') : h('span', { class: 'tag', title: source.title }, 'our choice'),
-            );
-          }),
+          // Each number's source stays in data/missions.json and shows on hover; the demo page shows no links.
+          profile.facts.map((fact) => h('li', { title: missions.sources[fact.source].title }, fact.text)),
         ),
-        h('button', { type: 'button', onClick: () => { profileId = 'custom'; drawSetup(); save(); } }, 'Change these numbers'),
+        h('button', { type: 'button', onClick: () => { profileId = 'custom'; drawSetup(); save(); } }, 'Edit'),
       );
       return;
     }
@@ -461,12 +454,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
             h('strong', {}, region.name),
             h('span', { class: `verdict ${kind}` }, text),
           ),
-          h(
-            'small',
-            { class: 'region-note' },
-            region.note ? `${region.note} ` : '',
-            region.source?.url ? h('a', { href: region.source.url, target: '_blank', rel: 'noopener', title: region.source.title }, 'Where the point comes from') : null,
-          ),
+          region.note ? h('small', { class: 'region-note', title: region.source?.title ?? '' }, region.note) : null,
         );
       }),
     );
