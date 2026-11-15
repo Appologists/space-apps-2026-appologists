@@ -116,10 +116,10 @@
       "note": "A site proposed inside NASA's candidate region of this name.",
       "source": "gracy-lee-2024"
     },
-    { "id": "shackleton", "site": "shackleton" },
-    { "id": "de-gerlache", "site": "de-gerlache" },
-    { "id": "haworth", "site": "haworth" },
-    { "id": "nobile", "site": "nobile" },
-    { "id": "malapert", "site": "malapert" }
+    { "id": "shackleton", "site": "shackleton", "searchRadiusKm": 20, "searchRadiusSource": "our-choice" },
+    { "id": "de-gerlache", "site": "de-gerlache", "searchRadiusKm": 20, "searchRadiusSource": "our-choice" },
+    { "id": "haworth", "site": "haworth", "searchRadiusKm": 20, "searchRadiusSource": "our-choice" },
+    { "id": "nobile", "site": "nobile", "searchRadiusKm": 20, "searchRadiusSource": "our-choice" },
+    { "id": "malapert", "site": "malapert", "searchRadiusKm": 20, "searchRadiusSource": "our-choice" }
   ]
 }

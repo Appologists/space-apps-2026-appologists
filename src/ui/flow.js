@@ -35,7 +35,8 @@ const REGIONS = missions.regions.map((region) => {
   const site = region.site ? sitesData.sites.find((s) => s.id === region.site) : region;
   const sources = region.site ? sitesData.sources : missions.sources;
   // A named crater stands for its middle (a reference point, not a vetted landing site); missions.json says so.
-  return { id: region.id, name: site.name, lat: site.lat, lon: site.lon, source: sources[site.source] };
+  // searchRadiusKm: the crater regions are searched 20 km round their centres, to reach the rims (our choice).
+  return { id: region.id, name: site.name, lat: site.lat, lon: site.lon, searchRadiusKm: region.searchRadiusKm, source: sources[site.source] };
 });
 
 // The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
@@ -79,6 +80,7 @@ const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
 // How close the globe comes on step 2. Daniel (2026-11-14) asked for it further out, so the view shows which part
 // of the Moon this is; in its narrower pane that needs the Moon's curved edge in view, which is about 2.5 (our choice).
 const REGION_ZOOM = 2.5;
+const WIDE_KM = Math.max(...REGIONS.map((r) => r.searchRadiusKm ?? 0));
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
 /**
@@ -574,7 +576,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const done = [...scan.results.values()].filter((entry) => entry.result);
     const passing = done.filter((entry) => entry.result.sites.length).length;
     $('regionsLede').textContent =
-      `Each region is searched for 10 km around the point named, on real terrain, for a landing on ${formatUTC(mission.start)} and ${formatHours(mission.durationHours)} on the Moon. ` +
+      `Each region is searched for ${finder.values.radiusKm} km around the point named (${WIDE_KM} km round the crater centres, to reach their rims), on real terrain, for a landing on ${formatUTC(mission.start)} and ${formatHours(mission.durationHours)} on the Moon. ` +
       (scan.done ? `${passing} of ${REGIONS.length} have sites available for landing.` : `${done.length} of ${REGIONS.length} searched so far.`) +
       // A long mission is checked in longer steps (src/finder/client.js), which can miss short darkness.
       (done[0] && done[0].result.stepHours > 1
