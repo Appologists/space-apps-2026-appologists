@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" role="img" aria-labelledby="t d">
+  <title id="t">A home-made rover</title>
+  <desc id="d">Our own drawing, a joke: a cardboard box on four mismatched wheels, held together with duct tape, with a calculator for a solar panel and a webcam on a coat hanger.</desc>
+  <!-- Night sky and grey ground, so it sits in the card like the photo beside it. -->
+  <rect width="400" height="225" fill="#06080c"/>
+  <g fill="#e6e9ef">
+    <circle cx="30" cy="22" r="1.1"/><circle cx="84" cy="48" r="0.8"/><circle cx="140" cy="18" r="1"/>
+    <circle cx="222" cy="34" r="0.8"/><circle cx="300" cy="14" r="1.2"/><circle cx="356" cy="52" r="0.9"/>
+    <circle cx="376" cy="20" r="0.7"/><circle cx="58" cy="88" r="0.7"/><circle cx="330" cy="92" r="0.8"/>
+  </g>
+  <path d="M0 176 Q60 168 120 174 T250 171 T400 175 V225 H0 Z" fill="#5d5a55"/>
+  <path d="M0 176 Q60 168 120 174 T250 171 T400 175" fill="none" stroke="#8a867e" stroke-width="2"/>
+  <g fill="#4a4743"><ellipse cx="70" cy="200" rx="18" ry="4"/><ellipse cx="330" cy="206" rx="24" ry="5"/></g>
+
+  <!-- The whole rover leans, because no two wheels are the same size. -->
+  <g transform="rotate(-4 200 150)" stroke="#1c140a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Coat-hanger mast with a webcam and one googly eye -->
+    <path d="M232 104 L236 58 Q238 46 250 44 Q262 42 262 54" fill="none" stroke="#b8bcc4" stroke-width="3"/>
+    <rect x="246" y="30" width="34" height="22" rx="7" fill="#2b2f36"/>
+    <circle cx="263" cy="41" r="7" fill="#11151b" stroke="#6c7480"/>
+    <circle cx="263" cy="41" r="2.6" fill="#7fb2ff" stroke="none"/>
+    <circle cx="282" cy="30" r="8" fill="#ffffff"/>
+    <circle cx="285" cy="33" r="3.6" fill="#11151b" stroke="none"/>
+
+    <!-- Paperclip antenna with a sock for a flag -->
+    <path d="M150 104 L146 64 L152 64 L148 50" fill="none" stroke="#c9ccd2" stroke-width="2"/>
+    <path d="M148 50 L170 46 Q178 50 172 58 L166 66 Q160 70 158 62 L160 56 L149 58 Z" fill="#e05a8a"/>
+    <path d="M152 51 L168 48" fill="none" stroke="#ffffff" stroke-width="2"/>
+
+    <!-- Open box flaps -->
+    <path d="M118 104 L104 88 L176 90 L188 104 Z" fill="#b98f55"/>
+    <path d="M214 104 L230 86 L292 92 L282 104 Z" fill="#b98f55"/>
+
+    <!-- The box -->
+    <rect x="114" y="102" width="172" height="62" rx="2" fill="#cda36a"/>
+    <path d="M114 118 H286" fill="none" stroke="#a87f48" stroke-width="1.5"/>
+    <text x="134" y="148" font-family="'Marker Felt', 'Comic Sans MS', 'Chalkboard SE', cursive" font-size="22" fill="#1c140a" stroke="none">R<tspan fill="#c0392b">O</tspan>VER</text>
+    <text x="214" y="150" font-family="'Marker Felt', 'Comic Sans MS', 'Chalkboard SE', cursive" font-size="13" fill="#1c140a" stroke="none">v0.1 (final)</text>
+    <path d="M206 128 h16" fill="none" stroke="#1c140a" stroke-width="1.5"/>
+    <text x="226" y="132" font-family="'Marker Felt', 'Comic Sans MS', 'Chalkboard SE', cursive" font-size="10" fill="#1c140a" stroke="none">THIS SIDE UP</text>
+
+    <!-- Calculator taped on as a solar panel -->
+    <rect x="164" y="84" width="46" height="24" rx="3" fill="#30343b" transform="rotate(8 187 96)"/>
+    <rect x="168" y="87" width="38" height="7" fill="#5a6a4a" stroke="none" transform="rotate(8 187 96)"/>
+    <g fill="#9aa1ab" stroke="none" transform="rotate(8 187 96)">
+      <rect x="169" y="97" width="7" height="4"/><rect x="179" y="97" width="7" height="4"/><rect x="189" y="97" width="7" height="4"/><rect x="199" y="97" width="7" height="4"/>
+      <rect x="169" y="102" width="7" height="3"/><rect x="179" y="102" width="7" height="3"/><rect x="189" y="102" width="7" height="3"/><rect x="199" y="102" width="7" height="3"/>
+    </g>
+
+    <!-- Duct tape -->
+    <g fill="#9ea3aa" stroke="#55595f" stroke-width="1.2">
+      <path d="M160 92 l40 14 l-2 7 l-40 -14 z"/>
+      <path d="M108 128 l26 -6 l2 8 l-26 6 z"/>
+      <path d="M266 108 l28 22 l-5 6 l-28 -22 z"/>
+      <path d="M262 160 l34 -2 l0 8 l-34 2 z"/>
+    </g>
+
+    <!-- Four wheels, no two alike: a lawnmower wheel, a CD, a jar lid and a roll of tape -->
+    <g>
+      <circle cx="132" cy="168" r="22" fill="#1d1f23"/>
+      <circle cx="132" cy="168" r="9" fill="#d8b04a"/>
+      <circle cx="132" cy="168" r="3" fill="#1d1f23" stroke="none"/>
+    </g>
+    <g>
+      <circle cx="184" cy="172" r="16" fill="#d9dde3"/>
+      <circle cx="184" cy="172" r="11" fill="none" stroke="#9fd0ff" stroke-width="3" opacity="0.8"/>
+      <circle cx="184" cy="172" r="4" fill="#06080c"/>
+    </g>
+    <g>
+      <circle cx="232" cy="176" r="11" fill="#c0392b"/>
+      <circle cx="232" cy="176" r="6" fill="none" stroke="#7c1f15" stroke-width="2"/>
+    </g>
+    <g>
+      <circle cx="276" cy="170" r="18" fill="#9ea3aa"/>
+      <circle cx="276" cy="170" r="10" fill="#06080c"/>
+    </g>
+  </g>
+</svg>

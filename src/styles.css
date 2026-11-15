@@ -1191,6 +1191,21 @@ button:disabled {
   padding: 14px 16px;
   text-align: left;
 }
+.profile-pictures {
+  display: flex;
+  gap: 4px;
+  height: 120px;
+  margin: -6px -8px 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #06080c;
+}
+.profile-pictures img {
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .profile strong {
   font-size: 18px;
   font-weight: 600;
@@ -1214,6 +1229,10 @@ button:disabled {
   color: var(--dim);
   font-size: 13px;
 }
+.choice-label small.inline {
+  display: inline;
+  margin-left: 8px;
+}
 .choice-options {
   display: grid;
   grid-auto-flow: column;
@@ -1228,6 +1247,17 @@ button:disabled {
 input.big {
   width: 100%;
   min-height: 48px;
+  font-size: 16px;
+}
+/* The landing date: the date box and its two buttons on one row. */
+.date-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.date-row button {
+  min-height: 48px;
+  padding-inline: 4px;
   font-size: 16px;
 }
 .facts {
@@ -1464,8 +1494,12 @@ input.big {
   }
   .app[data-step='1'] .profile {
     min-height: 110px;
-    padding: 18px 20px;
+    padding: 14px 16px 18px;
     align-content: start;
+  }
+  .app[data-step='1'] .profile-pictures {
+    height: clamp(140px, 22vh, 220px);
+    margin: 0 0 8px;
   }
   .app[data-step='1'] .profile strong {
     font-size: 26px;
@@ -1473,16 +1507,8 @@ input.big {
   .app[data-step='1'] .profile span {
     font-size: 18px;
   }
-  /* The custom choices sit two to a row, so the whole mission fits on about one screen. */
   .app[data-step='1'] .setup {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 20px 24px;
-    align-items: start;
-  }
-  .app[data-step='1'] .setup > .eyebrow,
-  .app[data-step='1'] .setup > .facts,
-  .app[data-step='1'] .setup > button {
-    grid-column: 1 / -1;
+    gap: 20px;
   }
   .app[data-step='1'] .setup .eyebrow {
     font-size: 14px;
@@ -1505,8 +1531,15 @@ input.big {
     font-size: 21px;
   }
   .app[data-step='1'] input.big {
-    min-height: 60px;
+    min-height: 64px;
     font-size: 20px;
+  }
+  .app[data-step='1'] .date-row {
+    gap: 10px;
+  }
+  .app[data-step='1'] .date-row button {
+    min-height: 64px;
+    font-size: 21px;
   }
   .app[data-step='1'] .facts {
     gap: 10px;
