@@ -11,6 +11,7 @@ export const same = (a, b) => (typeof a === 'number' && typeof b === 'number' ? 
 
 // A few big choices each, instead of number boxes. `on` says which object holds the value: the mission (start,
 // length) or the finder's values (the lander and the rover). An option's third entry is its source, shown on hover.
+// `custom` adds an "Other" button for any value in its range (a rover that survives 7 h of darkness, say).
 const yes = (when) => (v) => (v ? when[0] : when[1]);
 const distance = (v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`);
 export const GROUPS = [
@@ -29,8 +30,8 @@ export const GROUPS = [
       // 100 m is NASA's figure for the Artemis lander (missions.json, hls-2024); 200 m and 2 km are our choices, the
       // last for an older-style lander (decision V). 50 m was dropped: the search's 80 m cells make it the same as
       // 100 m. On the seven demo regions 100 m finds 8.4 km² that can take a landing, 200 m 1.8 km², 2 km none.
-      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[100, '100 m', 'NASA: Artemis Human Landing System (2024)'], [200, '200 m', 'Our choice'], [2000, '2 km', 'Our choice: an older-style lander']], format: distance, summary: (v) => `within ${distance(v)}` },
-      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[100, '100 m', 'NASA: Artemis Human Landing System (2024)'], [200, '200 m', 'Our choice'], [2000, '2 km', 'Our choice: an older-style lander']], format: distance, custom: { min: 50, max: 10000, step: 10, unit: 'm' }, summary: (v) => `within ${distance(v)}` },
+      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, custom: { min: 1, max: 30, step: 0.5, unit: '°' }, summary: (v) => `slopes up to ${v}°` },
       { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['Earth in view', null]) },
       { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['in sunlight', null]) },
     ],
@@ -39,9 +40,9 @@ export const GROUPS = [
     id: 'rover',
     title: 'Rover',
     choices: [
-      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, summary: (v) => `survives ${v} h dark` },
-      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
-      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, summary: (v) => `${v} m/hr` },
+      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, custom: { min: 1, max: 720, step: 1, unit: 'h' }, summary: (v) => `survives ${v} h dark` },
+      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, custom: { min: 1, max: 35, step: 0.5, unit: '°' }, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, custom: { min: 1, max: 5000, step: 1, unit: 'm/hr' }, summary: (v) => `${v} m/hr` },
       { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['needs Earth to drive', null]) },
     ],
   },
@@ -64,18 +65,61 @@ export function optionsWith(def, current) {
   return def.options.some(([value]) => same(value, current)) ? def.options : [...def.options, [current, def.format ? def.format(current) : String(current)]];
 }
 
-/** One question as a row of big buttons. */
+/** One question as a row of big buttons; with `def.custom`, an "Other" button opens a number box for any value in range. */
 export function choiceRow(def, current, set) {
-  return h(
-    'div',
-    { class: 'choice' },
-    h('div', { class: 'choice-label' }, def.label, def.hint ? h('small', {}, def.hint) : null),
-    h(
-      'div',
-      { class: 'choice-options', role: 'group', 'aria-label': def.label },
-      optionsWith(def, current).map(([value, text, source]) => h('button', { type: 'button', title: source ?? '', 'aria-pressed': String(same(value, current)), onClick: () => set(value) }, text)),
-    ),
-  );
+  const preset = def.options.some(([value]) => same(value, current));
+  const options = def.custom ? def.options : optionsWith(def, current);
+  const row = h('div', { class: 'choice' }, h('div', { class: 'choice-label' }, def.label, def.hint ? h('small', {}, def.hint) : null));
+  const buttons = options.map(([value, text, source]) => h('button', { type: 'button', title: source ?? '', 'aria-pressed': String(same(value, current)), onClick: () => set(value) }, text));
+  let box = null;
+  const toggle = (open) => {
+    if (open && !box) {
+      box = customBox(def, current, set);
+      row.append(box);
+      box.querySelector('input')?.focus();
+    } else if (!open && box) {
+      box.remove();
+      box = null;
+    }
+    other?.setAttribute('aria-expanded', String(!!box));
+  };
+  // The "Other" button shows a value that is not one of the three, pressed.
+  const other = def.custom
+    ? h('button', { type: 'button', class: 'choice-other', 'aria-pressed': String(!preset), 'aria-expanded': 'false', onClick: () => toggle(!box) }, preset ? 'Other' : def.format(current))
+    : null;
+  row.append(h('div', { class: 'choice-options', role: 'group', 'aria-label': def.label }, buttons, other));
+  if (def.custom && !preset) toggle(true);
+  return row;
+}
+
+/** The "Other" number box: any value in the question's range, applied when the box is left or Enter is pressed. */
+function customBox(def, current, set) {
+  const { min, max, step, unit } = def.custom;
+  const note = h('small', { class: 'choice-custom-note' }, `${min}–${max} ${unit}`);
+  const apply = (input) => {
+    const value = Number(input.value);
+    if (!Number.isFinite(value) || value < min || value > max) {
+      note.textContent = `Enter a number from ${min} to ${max} ${unit}`;
+      note.classList.add('bad');
+      return;
+    }
+    if (!same(value, current)) set(value);
+  };
+  return h('label', { class: 'choice-custom' },
+    h('input', {
+      type: 'number',
+      class: 'big',
+      min: String(min),
+      max: String(max),
+      step: String(step),
+      value: String(current),
+      inputMode: 'decimal',
+      'aria-label': `${def.label} (${unit})`,
+      onChange: (e) => apply(e.target),
+      onKeydown: (e) => { if (e.key === 'Enter') apply(e.target); },
+    }),
+    h('span', { class: 'choice-unit' }, unit),
+    note);
 }
 
 /**

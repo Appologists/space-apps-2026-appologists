@@ -18,6 +18,7 @@ import { missionRegions } from '../finder/regions.js';
 import { STATE_STORY, milestoneLabel } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
 import { clear, h } from './dom.js';
+import { createDateScan } from './date-scan-panel.js';
 import { decodeFlow, encodeFlow } from './flow-state.js';
 import { GROUPS, choiceRow, dateRow, durationRow, groupSummary } from './mission-questions.js';
 
@@ -77,7 +78,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     h('li', {}, h('button', { type: 'button', onClick: () => go(i + 1) }, h('span', { class: 'n' }, String(i + 1)), s.short)),
   );
   $('steps').append(...stepButtons);
-  $('flowBack').addEventListener('click', () => go(step - 1));
+  $('flowBack').addEventListener('click', () => (step === 1 ? backToMissions() : go(step - 1)));
   $('flowNext').addEventListener('click', () => go(step === STEPS.length ? 1 : step + 1));
   const sections = [...document.querySelectorAll('[data-steps]')];
 
@@ -103,7 +104,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       button.disabled = i + 1 > furthest;
     });
     const why = blocked();
-    $('flowBack').disabled = step === 1;
+    $('flowBack').disabled = step === 1 && !profileId; // on step 1, Back returns to the choice of mission
     $('flowNext').disabled = !!why;
     $('flowNext').textContent = STEPS[step - 1].next;
     $('flowHint').hidden = !why;
@@ -113,6 +114,12 @@ export function createFlow({ app, globe, finder, surface, api }) {
   async function go(next) {
     if (next < 1 || next > STEPS.length || (next > step && next > furthest && (next !== step + 1 || blocked()))) return;
     pause();
+    // Leaving the surface for a map step: lift off and fade out first, then let the map fade back in.
+    const leavingSurface = next <= 3 && surface.isOpen();
+    if (leavingSurface) {
+      app.classList.add('flying'); // keeps the finder's map invisible until the surface has gone
+      await surface.close({ outro: true });
+    }
     step = next;
     furthest = Math.max(furthest, step);
     app.dataset.step = String(step);
@@ -167,6 +174,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     }
     drawNav();
     save();
+    if (leavingSurface) setTimeout(() => app.classList.remove('flying'), 40); // the map fades in (styles.css)
   }
 
   /** True when the surface view is open at the drive's start, which the Surface and Ride steps need. */
@@ -316,16 +324,19 @@ export function createFlow({ app, globe, finder, surface, api }) {
   );
   $('profiles').append(...profileButtons);
 
+  /** Back to the two mission cards (step 1's Back button, and the "← Back" card). */
+  function backToMissions() {
+    if (!profileId) return;
+    profileId = null;
+    drawSetup();
+    drawNav();
+    save();
+  }
+
   /** A tap on a mission card. With the custom form open, the other card is a "Back" to the choice of mission. */
   function chooseProfile(id) {
     if (id === profileId) return; // already chosen: keep whatever has been set
-    if (profileId === 'custom') {
-      profileId = null;
-      drawSetup();
-      drawNav();
-      save();
-      return;
-    }
+    if (profileId === 'custom') return backToMissions();
     useProfile(id);
   }
 
@@ -426,7 +437,37 @@ export function createFlow({ app, globe, finder, surface, api }) {
     return ['fail', `No available sites. Cause: ${FAIL_WORDS[worst]}`];
   }
 
+  // ---- When can you land? (date-scan-panel.js): every landing hour for 30 days at each region's best spot --------
+  let lastMissionStart = null;
+  let startFromScan = false; // the landing time was just taken from the scan: keep its 30-day window
+  const when = createDateScan({
+    el: $('dateScan'),
+    onUse: (date) => {
+      startFromScan = true;
+      api.setMission({ start: date });
+      api.setStatus(`Landing time set to ${formatUTC(date)}. Searching the regions again for it…`, 6000);
+      searchRegions();
+      save();
+    },
+  });
+  function drawWhen() {
+    const start = api.getMission().start.getTime();
+    if (lastMissionStart !== null && start !== lastMissionStart && !startFromScan) when.resetWindow(); // a new plan: a new window
+    if (start !== lastMissionStart) startFromScan = false;
+    lastMissionStart = start;
+    // Up to three of the best spots the search found in each region (on another date another one may be the
+    // good one), or the region's named point where the search found none.
+    const spots = REGIONS.flatMap((region) => {
+      const sites = scan.results.get(region.id)?.result?.sites ?? [];
+      return sites.length
+        ? sites.slice(0, 3).map((site) => ({ region: region.name, name: region.name, lat: site.lat, lon: site.lon, fromSearch: true }))
+        : [{ region: region.name, name: region.name, lat: region.lat, lon: region.lon, fromSearch: false }];
+    });
+    when.update({ spots, question: finder.paramsFor({ lat: 0, lon: 0 }), ready: scan.done });
+  }
+
   function drawRegions() {
+    drawWhen();
     const mission = api.getMission();
     const done = [...scan.results.values()].filter((entry) => entry.result);
     const passing = done.filter((entry) => entry.result.sites.length).length;
