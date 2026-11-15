@@ -113,3 +113,44 @@ describe('the map at one moment', () => {
     expect(legend.note).toMatch(/shape of the ground/);
   });
 });
+
+describe('the drive timeline', () => {
+  it('starts at touchdown, then lists the state at landing and every change, in time order', () => {
+    const r = fake();
+    const path = [50, 51, 52, 53, 54];
+    r.sunMask.fill(0, 2 * r.maskStride, 5 * r.maskStride); // dark everywhere from 2 h to 5 h
+    const track = createTrack(r, { path, drive: simulatePlan(r, path, rover) });
+    const m = track.milestones;
+    expect(m[0]).toEqual({ hours: 0, state: null });
+    expect(m[1]).toEqual({ hours: 0, state: STATE.DRIVING });
+    expect(m.slice(2).map((x) => x.hours)).toEqual(track.changes);
+    for (const x of m.slice(1)) expect(x.state).toBe(track.at(x.hours).state);
+    expect(m.at(-1).state).toBe(STATE.ARRIVED);
+  });
+});
+
+describe('the timeline words', () => {
+  it('names touchdown, each state, and each arrival by its marker', async () => {
+    const { milestoneLabel } = await import('../src/finder/plan-text.js');
+    expect(milestoneLabel({ hours: 0, state: null })).toBe('Touchdown');
+    expect(milestoneLabel({ hours: 3, state: STATE.DRIVING })).toBe('Driving in sunlight');
+    expect(milestoneLabel({ hours: 3, state: STATE.HOLD })).toBe('Waiting until path is lit');
+    expect(milestoneLabel({ hours: 9, state: STATE.ARRIVED, destination: 1 })).toBe('Arrived at marker B');
+  });
+
+  it('marks the arrival at every destination, the last one where the rover stops', () => {
+    const r = fake();
+    const path = [50, 51, 52, 53, 54];
+    const drive = simulatePlan(r, path, rover);
+    const stops = [
+      { destination: 1, pathIndex: 2, arrivalHours: 2 },
+      { destination: 0, pathIndex: 4, arrivalHours: drive.arrivalHours },
+    ];
+    const track = createTrack(r, { path, drive, stops });
+    const arrivals = track.milestones.filter((m) => m.destination != null);
+    expect(arrivals.map((m) => m.destination)).toEqual([1, 0]);
+    expect(arrivals[0].hours).toBe(2);
+    expect(track.milestones.at(-1)).toMatchObject({ state: STATE.ARRIVED, destination: 0 });
+    for (let i = 1; i < track.milestones.length; i++) expect(track.milestones[i].hours).toBeGreaterThanOrEqual(track.milestones[i - 1].hours);
+  });
+});

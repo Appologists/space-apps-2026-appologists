@@ -10,10 +10,12 @@ import { STATE, hopLength } from './schedule.js';
  * @returns {null | {
  *   at: (hours: number) => {east: number, north: number, elevationM: number, headingDeg: number, distanceM: number, step: number, state: number, lit: boolean, earth: boolean, darkH: number},
  *   points: {east: number, north: number}[], lengthM: number, startHours: number, endHours: number,
- *   changes: number[], nextChange: (hours: number) => number|null}}
+ *   changes: number[], milestones: {hours: number, state: number|null, destination?: number}[], nextChange: (hours: number) => number|null}}
  *   null without a route. `east`/`north` are metres from the middle of the search area. `startHours` to
  *   `endHours` is the stretch from the first step it drives in to the end of the last one. `darkH` is the
- *   unbroken time in the dark so far; `changes` are the hours at which the rover starts doing something else.
+ *   unbroken time in the dark so far; `changes` are the hours at which the rover starts doing something else;
+ *   `milestones` is touchdown (state null) at 0 h, the state it starts in, then one entry per change and per
+ *   arrival at a destination (those carry `destination`, the destination's index).
  */
 export function createTrack(result, plan) {
   const path = plan?.path;
@@ -82,6 +84,20 @@ export function createTrack(result, plan) {
     };
   }
 
+  // The drive's timeline: touchdown, then every time the rover starts doing something else, and every arrival at
+  // a destination (named by `destination`, its index). The last arrival is the change to "arrived" itself.
+  const stops = (plan.stops ?? []).filter((stop) => stop.arrivalHours != null && stop.arrivalHours > 0);
+  const lastStop = stops.at(-1) ?? null;
+  const milestones = [
+    { hours: 0, state: null },
+    { hours: 0, state: drive.timeline[0] },
+    ...changes.map((c) => {
+      const state = drive.timeline[Math.round(c / H)];
+      return state === STATE.ARRIVED && lastStop ? { hours: c, state, destination: lastStop.destination } : { hours: c, state };
+    }),
+    ...stops.slice(0, -1).map((stop) => ({ hours: stop.arrivalHours, state: STATE.ARRIVED, destination: stop.destination })),
+  ].sort((a, b) => a.hours - b.hours);
+
   /** The first change of what the rover does after `hours`, or null if nothing changes again. */
   const nextChange = (hours) => changes.find((c) => c > hours + 1e-6) ?? null;
 
@@ -92,6 +108,7 @@ export function createTrack(result, plan) {
     startHours: first < 0 ? 0 : first * H,
     endHours: first < 0 ? 0 : (last + 1) * H,
     changes,
+    milestones,
     nextChange,
   };
 }
