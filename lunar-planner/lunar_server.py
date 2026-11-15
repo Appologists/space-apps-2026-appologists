@@ -13,7 +13,7 @@ from flask import Flask, jsonify, request
 
 ROOT = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=str(ROOT / 'public'), static_url_path='')
-VERSION = '2026-11-14 round 6 (street view tools, education)'
+VERSION = '2026-11-14 round 7 (learn: guide, topics, timeline, live sync)'
 
 
 @app.after_request
@@ -706,9 +706,29 @@ def classic():
     return app.send_static_file('lunar.html')
 
 
+def git_commit():
+    """The commit the repository is on, read from .git without running git (empty if unknown)."""
+    git = ROOT.parent / '.git'
+    try:
+        head = (git / 'HEAD').read_text().strip()
+        if not head.startswith('ref: '):
+            return head[:12]
+        ref = head[5:]
+        path = git / ref
+        if path.exists():
+            return path.read_text().strip()[:12]
+        for line in (git / 'packed-refs').read_text().splitlines():
+            if line.endswith(' ' + ref):
+                return line.split(' ')[0][:12]
+    except OSError:
+        pass
+    return ''
+
+
 @app.get('/api/health')
 def health():
-    return jsonify(status='ok', app='Apologistics Lunar Site Planner', version=VERSION, folder=str(ROOT))
+    # live-sync.js on each page compares `commit` with the one it loaded with, and reloads after a git pull.
+    return jsonify(status='ok', app='Apologistics Lunar Site Planner', version=VERSION, folder=str(ROOT), commit=git_commit())
 
 
 @app.get('/api/site')

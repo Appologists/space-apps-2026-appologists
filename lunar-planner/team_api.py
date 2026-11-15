@@ -805,8 +805,8 @@ def landing_search():
 # The team's front-end (index.html, src/), served without Vite
 # ================================================================================================
 
-IMPORT_MAP = ('<link rel="stylesheet" href="/src/styles.css">\n'
-              '<script type="importmap">{"imports":{"three":"/vendor/team/three.module.js",'
+STYLESHEET = '<link rel="stylesheet" href="/src/styles.css">\n'
+IMPORT_MAP = ('<script type="importmap">{"imports":{"three":"/vendor/team/three.module.js",'
               '"astronomy-engine":"/vendor/team/astronomy.js"}}</script>\n')
 
 
@@ -816,9 +816,14 @@ def team_app_present():
 
 def team_index():
     html = (REPO / 'index.html').read_text('utf-8')
-    link = ('<a href="/classic" style="position:fixed;right:12px;bottom:10px;z-index:50;font:12px system-ui;'
-            'color:#9aa3ad;text-decoration:none;opacity:.7">Classic planner &rarr;</a>\n')
-    html = html.replace('</head>', IMPORT_MAP + '</head>', 1).replace('</body>', link + '</body>', 1)
+    style = 'color:#9aa3ad;text-decoration:none;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.45)'
+    link = ('<nav aria-label="Other pages" style="position:fixed;right:12px;bottom:10px;z-index:50;display:flex;gap:6px;'
+            'font:12px system-ui;opacity:.85">'
+            f'<a href="/learn" style="{style}">Education</a>'
+            f'<a href="/classic" style="{style}">Classic planner &rarr;</a></nav>\n'
+            '<script src="/live-sync.js" defer></script>\n')
+    head = IMPORT_MAP if '/src/styles.css' in html else STYLESHEET + IMPORT_MAP
+    html = html.replace('</head>', head + '</head>', 1).replace('</body>', link + '</body>', 1)
     return Response(html, mimetype='text/html', headers={'Cache-Control': 'no-store'})
 
 
@@ -859,6 +864,16 @@ def team_textures(name):
         if str(path).startswith(str(base.resolve())) and path.is_file():
             return send_file(path, max_age=3600)
     abort(404)
+
+
+@bp.get('/images/<path:name>')
+def team_images(name):
+    # Vite serves the team's public/ folder at the site root; the mission cards use public/images/.
+    base = REPO / 'public' / 'images'
+    path = (base / name).resolve()
+    if not str(path).startswith(str(base.resolve())) or not path.is_file():
+        abort(404)
+    return send_file(path, max_age=3600)
 
 
 @bp.get('/favicon.ico')
