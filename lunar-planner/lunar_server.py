@@ -13,6 +13,15 @@ from flask import Flask, jsonify, request
 
 ROOT = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=str(ROOT / 'public'), static_url_path='')
+VERSION = '2026-11-14 round 6 (street view tools, education)'
+
+
+@app.after_request
+def no_stale_pages(response):
+    # Pages, scripts and styles change often during the hackathon: always fetch fresh copies.
+    if response.mimetype in ('text/html', 'text/javascript', 'application/javascript', 'text/css'):
+        response.headers['Cache-Control'] = 'no-cache'
+    return response
 
 URL = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 MOON_RADIUS_M = 1737400.0
@@ -699,7 +708,7 @@ def classic():
 
 @app.get('/api/health')
 def health():
-    return jsonify(status='ok', app='Apologistics Lunar Site Planner')
+    return jsonify(status='ok', app='Apologistics Lunar Site Planner', version=VERSION, folder=str(ROOT))
 
 
 @app.get('/api/site')
@@ -749,6 +758,25 @@ import learn_api  # noqa: E402  (the education section, ../education/, at /learn
 
 app.register_blueprint(learn_api.bp)
 
+def free_port(first=8002):
+    """The first port from `first` that nothing answers on. Connecting (not binding) also finds servers that
+    Windows does not list, such as ones running inside WSL or Docker."""
+    import socket
+    for port in [first] + list(range(8765, 8785)):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.settimeout(0.3)
+            if probe.connect_ex(('127.0.0.1', port)) != 0:
+                return port
+    raise SystemExit('No free port between 8765 and 8784.')
+
+
 if __name__ == '__main__':
-    print('Open http://127.0.0.1:8002  (the team app; the classic planner is at /classic)')
-    app.run(host='127.0.0.1', port=8002, debug=False, threaded=True)
+    import os
+    PORT = free_port(int(os.environ.get('LUNAR_PORT', '8002')))
+    (ROOT / '.port').write_text(str(PORT))
+    print('Lunar Site Planner %s' % VERSION)
+    print('Serving from %s' % ROOT)
+    if PORT != 8002:
+        print('Port 8002 is busy (an older server answers there), so this copy uses port %d.' % PORT)
+    print('Open http://127.0.0.1:%d/classic (our planner), /learn (education), / (the team app)' % PORT)
+    app.run(host='127.0.0.1', port=PORT, debug=False, threaded=True)

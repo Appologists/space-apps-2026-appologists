@@ -9,6 +9,7 @@
     <script type="importmap">{"imports":{"three":"/vendor/team/three.module.js","three/addons/":"/vendor/three/examples/jsm/","astronomy-engine":"/vendor/team/astronomy.js"}}</script>
 </head>
 <body>
+<canvas id="bg" aria-hidden="true"></canvas>
 
 <header class="top">
     <a class="brand" href="#hero"><span class="px">LUNAR NAVIGATOR</span><span class="brand-sub mono">/ learn</span></a>
@@ -22,17 +23,17 @@
         <span class="lvl px" id="lvl">LV 1</span>
         <span class="xpbar"><i id="xpfill"></i></span>
         <span class="mono quiet" id="xptext">0 XP</span>
-        <a class="back" href="/">Planner &rarr;</a>
+        <a class="back" href="/classic">&larr; Back to explorer</a>
     </div>
 </header>
 
 <main>
     <!-- ================= Hero ================= -->
     <section id="hero" class="hero">
-        <div class="grid-bg" aria-hidden="true"></div>
+        <div class="hero-copy">
         <p class="kicker mono">NASA SPACE APPS 2026 · EDUCATION</p>
         <h1 class="px morph" id="hero-title" aria-label="Learn the Moon">LEARN THE MOON</h1>
-        <p class="lead">Explore the Moon, Earth and Sun with live NASA data in 3D, then test what you have learned. Every value on this page comes from a named source, and every fact links to it.</p>
+        <p class="lead">Live NASA data, in 3D.</p>
         <div class="cta">
             <a class="btn primary" href="#lab">Open the 3D lab</a>
             <a class="btn" href="#play">Test yourself</a>
@@ -51,14 +52,15 @@
             <div><dt class="px" id="stat-q">18</dt><dd>questions</dd></div>
             <div><dt class="px" id="stat-players">0</dt><dd>participants</dd></div>
         </dl>
+        </div>
     </section>
 
     <!-- ================= 3D lab ================= -->
     <section id="lab" class="section">
-        <div class="head">
+        <div class="head" data-reveal>
             <p class="kicker mono">01 · 3D LAB</p>
             <h2 class="px">INTERACTIVE 3D</h2>
-            <p class="quiet">Drag to rotate, scroll to zoom. The Earth and Sun images are the latest from NASA's EPIC and SDO; the Moon uses LRO maps and LOLA heights.</p>
+            <p class="quiet">Drag to turn. Select a site.</p>
         </div>
         <div class="tabs" role="tablist">
             <button role="tab" data-world="moon" class="on">Moon</button>
@@ -66,7 +68,7 @@
             <button role="tab" data-world="sun">Sun</button>
             <button role="tab" data-world="system">Sun · Earth · Moon</button>
         </div>
-        <div class="lab">
+        <div class="lab" data-reveal>
             <div class="stage" id="stage">
                 <canvas id="gl"></canvas>
                 <div class="pins" id="pins"></div>
@@ -77,40 +79,44 @@
         </div>
     </section>
 
-    <!-- ================= Facts ================= -->
+    <!-- ================= Facts in 3D ================= -->
     <section id="facts" class="section">
-        <div class="head">
-            <p class="kicker mono">02 · FACT DECK</p>
-            <h2 class="px">FACTS</h2>
-            <p class="quiet">Select a card to read it. Each card cites its NASA source.</p>
+        <div class="head" data-reveal>
+            <p class="kicker mono">02 · FACTS IN 3D</p>
+            <h2 class="px">SEE THE NUMBERS</h2>
         </div>
-        <div class="filters" role="group" aria-label="Show facts about">
-            <button data-filter="all" class="on">All</button>
-            <button data-filter="moon">Moon</button>
-            <button data-filter="earth">Earth</button>
-            <button data-filter="sun">Sun</button>
+        <div class="dots" id="dots" data-reveal>
+            <div class="dots-caption" aria-live="polite">
+                <div class="big px" id="dot-big"></div>
+                <p id="dot-line"></p>
+                <a id="dot-src" class="src" target="_blank" rel="noopener">Source</a>
+            </div>
+            <div class="dots-nav">
+                <button id="dot-prev" aria-label="Previous fact">&larr;</button>
+                <span id="dot-steps"></span>
+                <button id="dot-next" aria-label="Next fact">&rarr;</button>
+            </div>
         </div>
-        <div class="deck" id="deck"></div>
     </section>
 
     <!-- ================= Play ================= -->
     <section id="play" class="section">
-        <div class="head">
+        <div class="head" data-reveal>
             <p class="kicker mono">03 · ASSESSMENT</p>
             <h2 class="px">TEST YOURSELF</h2>
-            <p class="quiet">Two short exercises. Scores are recorded on the leaderboard below.</p>
+            
         </div>
-        <div class="games" id="games">
+        <div class="games" id="games" data-reveal>
             <article class="game-card">
                 <p class="kicker mono">GAME 1</p>
                 <h3 class="px">MISSION QUIZ</h3>
-                <p>10 questions, 20 seconds each. Faster correct answers score more; three correct in a row add a 1.5&times; streak bonus.</p>
+                <p>10 questions &middot; 20 s each</p>
                 <button class="btn primary" data-start="quiz">Start quiz</button>
             </article>
             <article class="game-card">
                 <p class="kicker mono">GAME 2</p>
                 <h3 class="px">TEMPERATURE ESTIMATE</h3>
-                <p>Five rounds. For a real landing site and local time, estimate the surface temperature, then compare with the value measured by LRO Diviner.</p>
+                <p>5 real sites &middot; guess, then see Diviner</p>
                 <button class="btn primary" data-start="hotcold">Start estimation</button>
             </article>
         </div>
@@ -119,12 +125,12 @@
 
     <!-- ================= Leaderboard ================= -->
     <section id="board" class="section">
-        <div class="head">
+        <div class="head" data-reveal>
             <p class="kicker mono">04 · LEADERBOARD</p>
             <h2 class="px">LEADERBOARD</h2>
-            <p class="quiet">Stored on this computer, so everyone using this station shares one board.</p>
+            
         </div>
-        <div class="board-wrap">
+        <div class="board-wrap" data-reveal>
             <div class="board">
                 <div class="filters" role="tablist">
                     <button data-board="quiz" class="on">Mission quiz</button>
@@ -153,6 +159,7 @@
 </footer>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<script type="module" src="/learn/bg.js"></script>
 <script type="module" src="/learn/learn.js"></script>
 </body>
 </html>

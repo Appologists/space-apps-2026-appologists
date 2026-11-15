@@ -1063,3 +1063,472 @@ button {
         grid-template-columns: repeat(2, 140px);
     }
 }
+
+/* Keyboard focus: a clear ring on every link and control. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.top nav a:focus-visible,
+.back:focus-visible {
+    color: var(--text);
+}
+
+/* =====================================================================
+   v2: the explorer's Moon behind the page, a two-column hero, glass panels,
+   compact lab cards, and gentle scroll-in transitions.
+   ===================================================================== */
+html {
+    background: #000;
+}
+
+body {
+    background: transparent;
+}
+
+#bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.top,
+main,
+.foot,
+.toasts {
+    position: relative;
+    z-index: 1;
+}
+
+.top {
+    position: sticky;
+    z-index: 20;
+}
+
+.toasts {
+    position: fixed;
+    z-index: 50;
+}
+
+.top nav a.on {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+/* ---------- Hero: copy on the left, the Moon on the right ---------- */
+.hero {
+    display: flex;
+    align-items: center;
+    min-height: calc(100vh - 60px);
+    padding: 72px 6vw 80px;
+    text-align: left;
+    border-bottom: 0;
+    overflow: visible;
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.6) 38%, rgba(0, 0, 0, 0) 64%);
+    pointer-events: none;
+}
+
+.hero-copy {
+    position: relative;
+    max-width: 640px;
+    animation: hero-in 0.9s var(--ease) both;
+}
+
+.hero h1 {
+    margin: 0;
+    max-width: none;
+    font-size: clamp(52px, 7.4vw, 118px);
+    line-height: 0.95;
+}
+
+.hero .lead {
+    margin: 26px 0 30px;
+    max-width: 540px;
+}
+
+.cta {
+    justify-content: flex-start;
+}
+
+.shapes {
+    margin-top: 26px;
+}
+
+.stats {
+    margin: 40px 0 0;
+}
+
+@keyframes hero-in {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .hero {
+        text-align: center;
+        justify-content: center;
+    }
+    .hero::before {
+        background: rgba(0, 0, 0, 0.55);
+    }
+    .cta {
+        justify-content: center;
+    }
+    .stats {
+        margin: 40px auto 0;
+    }
+}
+
+/* ---------- Glass surfaces over the Moon ---------- */
+.lab,
+.game-card,
+.arena,
+.board,
+.badges,
+.tabs,
+.filters,
+.shapes,
+.stats div,
+.card .face {
+    background: rgba(10, 10, 10, 0.72);
+    backdrop-filter: blur(14px) saturate(130%);
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+}
+
+.card .back {
+    background: rgba(16, 16, 16, 0.9);
+}
+
+.stats {
+    background: var(--line);
+}
+
+.game-card {
+    transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+}
+
+.game-card:hover {
+    border-color: var(--line-2);
+    transform: translateY(-2px);
+}
+
+/* ---------- Compact lab cards ---------- */
+.info {
+    padding: 26px 26px 22px;
+}
+
+.info h3 {
+    font-size: 34px;
+}
+
+.info .sub {
+    margin: 2px 0 0;
+    font: 13px var(--sans);
+    color: var(--quiet);
+}
+
+.info .coords {
+    margin: 4px 0 18px;
+    font: 12px var(--mono);
+    color: var(--dim);
+}
+
+.tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.tile {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #000;
+}
+
+.tile span {
+    display: block;
+    font: 500 11px var(--mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.tile.cold span {
+    color: var(--earth);
+}
+
+.tile.hot span {
+    color: var(--sun);
+}
+
+.tile b {
+    display: block;
+    margin-top: 4px;
+    font-size: 30px;
+    line-height: 1;
+    color: var(--text);
+}
+
+.tile small {
+    font: 12px var(--mono);
+    color: var(--quiet);
+}
+
+.spark {
+    height: 100px;
+    margin: 8px 0 6px;
+}
+
+.takeaway {
+    margin: 6px 0 16px;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #d6d6d6;
+}
+
+.info ul.facts {
+    margin: 0 0 14px;
+}
+
+.info ul.facts li {
+    padding: 9px 0;
+    font-size: 14px;
+    color: var(--quiet);
+}
+
+.legend-list {
+    display: grid;
+    gap: 8px;
+    margin: 16px 0 !important;
+}
+
+.legend-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 !important;
+    border: 0 !important;
+    font-size: 14px;
+}
+
+.legend-list .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 8px currentColor;
+    background: currentColor;
+}
+
+.legend-list .dot.apollo {
+    color: #ededed;
+}
+
+.legend-list .dot.robotic {
+    color: #b9a3ff;
+}
+
+.legend-list .dot.south-pole {
+    color: #4fe0c2;
+}
+
+.info .src {
+    font: 11px var(--mono);
+    color: var(--dim);
+    margin: 0 0 10px;
+}
+
+.link-btn {
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    font: 13px var(--sans);
+    color: var(--quiet);
+}
+
+.link-btn:hover {
+    color: var(--text);
+}
+
+/* ---------- Scroll-in ---------- */
+[data-reveal] {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
+}
+
+[data-reveal].in {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-reveal] {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.games,
+.board-wrap {
+    margin-top: 28px;
+}
+
+/* ---------- Facts in 3D (one cloud of dots per fact) ---------- */
+.dots {
+    position: relative;
+    height: 560px;
+    margin-top: 28px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: radial-gradient(ellipse at 60% 50%, rgba(20, 24, 32, 0.85), rgba(0, 0, 0, 0.92) 70%);
+    overflow: hidden;
+}
+
+.dots canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+.dots-caption {
+    position: absolute;
+    left: 32px;
+    bottom: 30px;
+    max-width: 420px;
+    pointer-events: none;
+}
+
+.dots-caption .big {
+    font-size: clamp(56px, 8vw, 96px);
+    line-height: 0.95;
+    color: var(--text);
+    animation: panel-rise 0.6s var(--ease) both;
+}
+
+.dots-caption p {
+    margin: 10px 0 8px;
+    font-size: 18px;
+    color: #d6d6d6;
+}
+
+.dots-caption .src {
+    pointer-events: auto;
+    font: 11px var(--mono);
+    color: var(--dim);
+}
+
+.dots-nav {
+    position: absolute;
+    right: 24px;
+    bottom: 26px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dots-nav button {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--line-2);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    font-size: 16px;
+}
+
+.dots-nav button:hover {
+    border-color: #555;
+}
+
+#dot-steps {
+    display: flex;
+    gap: 6px;
+}
+
+#dot-steps i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--line-2);
+    transition: background 0.3s, width 0.3s;
+}
+
+#dot-steps i.on {
+    width: 20px;
+    border-radius: 4px;
+    background: var(--accent);
+}
+
+@keyframes panel-rise {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ---------- Sky now (JPL Horizons) in the site card ---------- */
+.sky-now {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 4px 0 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #000;
+}
+
+.skydial {
+    width: 96px;
+    height: 96px;
+    flex: none;
+}
+
+.sky-now .tag {
+    font: 500 11px var(--mono);
+    letter-spacing: 0.12em;
+    color: var(--accent);
+}
+
+.sky-now p {
+    margin: 4px 0 2px;
+    font-size: 15px;
+}
+
+.sky-now small {
+    font: 11px var(--mono);
+    color: var(--dim);
+}
+
+.hero .lead {
+    font-size: 22px;
+    color: #cfcfcf;
+}
+
+.game-card p {
+    font: 13px var(--mono);
+}

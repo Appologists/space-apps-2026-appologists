@@ -5,3 +5,4 @@ data/
 public/textures/moon-elevation-grid.bin
 __pycache__/
 .venv/
+.port
