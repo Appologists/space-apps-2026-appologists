@@ -142,18 +142,32 @@ export function createDateScan({ el, onUse }) {
 
   const dateOf = (start) => new Date(anchor.getTime() + start.hours * 3_600_000);
 
+  // Which fold-outs of the answer card are open, so a redraw (new panel settings) keeps them as they were.
+  const open = { more: false, panel: false };
+  const remember = (which) => (e) => { open[which] = e.currentTarget.open; };
+
+  /** One stat: a big number and a few words under it. */
+  const stat = (cls, value, label) => h('div', { class: `when-stat ${cls}` }, h('b', {}, value), h('span', {}, label));
+
   function answer(row, start) {
     const date = dateOf(start);
     const spotText = row.spot.fromSearch ? row.spot.name : `${row.spot.name} (named point)`;
+    const power = powerOf(row, start);
+    const limit = Number.isFinite(last.rules.maxDarknessHours) ? ` (limit ${formatHours(last.rules.maxDarknessHours)})` : '';
     return h('div', { class: 'when-answer' },
       h('div', { class: 'when-big' }, `${dayLabel(date)} · ${timeLabel(date)}`),
       h('div', { class: 'when-where' }, spotText, h('span', { class: 'when-coords' }, ` ${formatLatLon(row.spot.lat, row.spot.lon, 2)}`)),
-      h('ul', { class: 'when-facts' },
-        h('li', {}, `${formatHours(start.longestLitH)} of unbroken sunlight (lit ${pct(start.litFraction)} of the stay)`),
-        h('li', {}, `Earth in view ${pct(start.earthFraction)} of the stay`),
-        ...skyFacts(row, start),
-        h('li', {}, start.longestDarkH > 0 ? `Longest darkness ${formatHours(start.longestDarkH)}${Number.isFinite(last.rules.maxDarknessHours) ? ` (limit ${formatHours(last.rules.maxDarknessHours)})` : ''}` : 'Never dark during the stay')),
-      powerBlock(row, start),
+      h('div', { class: 'when-stats' },
+        stat('sun', formatHours(start.longestLitH), 'of sun in a row'),
+        stat('earth', pct(start.earthFraction), 'Earth in view'),
+        power ? stat('power', `~${watts(power.atLanding)}`, power.stay.batteryWh > 0 ? `solar · ${wattHours(power.stay.batteryWh)} battery` : `solar · runs ${watts(panel.loadW)}`) : '',
+        stat('dark', start.longestDarkH > 0 ? formatHours(start.longestDarkH) : 'None', start.longestDarkH > 0 ? 'longest dark' : 'dark hours')),
+      h('details', { class: 'when-more', open: open.more, onToggle: remember('more') },
+        h('summary', {}, 'Details'),
+        h('ul', { class: 'when-facts' },
+          h('li', {}, `Lit ${pct(start.litFraction)} of the stay${start.longestDarkH > 0 ? `; longest darkness ${formatHours(start.longestDarkH)}${limit}` : ''}`),
+          ...skyFacts(row, start)),
+        power ? powerBlock(power) : ''),
       h('button', { type: 'button', class: 'primary when-use', onClick: () => onUse(date) }, 'Use this landing time'));
   }
 
@@ -171,30 +185,33 @@ export function createDateScan({ el, onUse }) {
     ];
   }
 
-  /** Estimated panel output for the chosen landing, with the panel settings beside it. */
-  function powerBlock(row, start, open = false) {
+  /** Estimated panel output over the stay, for the panel set below (null when there is no light data). */
+  function powerOf(row, start) {
     const light = row.light;
-    if (!light) return '';
-    const power = powerSeries({ sunClear: light.sunClear, sunEl: light.sunEl, sunDistanceAU: last.sunAU, panel });
-    const stay = energySummary(power, start.index, Math.round(last.missionHours), 1, panel.loadW);
-    const atLanding = power[start.index];
+    if (!light) return null;
+    const series = powerSeries({ sunClear: light.sunClear, sunEl: light.sunEl, sunDistanceAU: last.sunAU, panel });
+    return { atLanding: series[start.index], stay: energySummary(series, start.index, Math.round(last.missionHours), 1, panel.loadW) };
+  }
+
+  /** The power numbers in words, with the panel settings beside them. */
+  function powerBlock({ atLanding, stay }) {
     const lines = [
-      h('li', {}, `About ${watts(atLanding)} at landing; ${watts(stay.averageW)} on average over the stay (most ${watts(stay.peakW)})`),
-      h('li', {}, `About ${wattHours(stay.energyWh)} collected over the stay${stay.zeroHours > 0 ? `; no power for ${formatHours(stay.zeroHours)} in all` : ''}`),
+      h('li', {}, `About ${watts(atLanding)} at landing, ${watts(stay.averageW)} on average (most ${watts(stay.peakW)})`),
+      h('li', {}, `About ${wattHours(stay.energyWh)} over the stay${stay.zeroHours > 0 ? `; no power for ${formatHours(stay.zeroHours)} in all` : ''}`),
       h('li', {}, stay.batteryWh > 0
-        ? `With a steady ${watts(panel.loadW)} load, the battery must hold at least ${wattHours(stay.batteryWh)} to keep it running through the stay${stay.coversLoad ? '' : ' (and the panel does not make enough over the stay to keep up)'}`
-        : `The panel alone covers a steady ${watts(panel.loadW)} load for the whole stay`),
+        ? `A steady ${watts(panel.loadW)} load needs a battery of at least ${wattHours(stay.batteryWh)}${stay.coversLoad ? '' : ' (and the panel does not make enough over the stay to keep up)'}`
+        : `The panel alone runs a steady ${watts(panel.loadW)} load the whole stay`),
     ];
     return h('div', { class: 'when-power' },
       h('div', { class: 'when-power-head' }, 'Solar power (estimate)'),
       h('ul', { class: 'when-facts' }, lines),
-      panelSettings(open));
+      panelSettings(open.panel));
   }
 
-  /** Redraw only the power block (keeps the settings open and the rest of the card as it is). */
+  /** New panel settings: redraw only the answer card (its open fold-outs stay open; the rest is untouched). */
   function redrawPower() {
-    const old = el.querySelector('.when-power');
-    if (old && picked) old.replaceWith(powerBlock(picked.row, picked.start, true));
+    const old = el.querySelector('.when-answer');
+    if (old && picked) old.replaceWith(answer(picked.row, picked.start));
   }
 
   function panelSettings(open) {
@@ -207,9 +224,9 @@ export function createDateScan({ el, onUse }) {
     const number = (label, field, value, { min, max, step, toValue = (v) => v }) =>
       h('label', {}, label, h('input', { type: 'number', min, max, step, value: String(value), onChange: (e) => set(field, toValue(Number(e.target.value))) }));
     const isExample = ['areaM2', 'efficiency', 'mount', 'otherLosses', 'loadW'].every((k) => panel[k] === EXAMPLE_PANEL[k]);
-    return h('details', { class: 'when-panel', open },
+    return h('details', { class: 'when-panel', open, onToggle: remember('panel') },
       h('summary', {}, isExample
-        ? `For an example panel: ${panel.areaM2} m², ${Math.round(panel.efficiency * 100)}% efficient, ${MOUNTS[panel.mount].label}. Change to yours`
+        ? `Example panel: ${panel.areaM2} m², ${Math.round(panel.efficiency * 100)}% efficient, ${MOUNTS[panel.mount].label}. Change`
         : `For your panel: ${panel.areaM2} m², ${Math.round(panel.efficiency * 100)}% efficient, ${MOUNTS[panel.mount].label}`),
       h('div', { class: 'when-panel-form' },
         number('Area (m²)', 'areaM2', panel.areaM2, { min: '0.01', max: '100', step: '0.1' }),

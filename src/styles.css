@@ -2341,6 +2341,39 @@ button:active:not(:disabled) {
 .when-use {
   justify-self: start;
 }
+/* the answer at a glance: four numbers, the words fold out under "Details" */
+.when-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+.when-stat {
+  display: grid;
+  gap: 1px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.when-stat b {
+  font-family: var(--font-num);
+  font-size: 16px;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink);
+}
+.when-stat span {
+  font-size: 12px;
+  color: var(--dim);
+}
+.when-stat.sun b { color: var(--sun); }
+.when-stat.earth b { color: var(--earth); }
+.when-more > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
 .when-power {
   border-top: 1px solid var(--rule);
   padding-top: 6px;
