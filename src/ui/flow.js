@@ -170,10 +170,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         if (region) globe.focus(region.lat, region.lon, REGION_ZOOM);
         else globe.view('southClose');
       } else if (result) finder.open();
-      const map = finder.getMap();
-      clock.showTime = false;
-      map?.setTime(null);
-      map?.setRover(step === 3 && track ? track.at(clock.hours) : null);
+      applyMapView();
       if (step === 3) {
         finder.setClickMode('dest');
         setHours(track?.startHours ?? 0);
@@ -667,7 +664,6 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function timeChanged() {
     if (clock.fromHere) return;
     clock.hours = api.viewIndex() * api.stepHours();
-    if (step === 3 && track) clock.showTime = true;
     showMoment();
   }
 
@@ -675,9 +671,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function showMoment() {
     const result = finder.getResult();
     const map = finder.getMap();
-    if (step === 3 && map && result) {
-      map.setTime(clock.showTime && track ? Math.floor(clock.hours / result.stepHours) : null);
-      map.setRover(track ? track.at(clock.hours) : null);
+    if ((step === 2 || step === 3) && map && result) {
+      map.setTime(clock.showTime ? Math.floor(clock.hours / result.stepHours) : null);
+      map.setRover(step === 3 && track ? track.at(clock.hours) : null);
     }
     if (step === 5 && track && surface.isOpen()) {
       const now = track.at(clock.hours);
@@ -704,7 +700,6 @@ export function createFlow({ app, globe, finder, surface, api }) {
     if (!(clock.hours >= from && clock.hours < to - 0.05)) setHours(from);
     clock.rate = (to - from) / Math.min(Math.max((to - from) * 0.5, 10), 16);
     clock.playing = true;
-    clock.showTime = true;
     clock.freeLook = false;
     let last = performance.now();
     const tick = (now) => {
@@ -732,7 +727,6 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function nextChange() {
     const at = track?.nextChange(clock.hours);
     if (at == null) return;
-    clock.showTime = true;
     setHours(at);
   }
 
@@ -743,9 +737,37 @@ export function createFlow({ app, globe, finder, surface, api }) {
     drawClock();
   }
 
-  // Choosing a map layer leaves "sunlight at the time shown"; a drag on the surface view takes over the looking.
-  $('finderLayers').addEventListener('click', () => {
+  // ---- What the map is coloured by: a small toggle on the map itself (Daniel, 2026-11-14) ----------------------
+  // Day/night is the sunlight at the clock's moment; the others are finder layers (map-layers.js). Each step
+  // keeps its own choice: the Regions step opens on the landing sites, the Drive step on day and night.
+  const MAP_VIEWS = [
+    ['time', 'Day/night'],
+    ['slope', 'Slope'],
+    ['result', 'Landing sites'],
+  ];
+  const mapViewFor = { 2: 'result', 3: 'time' };
+  const mapViewButtons = MAP_VIEWS.map(([id, label]) => h('button', { type: 'button', onClick: () => setMapView(id) }, label));
+  $('mapViews').append(...mapViewButtons);
+  function setMapView(id) {
+    if (step === 2 || step === 3) mapViewFor[step] = id;
+    applyMapView();
+  }
+  function pressMapView(id) {
+    mapViewButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(MAP_VIEWS[i][0] === id)));
+  }
+  function applyMapView() {
+    const id = mapViewFor[step] ?? 'result';
+    pressMapView(id);
+    clock.showTime = id === 'time';
+    if (id !== 'time') finder.chooseLayer(id);
+    showMoment();
+  }
+  // The "why no drive works" box can show another layer (Darkness, Reach…): the toggle follows it.
+  finder.listenLayer((id) => {
+    if (step !== 2 && step !== 3) return;
+    mapViewFor[step] = id;
     clock.showTime = false;
+    pressMapView(id);
   });
   $('surfaceCanvas').addEventListener('pointerdown', () => {
     clock.freeLook = true;
@@ -800,7 +822,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
           { class: 'tl-row' },
           h(
             'button',
-            { type: 'button', onClick: () => { clock.showTime = true; setHours(m.hours); } },
+            { type: 'button', onClick: () => setHours(m.hours) },
             h('span', { class: 'tl-mark', 'aria-hidden': 'true' }),
             h('span', { class: 'tl-time' }, dayText(m.hours)),
             h('span', { class: 'tl-label' }, milestoneLabel(m)),
