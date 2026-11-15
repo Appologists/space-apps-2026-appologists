@@ -126,6 +126,8 @@
 
   body.globe #readout, body.globe #stats, body.globe #timebar, body.globe #compassWrap, body.globe #mapPanel,
   body.globe #cross, body.globe #badge, body.globe #help, body.globe #site, body.globe #backGlobe, body.globe #homeBtn, body.globe #vrBtn{display:none}
+  body.embed #backGlobe, body.embed #homeBtn, body.embed #siteSeg, body.embed #hero{display:none!important}
+  body.embed #site{top:16px} body.embed #vrBtn{right:16px} body.embed #readout{top:68px}
   #globePanel{top:16px;left:16px;width:320px;padding:16px;display:none}
   body.globe #globePanel{display:block}
   #globePanel h1{margin:6px 0 4px;font-size:22px;letter-spacing:-.01em}
@@ -355,12 +357,23 @@ const SITES = {
     hills:[], realSummit:true} },  // Malapert is a real 5 km mountain: no made-up hills, start on its real summit
   // Apollo 11: no 5 m elevation baked yet, so its ground is the old illustrative model (says so on screen). Its sky is real.
   apollo11:  { grey:0.52, illustrative:true, seed:31, amp:3.5, scale:300, fine:1.2,
-    craters:{n:110, rmin:4, rmax:70}, hills:[], fixedCraters:[[400,10,95,20],[-260,-180,40,8],[120,-320,28,6]], lander:true }
+    craters:{n:110, rmin:4, rmax:70}, hills:[], fixedCraters:[[400,10,95,20],[-260,-180,40,8],[120,-320,28,6]], lander:true },
+  // any spot the finder picks: terrain and sky made on request by the app's server (server/streetview-bake.mjs).
+  // Same look as the others, but you start exactly on the chosen spot (no made-up hill under your feet).
+  here:      { seed:23, grey:0.64, at:null, deco:{refSunAz:44,amp:18, scale:420, fine:2.2, craters:{n:40, rmin:14, rmax:200}, small:{n:200, rmin:3, rmax:14},
+    hills:[ {az:80,d:720,h:150,s:120}, {az:112,d:900,h:85,s:90}, {az:200,d:650,h:60,s:160}, {az:300,d:800,h:95,s:140} ], atCentre:true} }
 };
 const SITE_KEYS=Object.keys(SITES);
 let SKY_START=0;              // ms, first hour in the sky tables
+const b64=(t,T)=>{ const bin=atob(t), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return new T(u.buffer); };
 async function loadSite(key){
   const st=SITES[key]; if(st.meta) return st;
+  if(st.at){ // a spot from the finder: one request to the app's server
+    const q=new URLSearchParams({lat:st.at.lat, lon:st.at.lon, name:st.at.name||''});
+    const r=await fetch('/api/terrain/streetview?'+q); const j=await r.json(); if(!r.ok) throw new Error(j.error||r.status);
+    st.meta=j.meta; st.sky=b64(j.sky,Float32Array); SKY_START=Date.parse(j.meta.sky.startUTC);
+    st.near=b64(j.near,Float32Array); st.far=b64(j.far,Float32Array); st.err=j.err?b64(j.err,Uint8Array):null; st.distant=j.meta.distantHorizon.elevDeg;
+    return st; }
   const base=`data/${key}/`; const get=(f,T)=>fetch(base+f).then(r=>{ if(!r.ok) throw new Error(base+f+' '+r.status); return r.arrayBuffer(); }).then(b=>new T(b));
   st.meta=await fetch(base+'meta.json').then(r=>r.json());
   st.sky=await get(st.meta.sky.file,Float32Array); SKY_START=Date.parse(st.meta.sky.startUTC);
@@ -434,7 +447,7 @@ function sampleR(x,z){ const gx=(x+S)/CELL, gz=(z+S)/CELL; if(gx<0||gz<0||gx>N-1
 function sampleF(x,z){ if(!FAR) return -1e9; const gx=(x+SF)/CF, gz=(z+SF)/CF; if(gx<0||gz<0||gx>NF-1||gz>NF-1) return -1e9; return bil(FAR,NF,gx,gz); }
 function slopeOf(f,x,z){ const e=CELL; const gx=(f(x+e,z)-f(x-e,z))/(2*e), gz=(f(x,z+e)-f(x,z-e))/(2*e); return Math.atan(Math.sqrt(gx*gx+gz*gz))/DEG; }
 const slopeAt=(x,z)=>slopeOf(sampleH,x,z), slopeReal=(x,z)=>slopeOf(sampleR,x,z);
-function errAt(x,z){ if(!site.err) return null; const n=site.meta.err.n, i=Math.round((x+S)/site.meta.err.cell), j=Math.round((z+S)/site.meta.err.cell);
+function errAt(x,z){ if(!site.err||!site.meta.err) return null; const n=site.meta.err.n, i=Math.round((x+S)/site.meta.err.cell), j=Math.round((z+S)/site.meta.err.cell);
   if(i<0||j<0||i>=n||j>=n) return null; return site.err[j*n+i]*site.meta.err.unit; }
 function dirAzEl(az,el){ const a=az*DEG, e=el*DEG; return new THREE.Vector3(Math.sin(a)*Math.cos(e), Math.sin(e), -Math.cos(a)*Math.cos(e)); }
 
@@ -724,7 +737,8 @@ function applyColors(){ const rng=mulberry32(4);
 const cam={x:0,z:0,yaw:0,pitch:-0.03,target:null};
 function spawn(){
   // like the original: start on the highest drawn ground within 300 m, Sun ~36° to your left so slopes are side-lit
-  if(!site.lander){ let best=-1e9,bx=0,bz=0; const f=site.deco&&site.deco.realSummit?sampleR:sampleH; for(let z=-300;z<=300;z+=10)for(let x=-300;x<=300;x+=10){ const h=f(x,z); if(h>best){best=h;bx=x;bz=z;} }
+  if(site.deco&&site.deco.atCentre){ cam.x=0; cam.z=0; cam.yaw=-(80+(site.lookRot||0))*DEG; }
+  else if(!site.lander){ let best=-1e9,bx=0,bz=0; const f=site.deco&&site.deco.realSummit?sampleR:sampleH; for(let z=-300;z<=300;z+=10)for(let x=-300;x<=300;x+=10){ const h=f(x,z); if(h>best){best=h;bx=x;bz=z;} }
     cam.x=bx; cam.z=bz; cam.yaw=-(80+(site.lookRot||0))*DEG; }  // the original's view direction, turned with the hills
   else { cam.x=-22; cam.z=14; cam.yaw=-(105)*DEG; }
   cam.pitch=-0.04; cam.target=null;
@@ -736,7 +750,8 @@ async function setSite(key){ const ld=document.getElementById('loading'); ld.sty
   siteKey=key; site=SITES[key];
   setWeek(weekIn.value||null);
   // open at the hour of this week when the Sun is highest (real data; you can scrub to any other hour)
-  { let best=-99; for(let h=0;h<=168;h+=0.5){ const e=SUN(h).el; if(e>best){ best=e; t=h; } } scrub.value=t; }
+  if(START_AT&&!isNaN(START_AT)&&key==='here'){ t=Math.max(0,(START_AT-T0)/3600e3); scrub.value=t; }
+  else { let best=-99; for(let h=0;h<=168;h+=0.5){ const e=SUN(h).el; if(e>best){ best=e; t=h; } } scrub.value=t; }
   site.lookRot = site.deco ? SUN(t).az-site.deco.refSunAz : 0;
   genTerrain(site);
   if(site.near) TU.uNearH.value.image.data.set(HS); else TU.uNearH.value.image.data.set(H); TU.uNearH.value.needsUpdate=true;
@@ -747,7 +762,7 @@ async function setSite(key){ const ld=document.getElementById('loading'); ld.sty
   document.getElementById('siteSrc').textContent=m.pick;
   document.getElementById('badge').textContent= site.illustrative
     ? 'ground here is illustrative (no 5 m NASA map baked yet) · Sun & Earth are real for the dates shown'
-    : 'shape of the ground: NASA LOLA 5 m · hills to 60 km: LOLA 80 m · real Sun & Earth · craters, bumps & rocks added for looks';
+    : `shape of the ground: NASA LOLA ${site.meta.fineGround===false?'80 m (no 5 m map here)':'5 m'} · hills to 60 km: LOLA 80 m · real Sun & Earth · craters, bumps & rocks added for looks`;
   analysisDirty=true; }
 
 /* ---------- time ---------- */
@@ -1136,11 +1151,19 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;   // run
   renderer.render(scene,camera);
 }
 
-resize(); document.body.classList.add('hero'); setView('globe'); renderer.setAnimationLoop(frame);
+resize(); renderer.setAnimationLoop(frame);
+const QS=new URLSearchParams(location.search), EMBED=QS.has('embed');
+if(EMBED) document.body.classList.add('embed');   // inside the app: the app has its own navigation
+if(QS.has('lat')&&QS.has('lon')){ SITES.here.at={lat:+QS.get('lat'), lon:+QS.get('lon'), name:QS.get('name')||'Landing spot'}; }
+// &start=<ISO time>: open on that week, at that hour (the app passes the moment of touchdown)
+const START_AT=QS.has('start')?new Date(QS.get('start')):null;
+if(START_AT&&!isNaN(START_AT)) document.getElementById('weekStart').value=START_AT.toISOString().slice(0,10);
+if(!SITES.here.at){ document.body.classList.add('hero'); setView('globe'); }
 Promise.all(Object.keys(SITE_LL).map(k=>fetch(`data/${k}/meta.json`).then(r=>r.json()).then(m=>{ SITE_LL[k]=[m.lat,m.lon];
   gMarkers[k].position.copy(llToVec(m.lat,m.lon,1.012)); const sb=document.getElementById('sb_'+k); if(sb) sb.textContent=fmtLL(m)+(m.near?` · ${Math.round(m.heightM)} m`:''); })))
   .catch(e=>console.warn('site list',e))
-  .then(()=>setSite('shackleton')).then(()=>runAnalysis());
+  .then(()=>SITES.here.at?(hideHero(),setSite('here').then(()=>{ runAnalysis(); setView('street'); })):setSite('shackleton').then(()=>runAnalysis()))
+  .catch(e=>{ const ld=document.getElementById('loading'); ld.style.display='block'; ld.textContent='Could not open the street view here: '+e.message; });
 /* ---------- hook for part one (site filters) ----------
    StreetView.setSummary({ title:'Why this site', items:[{value:'82', unit:'%', label:'Sunlight, Jan 2027'}, ...] })
      replaces the bottom-left box (up to 4 items in the 2x2 grid; more wrap onto new rows).
@@ -1155,6 +1178,8 @@ window.StreetView={
   clearSummary(){ customSummary=null; document.querySelector('#stats .statgrid').innerHTML=
     '<div class="stat"><div class="v" id="sLongLit">—</div><div class="k">Longest stretch of sun</div></div><div class="stat"><div class="v" id="sLongDark">—</div><div class="k">Longest night to survive</div></div><div class="stat"><div class="v" id="sLit">—</div><div class="k">Time in sunlight</div></div><div class="stat"><div class="v" id="sBoth">—</div><div class="k">Power + signal home</div></div>';
     setWeek(weekIn.value); },
+  /* open at any spot (needs the app's server): StreetView.goToPoint(-89.0, 122.7, 'Peak near Shackleton') */
+  goToPoint(lat,lon,name){ const h=SITES.here; if(!h.at||h.at.lat!==lat||h.at.lon!==lon){ h.at={lat,lon,name}; h.meta=null; } return this.goTo('here'); },
   goTo(key){ if(!SITES[key]) throw new Error('unknown site '+key); hideHero(); document.querySelectorAll('#siteSeg button').forEach(x=>x.classList.toggle('on',x.dataset.site===key));
     return setSite(key).then(()=>{ runAnalysis(); setView('street'); }); },
 };

@@ -75,7 +75,7 @@ const GROUPS = [
 const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
 // How close the globe comes on step 2. Daniel (2026-11-14) asked for it further out, so the view shows which part
 // of the Moon this is; in its narrower pane that needs the Moon's curved edge in view, which is about 2.5 (our choice).
-const REGION_ZOOM = 2.5;
+const REGION_ZOOM = 1.35; // the combined app (ui/shell.js) shows the whole Moon here, with the region's map popped out beside it
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
 /**
@@ -894,5 +894,5 @@ export function createFlow({ app, globe, finder, surface, api }) {
   const saved = decodeFlow(location.hash); // read before go(1) writes the address
   go(1).then(() => restore(saved));
 
-  return { go, routeChanged, timeChanged, getStep: () => step, debug: { scan: () => scan, clock, play, pause, useProfile } };
+  return { go, routeChanged, timeChanged, getStep: () => step, getRegion: () => REGIONS.find((r) => r.id === regionId) ?? null, debug: { scan: () => scan, clock, play, pause, useProfile } };
 }
