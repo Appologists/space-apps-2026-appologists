@@ -361,6 +361,7 @@ async function selectSite(s) {
         if (r.ok && selectedSite === s) {
             const j = await r.json();
             const now = Date.now();
+            s.skySource = typeof j.source === 'string' && j.source.includes('Astronomy Engine') ? 'astronomy' : 'horizons';
             s.sky = j.samples.reduce((best, x) => (Math.abs(new Date(x.t) - now) < Math.abs(new Date(best.t) - now) ? x : best));
             renderInfo();
         }
@@ -558,7 +559,9 @@ function moonInfo() {
     }
     const street = new URLSearchParams({view: 'surface', lat: s.lat.toFixed(5), lon: s.lon.toFixed(5), name: s.name});
     kids.push(h('a', {class: 'btn primary street', href: `/classic?${street}`}, 'Open street view \u2192'));
-    kids.push(sourcesLine([['LRO Diviner', SOURCES.diviner.url], ['JPL Horizons', SOURCES.horizons.url], [SHORT_SOURCE[s.source] || s.source, src ? src.url : '#']]));
+    // On the team's dev server (npm run dev) the sky comes from Astronomy Engine, which the team checks against Horizons.
+    const sky = s.skySource === 'astronomy' ? ['Astronomy Engine, checked with JPL Horizons', 'https://github.com/cosinekitty/astronomy'] : ['JPL Horizons', SOURCES.horizons.url];
+    kids.push(sourcesLine([['LRO Diviner', SOURCES.diviner.url], sky, [SHORT_SOURCE[s.source] || s.source, src ? src.url : '#']]));
     kids.push(h('button', {class: 'link-btn', onclick: () => {
         selectedSite = null;
         for (const p of worlds.moon.pins) {
