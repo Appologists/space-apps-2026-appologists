@@ -1,7 +1,11 @@
 {
-  "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed. `sections` lists only data and tools the app really uses (package.json, data/catalog.json, data/missions.json, data/sites.json, index.html).",
+  "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed. `sections` lists only data and tools the app really uses (package.json, data/catalog.json, data/missions.json, data/sites.json, index.html). `site` is the address the QR code under the credits opens; after changing it, remake the picture: swift tools/make-qr.swift \"<address>\" public/site-qr.svg.",
   "teamName": "Team Apollogists",
   "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
+  "site": {
+    "label": "Our code on GitHub",
+    "url": "https://github.com/Appologists/space-apps-2026-appologists"
+  },
   "team": [
     {
       "name": "Khiem Hoang Tran"

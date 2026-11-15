@@ -82,9 +82,15 @@
             </details>
           </section>
 
-          <section data-steps="5" aria-label="Ride along">
+          <section data-steps="5" aria-label="Ride along" id="rideSection">
             <div class="playback" id="driveNow"></div>
             <div class="credits" id="credits"></div>
+            <!-- The site's address as a QR code for the audience (Daniel, 2026-11-15). Filled in from data/credits.json
+                 by flow.js and hidden until then; the picture is made by tools/make-qr.swift. -->
+            <a class="site-qr" id="siteQr" target="_blank" rel="noopener" hidden>
+              <img src="/site-qr.svg" alt="QR code: scan to open the site" width="230" height="230" />
+              <span class="site-qr-text"><b id="siteQrLabel"></b><span id="siteQrUrl"></span></span>
+            </a>
           </section>
 
           <!-- Off the Ride tab (Daniel, 2026-11-15): the ride keeps the play button, the clock and the credits. -->
