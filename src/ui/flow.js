@@ -310,31 +310,35 @@ export function createFlow({ app, globe, finder, surface, api }) {
     );
   }
 
+  // The mission cards are built once and then only updated, so the change to the compact row can slide.
+  const profileButtons = missions.profiles.map((profile) =>
+    h(
+      'button',
+      { type: 'button', class: 'profile', onClick: () => useProfile(profile.id) },
+      profile.pictures?.length
+        ? h(
+            'span',
+            { class: 'profile-pictures' },
+            profile.pictures.map((picture) =>
+              h('img', {
+                src: /^https?:/.test(picture.src) ? picture.src : `${import.meta.env.BASE_URL}${picture.src}`,
+                alt: picture.alt,
+                title: picture.credit,
+                style: `flex: ${picture.width ?? 100} 1 0; object-position: ${picture.position ?? '50% 50%'}`,
+              }),
+            ),
+          )
+        : null,
+      h('strong', {}, profile.name),
+      h('span', { class: 'profile-blurb' }, profile.blurb),
+    ),
+  );
+  $('profiles').append(...profileButtons);
+
   function drawSetup() {
-    clear($('profiles')).append(
-      ...missions.profiles.map((profile) =>
-        h(
-          'button',
-          { type: 'button', class: 'profile', 'aria-pressed': String(profile.id === profileId), onClick: () => useProfile(profile.id) },
-          profile.pictures?.length
-            ? h(
-                'span',
-                { class: 'profile-pictures' },
-                profile.pictures.map((picture) =>
-                  h('img', {
-                    src: /^https?:/.test(picture.src) ? picture.src : `${import.meta.env.BASE_URL}${picture.src}`,
-                    alt: picture.alt,
-                    title: picture.credit,
-                    style: `flex: ${picture.width ?? 100} 1 0; object-position: ${picture.position ?? '50% 50%'}`,
-                  }),
-                ),
-              )
-            : null,
-          h('strong', {}, profile.name),
-          h('span', {}, profile.blurb),
-        ),
-      ),
-    );
+    missions.profiles.forEach((profile, i) => profileButtons[i].setAttribute('aria-pressed', String(profile.id === profileId)));
+    // With the custom form open, the title goes and the cards shrink to one slim row, leaving the room to the form.
+    $('missionSection').classList.toggle('compact', profileId === 'custom');
     const el = clear($('setup'));
     if (!profileId) return;
     const profile = missions.profiles.find((p) => p.id === profileId);
