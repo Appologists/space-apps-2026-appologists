@@ -11,13 +11,35 @@
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
 
+<!-- Corner panel on the moving background: colour the Moon by photo, elevation or heat -->
+<aside class="layer-dock" id="layer-dock" aria-label="Moon colour layer">
+    <div class="seg-mini" role="group" aria-label="Colour the Moon by">
+        <button data-layer="photo" class="on">Photo</button>
+        <button data-layer="elevation">Elevation</button>
+        <button data-layer="heat">Heat</button>
+    </div>
+    <canvas id="layer-map" width="440" height="220" aria-label="Map of the Moon in the chosen colours"></canvas>
+    <div class="layer-scale">
+        <i id="layer-grad"></i>
+        <div><span id="layer-lo"></span><span id="layer-title"></span><span id="layer-hi"></span></div>
+    </div>
+</aside>
+
 <header class="top">
     <a class="brand" href="#hero"><span class="px">LUNAR NAVIGATOR</span><span class="brand-sub mono">/ learn</span></a>
-    <nav>
+    <div class="tabs-top" role="tablist" aria-label="Page">
+        <a href="#hero" id="tab-learn" role="tab" class="on" aria-selected="true">Education</a>
+        <a href="#team" id="tab-team" role="tab" aria-selected="false">Our team</a>
+    </div>
+    <nav class="subnav" aria-label="Education sections">
         <a href="#lab">3D lab</a>
         <a href="#facts">Facts</a>
+        <a href="#topics">Topics</a>
+        <a href="#guide">Guide</a>
+        <a href="#timeline">Timeline</a>
         <a href="#play">Play</a>
-        <a href="#board">Leaderboard</a>
+        <a href="#board">Board</a>
+        <a href="#more">More facts</a>
     </nav>
     <div class="me">
         <span class="lvl px" id="lvl">LV 1</span>
@@ -27,7 +49,7 @@
     </div>
 </header>
 
-<main>
+<main id="view-learn">
     <!-- ================= Hero ================= -->
     <section id="hero" class="hero">
         <div class="hero-copy">
@@ -99,34 +121,70 @@
         </div>
     </section>
 
+    <!-- ================= Topics ================= -->
+    <section id="topics" class="section">
+        <div class="head" data-reveal>
+            <p class="kicker mono">03 · TOPICS</p>
+            <h2 class="px">HOW A LANDING SITE IS CHOSEN</h2>
+            <p class="quiet" id="topic-count"></p>
+        </div>
+        <div class="topic-tabs" id="topic-tabs" role="tablist" aria-label="Topics" data-reveal></div>
+        <div class="topic-body" id="topic-body" data-reveal></div>
+    </section>
+
+    <!-- ================= Guide to the app ================= -->
+    <section id="guide" class="section">
+        <div class="head" data-reveal>
+            <p class="kicker mono">04 · GUIDE</p>
+            <h2 class="px">HOW THE APP WORKS</h2>
+            <p class="quiet" id="guide-count"></p>
+        </div>
+        <div class="topic-tabs guide-tabs" id="guide-tabs" role="tablist" aria-label="Parts of the app" data-reveal></div>
+        <div class="topic-body" id="guide-body" data-reveal></div>
+    </section>
+
+    <!-- ================= Timeline ================= -->
+    <section id="timeline" class="section">
+        <div class="head" data-reveal>
+            <p class="kicker mono">05 · TIMELINE</p>
+            <h2 class="px">EVERY LANDING SITE IN THE APP</h2>
+            <p class="quiet" id="tl-count"></p>
+        </div>
+        <div class="tl-legend mono" data-reveal><span class="apollo">Crewed (Apollo)</span><span class="robotic">Robotic</span><span class="south-pole">South pole</span></div>
+        <ol class="timeline" id="timeline-list"></ol>
+    </section>
+
     <!-- ================= Play ================= -->
     <section id="play" class="section">
         <div class="head" data-reveal>
-            <p class="kicker mono">03 · ASSESSMENT</p>
+            <p class="kicker mono">06 · ASSESSMENT</p>
             <h2 class="px">TEST YOURSELF</h2>
             
         </div>
         <div class="games" id="games" data-reveal>
             <article class="game-card">
+                <canvas class="card-art" data-art="quiz" width="420" height="160" aria-hidden="true"></canvas>
                 <p class="kicker mono">GAME 1</p>
                 <h3 class="px">MISSION QUIZ</h3>
                 <p>10 questions &middot; 20 s each</p>
                 <button class="btn primary" data-start="quiz">Start quiz</button>
             </article>
             <article class="game-card">
+                <canvas class="card-art" data-art="hotcold" width="420" height="160" aria-hidden="true"></canvas>
                 <p class="kicker mono">GAME 2</p>
                 <h3 class="px">TEMPERATURE ESTIMATE</h3>
                 <p>5 real sites &middot; guess, then see Diviner</p>
                 <button class="btn primary" data-start="hotcold">Start estimation</button>
             </article>
         </div>
+        <div class="play-stats" id="play-stats" data-reveal></div>
         <div class="arena" id="arena" hidden></div>
     </section>
 
     <!-- ================= Leaderboard ================= -->
     <section id="board" class="section">
         <div class="head" data-reveal>
-            <p class="kicker mono">04 · LEADERBOARD</p>
+            <p class="kicker mono">07 · LEADERBOARD</p>
             <h2 class="px">LEADERBOARD</h2>
             
         </div>
@@ -144,22 +202,81 @@
             </div>
         </div>
     </section>
+    <!-- ================= More facts ================= -->
+    <section id="more" class="section">
+        <div class="head" data-reveal>
+            <p class="kicker mono">08 · MORE FACTS</p>
+            <h2 class="px">THE MOON, SUN AND EARTH IN MOTION</h2>
+            <p class="quiet" id="more-count"></p>
+        </div>
+        <div class="fx-grid" id="fx-grid"></div>
+    </section>
 </main>
 
-<footer class="foot">
-    <p>Data: <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">NASA/JPL Horizons</a> ·
-        <a href="https://lola.gsfc.nasa.gov/" target="_blank" rel="noopener">LRO LOLA</a> ·
-        <a href="https://www.diviner.ucla.edu/" target="_blank" rel="noopener">LRO Diviner</a> ·
-        <a href="https://svs.gsfc.nasa.gov/4720/" target="_blank" rel="noopener">LROC Moon map (NASA SVS)</a> ·
-        <a href="https://epic.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA EPIC</a> ·
-        <a href="https://sdo.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA SDO</a> ·
-        Moon phase: <a href="https://github.com/cosinekitty/astronomy" target="_blank" rel="noopener">Astronomy Engine</a>, checked against Horizons.</p>
-    <p class="quiet">Type: <a href="https://vercel.com/font" target="_blank" rel="noopener">Geist Pixel and Geist Mono</a> (Vercel) and
-        <a href="https://fonts.google.com/specimen/Wix+Madefor+Text" target="_blank" rel="noopener">Wix Madefor Text</a> (the type of base44), all under the SIL Open Font License.</p>
-</footer>
+<!-- ================= Our team ================= -->
+<main id="team" class="team" hidden>
+    <section class="section">
+        <div class="head">
+            <p class="kicker mono">OUR TEAM</p>
+            <h2 class="px">APPOLOGISTS</h2>
+            <p class="quiet">NASA Space Apps Challenge 2026 &middot; <a href="https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/" target="_blank" rel="noopener">Lunar Landing Site Navigator</a></p>
+        </div>
+        <div class="mission">
+            <p class="px big-line">WHERE, AND WHEN, TO LAND ON THE MOON.</p>
+            <p>At the south pole the Sun and Earth sit near the horizon, so a small change in place or date changes everything. We built a tool that compares sites and dates fast, for planners, teachers and the public.</p>
+        </div>
+        <div class="team-grid">
+            <a class="team-card" href="/classic">
+                <span class="kicker mono">01 &middot; EXPLORER</span>
+                <b class="px">RANK SITES</b>
+                <p>Sunlight and Earth contact for any site and date. Street view on real terrain.</p>
+            </a>
+            <a class="team-card" href="/">
+                <span class="kicker mono">02 &middot; FINDER</span>
+                <b class="px">FIND A LANDING</b>
+                <p>Searches an area for safe landings with real shadows, then plans the rover's route.</p>
+            </a>
+            <a class="team-card" href="#hero" data-to-learn>
+                <span class="kicker mono">03 &middot; LEARN</span>
+                <b class="px">TEACH IT</b>
+                <p>Live NASA data in 3D, facts, a quiz and a leaderboard.</p>
+            </a>
+        </div>
+        <div class="principles">
+            <div><b class="px">NASA DATA</b><span>LOLA, Diviner, LROC, EPIC, SDO and JPL Horizons</span></div>
+            <div><b class="px">SOURCED</b><span>Every site, dataset and number names its source</span></div>
+            <div><b class="px">CHECKED</b><span>Sun and Earth positions checked against JPL Horizons</span></div>
+            <div><b class="px">HONEST</b><span>Each result says what it leaves out</span></div>
+        </div>
+        <div class="team-stack">
+            <div>
+                <p class="kicker mono">HOW WE WORK</p>
+                <ol>
+                    <li>Every number comes from a named NASA dataset, or says &ldquo;our estimate&rdquo;.</li>
+                    <li>One coordinate rule everywhere: north and east positive, longitude &minus;180&deg; to 180&deg;.</li>
+                    <li>No data is invented. A site with no data is left out, not given a zero.</li>
+                    <li>The Sun and Earth maths is checked against NASA/JPL Horizons, with tests that run on each change.</li>
+                    <li>Each change goes through a pull request before it reaches <span class="mono">main</span>.</li>
+                </ol>
+            </div>
+            <div>
+                <p class="kicker mono">THE THREE PARTS</p>
+                <ul>
+                    <li><b>Finder</b> (<a href="/">/</a>): a 3D globe, a landing search on LOLA terrain, route choices and a drive plan for the rover.</li>
+                    <li><b>Explorer</b> (<a href="/classic">/classic</a>): site ranking for any date, and a street view on real terrain with JPL Horizons positions.</li>
+                    <li><b>Learn</b> (<a href="#hero" data-to-learn>/learn</a>): this page. Plain HTML and JavaScript, no build step.</li>
+                </ul>
+            </div>
+        </div>
+        <p class="team-links"><a class="btn" href="https://github.com/Appologists/space-apps-2026-appologists" target="_blank" rel="noopener">Our code on GitHub</a>
+            <a class="btn" href="https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/" target="_blank" rel="noopener">The challenge</a></p>
+    </section>
+</main>
+
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script type="module" src="/learn/bg.js"></script>
 <script type="module" src="/learn/learn.js"></script>
+<script src="/live-sync.js" defer></script>
 </body>
 </html>
