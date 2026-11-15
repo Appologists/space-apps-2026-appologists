@@ -3,8 +3,8 @@
   "teamName": "Team Apollogists",
   "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
   "site": {
-    "label": "Our code on GitHub",
-    "url": "https://github.com/Appologists/space-apps-2026-appologists"
+    "label": "Try it yourself",
+    "url": "https://appologists-lunar-navigator.netlify.app/"
   },
   "team": [
     {
