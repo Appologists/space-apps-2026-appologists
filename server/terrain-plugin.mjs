@@ -29,6 +29,11 @@ export function terrainApi({ root = process.cwd() } = {}) {
   const KEEP_IN_MEMORY = 16;
   const SEARCH_CODE = ['server/landing-search.mjs', 'server/lola-polar.mjs', 'server/composite.mjs', 'src/finder/score.js', 'src/finder/grid.js', 'src/surface/shadows.js'];
   const FAR_MARGIN_KM = 150; // how far beyond its area a search reads terrain (FAR_MARGIN_M in landing-search.mjs)
+  /** The same value with every object's keys sorted, so the same question always reads the same. */
+  const inOrder = (value) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, inOrder(value[key])]))
+      : value;
   function searchKey(params, found) {
     const code = SEARCH_CODE.map((file) => {
       try {
@@ -51,7 +56,7 @@ export function terrainApi({ root = process.cwd() } = {}) {
       : inside(radiusKm) && wholeMoonFar
         ? sources.map((s) => `${s.id}:${s.installed && !s.incomplete}`)
         : sources.map((s) => `${s.id}:${s.installed}:${s.coverage}`);
-    return createHash('sha1').update(JSON.stringify([params, data, code])).digest('hex');
+    return createHash('sha1').update(JSON.stringify([inOrder(params), data, code])).digest('hex');
   }
   function readKept(key) {
     if (kept.has(key)) return kept.get(key);

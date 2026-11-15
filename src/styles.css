@@ -1306,6 +1306,7 @@ input.big {
 /* The finder's map fills the stage; its lists and controls are in the left panel now. */
 .finder {
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 .app.finder-open[data-step='3']:not(.surface-open) .timebar {
   display: grid; /* the time slider scrubs the drive */
