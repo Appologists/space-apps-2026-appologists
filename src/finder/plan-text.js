@@ -5,7 +5,10 @@ import { STATE } from './schedule.js';
 /** Destinations are named A, B, C … in the order they were added. */
 export const destinationName = (index) => String.fromCharCode(65 + index);
 
-/** One sentence on what the rover is doing and why, for each state of the replay. From Khiem's drive story (PR #7). */
+/**
+ * One sentence on what the rover is doing and why, for each state of the replay. From Khiem's drive story (PR #7).
+ * Not shown anywhere at present: Daniel took the sentences off the Ride tab on 2026-11-15. Kept for whoever wants them back.
+ */
 export const STATE_STORY = Object.freeze({
   [STATE.PARKED]: 'The rover sits at its start, waiting for its moment to leave.',
   [STATE.DRIVING]: 'Its spot is sunlit, so it drives on along the route.',

@@ -69,11 +69,15 @@
   #appbar nav a{display:flex;align-items:center;padding:0 14px;color:var(--muted);text-decoration:none;font:500 13.5px var(--sans);border-bottom:2px solid transparent}
   #appbar nav a:hover{color:var(--text)} #appbar nav a.on{color:var(--text);border-bottom-color:var(--accent)}
   body.in-app #backGlobe, body.in-app #homeBtn, body.in-app #siteSeg, body.in-app #hero{display:none!important}
+  body.in-app #stats{display:none!important}   /* opened from the app: no numbers panel (Daniel, 2026-11-15) */
   body.in-app #site{top:72px} body.in-app #vrBtn{top:72px;right:16px} body.in-app #readout{top:124px}
   body.in-app #compassWrap{top:72px} body.in-app #badge{top:126px}
   @keyframes vrPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,106,61,.7)}50%{box-shadow:0 0 0 10px rgba(255,106,61,0)}}
   body.vr-ready #vrBtn:not(.off){animation:vrPulse 1.6s ease-in-out infinite}
   #vrBtn.off{background:rgba(14,13,12,.9);color:var(--muted);border:1px dashed rgba(239,233,221,.35);box-shadow:none;cursor:help}
+  /* Where VR cannot start (a laptop), the "VR: open on a Quest" hint is not shown (Daniel, 2026-11-15). On a headset
+     the button is not .off, so "Enter VR" stays. */
+  #vrBtn.off{display:none!important}
   #site h1{margin:6px 0 2px;font-size:20px;font-weight:700;letter-spacing:-.01em}
   #site .coords{font-size:12px;color:var(--muted)}
   .seg{display:flex;gap:4px;background:rgba(255,255,255,.05);padding:3px;border-radius:10px;margin-top:10px}
