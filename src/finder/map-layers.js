@@ -12,7 +12,7 @@ export const MAP_LAYERS = [
   { id: 'result', label: 'Landing sites' },
   { id: 'sun', label: 'Sunlight' },
   { id: 'dark', label: 'Darkness' },
-  { id: 'earth', label: 'Earth link' },
+  { id: 'earth', label: 'Earth in view' },
   { id: 'slope', label: 'Slope' },
   { id: 'reach', label: 'Reach' },
 ];
@@ -161,8 +161,8 @@ export function layerLegend(layerId, result, extra) {
     }
     case 'earth':
       return {
-        title: 'Earth link',
-        note: 'How much of the mission Earth is in view of the antenna.',
+        title: 'Earth in view',
+        note: 'How much of the mission Earth is in view of the antenna: when it is, the geometry allows a direct link (antennas and station schedules are not checked).',
         stops: withLabels(blue, '0%', '100%'),
         swatches: [{ hex: NEVER_HEX, label: 'Earth never in view' }],
       };
