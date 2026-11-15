@@ -8,7 +8,8 @@ matters most; it ranks landing sites and shows where the Sun and Earth are in ea
 
 **Start here:** the left panel is five steps. Choose a mission, see which regions near the south pole can
 take it, plan the rover's drive and play it back, stand at the landing spot, then ride along the route.
-The older tools (ranked list of 23 sites, weights, terrain data) are under "More tools" on the first step.
+The older tools (ranked list of 23 sites, weights, terrain data) are off the page for the demo: add `?tools`
+to the address (`http://localhost:5173/?tools`) and they appear under "More tools" on the first step.
 
 **What works today:** a 3D Moon with 23 sites, ranking by uninterrupted sunlight and Earth visibility, a
 time slider, your own points by click or coordinates, and a one-click check against NASA JPL Horizons.
