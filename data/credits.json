@@ -2,7 +2,14 @@
   "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed.",
   "teamName": "Team Appologists",
   "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
-  "team": [],
+  "team": [
+    { "name": "Khiem Hoang Tran" },
+    { "name": "Lucas Nguyen" },
+    { "name": "Thanh Minh Nguyen" },
+    { "name": "Rishi Jasuja" },
+    { "name": "Karley Browning" },
+    { "name": "Daniel Blackburn" }
+  ],
   "thanks": [
     {
       "what": "Terrain",
