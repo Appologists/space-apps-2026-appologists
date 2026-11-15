@@ -14,7 +14,7 @@ import missions from '../../data/missions.json';
 import sitesData from '../../data/sites.json';
 import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
-import { STATE_STORY } from '../finder/plan-text.js';
+import { STATE_STORY, milestoneLabel } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
 import { DURATION_MARKS, formatDuration, positionOf, tidyDuration } from '../mission.js';
 import { clear, h } from './dom.js';
@@ -751,12 +751,18 @@ export function createFlow({ app, globe, finder, surface, api }) {
     clock.freeLook = true;
   });
 
-  // The parts of the player rewritten every frame: the clock line, the sentence, the darkness bar.
+  // The parts of the player rewritten every frame: the clock line, the sentence, the darkness bar and, on the
+  // Drive step, the timeline's milestones. On the Drive step they sit in a column at the map's right edge
+  // (Daniel, 2026-11-14), so they never cover the route; on the Ride step they stay in the left panel.
   let clockParts = null;
+  const dayText = (hours) => `Day ${(hours / 24).toFixed(1)}`;
+
   function drawClock() {
     const el = clear(step === 5 ? $('driveNow') : $('playback'));
     clear(step === 5 ? $('playback') : $('driveNow'));
+    const column = clear($('driveTimeline'));
     clockParts = null;
+    app.classList.toggle('timeline-on', step === 3 && !!track);
     if (step !== 3 && step !== 5) return;
     if (!track) {
       if (step === 5) el.append(h('p', { class: 'caveats' }, 'No drive is planned. Go back to "Drive" and add a destination.'));
@@ -768,32 +774,56 @@ export function createFlow({ app, globe, finder, surface, api }) {
       fill: h('i'),
       dark: h('span', { class: 'dark-text' }),
       next: h('button', { type: 'button', class: 'next-change', onClick: nextChange }, 'Next change'),
+      rows: null,
+      current: -1,
     };
-    el.append(
-      ...[
-        h(
-          'div',
-          { class: 'play-row' },
-          h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
-          clockParts.next,
-        ),
-        clockParts.story,
-        h(
-          'div',
-          { class: 'dark-meter' },
-          h('div', { class: 'dark-bar', title: 'Unbroken time in the dark so far. Full means the rover is lost.' }, clockParts.fill),
-          clockParts.dark,
-        ),
-        clockParts.text,
-        step === 5
-          ? h(
-              'p',
-              { class: 'caveats' },
-              'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.',
-            )
-          : null,
-      ].filter(Boolean), // append() would write a null out as the word "null"
+    const meter = h(
+      'div',
+      { class: 'dark-meter' },
+      h('div', { class: 'dark-bar', title: 'Unbroken time in the dark so far. Full means the rover is lost.' }, clockParts.fill),
+      clockParts.dark,
     );
+    el.append(
+      h(
+        'div',
+        { class: 'play-row' },
+        h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
+        clockParts.next,
+      ),
+    );
+    if (step === 3) {
+      // The timeline: touchdown at the top, then one row for every time the sentence changes. A tap on a row
+      // moves the clock there.
+      clockParts.rows = track.milestones.map((m) => {
+        const row = h(
+          'li',
+          { class: 'tl-row' },
+          h(
+            'button',
+            { type: 'button', onClick: () => { clock.showTime = true; setHours(m.hours); } },
+            h('span', { class: 'tl-mark', 'aria-hidden': 'true' }),
+            h('span', { class: 'tl-time' }, dayText(m.hours)),
+            h('span', { class: 'tl-label' }, milestoneLabel(m)),
+          ),
+        );
+        return { row, hours: m.hours };
+      });
+      column.append(
+        h('div', { class: 'tl-now' }, clockParts.text, meter),
+        h('ol', { class: 'tl-list', 'aria-label': 'What the rover does, from touchdown' }, clockParts.rows.map((r) => r.row)),
+      );
+    } else {
+      el.append(
+        clockParts.story,
+        meter,
+        clockParts.text,
+        h(
+          'p',
+          { class: 'caveats' },
+          'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.',
+        ),
+      );
+    }
     updateClockText();
   }
 
@@ -802,7 +832,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const now = track.at(clock.hours);
     const km = (m) => (m / 1000).toFixed(1);
     // The date and time are on the time bar under the map; this line keeps the day and the distance.
-    clockParts.text.textContent = `Day ${(clock.hours / 24).toFixed(1)} · ${km(now.distanceM)} of ${km(track.lengthM)} km driven`;
+    clockParts.text.textContent = `${dayText(clock.hours)} · ${km(now.distanceM)} of ${km(track.lengthM)} km driven`;
     const story = STATE_STORY[now.state] ?? '';
     if (clockParts.story.textContent !== story) clockParts.story.textContent = story;
     const max = route?.rover?.maxDarknessHours;
@@ -812,6 +842,26 @@ export function createFlow({ app, globe, finder, surface, api }) {
     // Whole hours, in the same unit as the "Max darkness" choice (24 / 50 / 100 h).
     clockParts.dark.textContent = max > 0 ? `In the dark ${Math.round(now.darkH)} h of the ${max} h it survives` : `In the dark ${Math.round(now.darkH)} h`;
     clockParts.next.disabled = track.nextChange(clock.hours) == null;
+    if (clockParts.rows) {
+      // The row now playing: the last one at or before the clock. Rows before it are done, rows after it to come.
+      let current = 0;
+      clockParts.rows.forEach((r, i) => {
+        if (r.hours <= clock.hours + 1e-6) current = i;
+      });
+      if (current !== clockParts.current) {
+        clockParts.current = current;
+        clockParts.rows.forEach((r, i) => {
+          r.row.className = `tl-row ${i < current ? 'done' : i === current ? 'now' : 'next'}`;
+          if (i === current) r.row.setAttribute('aria-current', 'step');
+          else r.row.removeAttribute('aria-current');
+        });
+        // Keep the row in view inside the column only (scrollIntoView could also move the stage).
+        const col = $('driveTimeline');
+        const row = clockParts.rows[current].row;
+        if (row.offsetTop < col.scrollTop) col.scrollTop = row.offsetTop - 8;
+        else if (row.offsetTop + row.offsetHeight > col.scrollTop + col.clientHeight) col.scrollTop = row.offsetTop + row.offsetHeight - col.clientHeight + 8;
+      }
+    }
   }
 
   $('suggestDrive').addEventListener('click', () => {

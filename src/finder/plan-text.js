@@ -16,6 +16,24 @@ export const STATE_STORY = Object.freeze({
   [STATE.LOST]: 'It sat in the dark for longer than it can survive. The mission is lost here.',
 });
 
+/** A few words for each state, for the drive's timeline beside the map (Daniel's wording, 2026-11-14). */
+export const STATE_LABEL = Object.freeze({
+  [STATE.PARKED]: 'Waiting to set off',
+  [STATE.DRIVING]: 'Driving in sunlight',
+  [STATE.WAIT_SUN]: 'Waiting in the dark',
+  [STATE.WAIT_EARTH]: 'Waiting for Earth to rise',
+  [STATE.HOLD]: 'Waiting until path is lit',
+  [STATE.ARRIVED]: 'Arrived',
+  [STATE.LOST]: 'Lost in the dark',
+});
+
+/** The timeline's words for one milestone (see `milestones` in playback.js). */
+export function milestoneLabel(milestone) {
+  if (milestone.state == null) return 'Touchdown';
+  if (milestone.destination != null) return `Arrived at marker ${destinationName(milestone.destination)}`;
+  return STATE_LABEL[milestone.state] ?? '';
+}
+
 const km = (m) => {
   const v = m / 1000;
   return `${v.toFixed(v < 10 ? 1 : 0)} km`;
