@@ -1557,3 +1557,49 @@ input.big {
     font-size: 17px;
   }
 }
+
+/* Step 1 with the custom form open: "Plan a mission" slides away and the two cards become one slim row, each
+   picture beside its name, so the form gets the height. */
+#missionSection .step-title {
+  max-height: 80px;
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.2s ease, margin 0.3s ease;
+}
+#missionSection.compact .step-title {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: -10px; /* takes back the section's gap */
+}
+.profile,
+.profile-pictures {
+  transition: height 0.3s ease, width 0.3s ease, min-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+}
+#missionSection.compact .profile {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 14px;
+  min-height: 0;
+  padding: 8px 12px 8px 8px;
+}
+#missionSection.compact .profile-pictures {
+  width: 96px;
+  height: 64px;
+  margin: 0;
+}
+#missionSection.compact .profile-blurb {
+  display: none;
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] #missionSection.compact .profile {
+    min-height: 0;
+    padding: 10px 16px 10px 10px;
+  }
+  .app[data-step='1'] #missionSection.compact .profile-pictures {
+    width: 104px;
+    height: 68px;
+    margin: 0;
+  }
+  .app[data-step='1'] #missionSection.compact .profile strong {
+    font-size: 24px;
+  }
+}
