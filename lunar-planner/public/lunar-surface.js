@@ -9,7 +9,25 @@ const TREK_URL = 'https://trek.nasa.gov/tiles/Moon/EQ/LRO_WAC_Mosaic_Global_303p
 let C = null;
 let viewer = null;
 let tileset = null;
-let tilesetReady = Promise.resolve(null);
+let tilesetReady = null;
+let ionToken = '';
+
+// The Cesium Moon 3D tiles are only requested when asked for, so nothing fails in the background.
+function loadTileset() {
+    if (!tilesetReady) {
+        if (!ionToken) {
+            tilesetReady = Promise.resolve(null);
+        } else {
+            tilesetReady = C.Cesium3DTileset.fromIonAssetId(MOON_ASSET_ID, {enableCollision: true}).then(t => {
+                tileset = t;
+                t.show = false;
+                viewer.scene.primitives.add(t);
+                return t;
+            }).catch(() => null);
+        }
+    }
+    return tilesetReady;
+}
 let sunEntity = null;
 let earthEntity = null;
 let site = null;
@@ -21,6 +39,8 @@ let onWalk = null;
 let onStatus = () => {};
 let onPoint = null;
 let lastSample = null;
+let exaggeration = 1;
+let walkTarget = null;
 let sunlightOn = false;
 let elevationOn = false;
 
@@ -68,9 +88,10 @@ async function loadCesium() {
     return window.Cesium;
 }
 
-async function createViewer(container, token) {
+async function createViewer(container, token, hasTerrain) {
     C = await loadCesium();
     C.Ellipsoid.default = C.Ellipsoid.MOON;
+    ionToken = token || '';
     if (token) {
         C.Ion.defaultAccessToken = token;
     }
@@ -93,7 +114,8 @@ async function createViewer(container, token) {
     });
     viewer = new C.Viewer(container, {
         globe: new C.Globe(C.Ellipsoid.MOON),
-        terrainProvider: lolaTerrain,
+        // Without the LOLA download the ground is a smooth Moon, so no request fails.
+        terrainProvider: hasTerrain ? lolaTerrain : new C.EllipsoidTerrainProvider({ellipsoid: C.Ellipsoid.MOON}),
         baseLayer: false,
         baseLayerPicker: false,
         geocoder: false,
@@ -109,6 +131,14 @@ async function createViewer(container, token) {
         skyAtmosphere: false,
     });
     const scene = viewer.scene;
+    // Smooth edges and sharp text-free detail: anti-aliasing and full device resolution (capped at 2x).
+    viewer.useBrowserRecommendedResolution = false;
+    viewer.resolutionScale = Math.min(1, 2 / (window.devicePixelRatio || 1));
+    scene.postProcessStages.fxaa.enabled = true;
+    if (scene.msaaSupported) {
+        scene.msaaSamples = 4;
+    }
+    scene.globe.maximumScreenSpaceError = 1.5;
     scene.backgroundColor = C.Color.BLACK;
     scene.globe.baseColor = C.Color.fromCssColorString('#3a3a37');
     scene.globe.enableLighting = false;
@@ -138,16 +168,6 @@ async function createViewer(container, token) {
     });
     viewer.imageryLayers.addImageryProvider(trek);
 
-    // Load the 3D Moon in the background so the camera works at once.
-    tilesetReady = C.Cesium3DTileset.fromIonAssetId(MOON_ASSET_ID, {enableCollision: true}).then(t => {
-        tileset = t;
-        t.show = false;
-        scene.primitives.add(t);
-        return t;
-    }).catch(() => {
-        tileset = null;
-        return null;
-    });
 
     sunEntity = viewer.entities.add({
         position: C.Cartesian3.ZERO,
@@ -196,7 +216,8 @@ function groundHeight(lat, lon) {
         return h;
     }
     const g = viewer.scene.globe.getHeight(carto);
-    return g !== undefined ? g : null;
+    // getHeight already includes vertical exaggeration; keep the real height here.
+    return g !== undefined ? g / exaggeration : null;
 }
 
 let camLat = 0;
@@ -204,7 +225,7 @@ let camLon = 0;
 let camH = 0;
 
 function placeCamera() {
-    const pos = C.Cartesian3.fromDegrees(camLon, camLat, camH + eyeM, C.Ellipsoid.MOON);
+    const pos = C.Cartesian3.fromDegrees(camLon, camLat, camH * exaggeration + eyeM, C.Ellipsoid.MOON);
     viewer.camera.setView({
         destination: pos,
         orientation: {heading: C.Math.toRadians(yawDeg), pitch: C.Math.toRadians(pitchDeg), roll: 0},
@@ -234,7 +255,24 @@ function tick() {
     if (keys.has('a') || keys.has('arrowleft')) {
         r -= 1;
     }
+    if (walkTarget && !f && !r) {
+        const dn = (walkTarget.lat - camLat) * Math.PI / 180 * 1737400;
+        const de = (walkTarget.lon - camLon) * Math.PI / 180 * 1737400 * Math.max(0.02, Math.cos(camLat * Math.PI / 180));
+        const dist = Math.hypot(dn, de);
+        if (dist < 2) {
+            walkTarget = null;
+        } else {
+            const move = Math.min(dist, Math.max(30, dist * 2.5) * dt);
+            camLat += (dn / dist) * move / 1737400 * 180 / Math.PI;
+            camLon += (de / dist) * move / (1737400 * Math.max(0.02, Math.cos(camLat * Math.PI / 180))) * 180 / Math.PI;
+            walked += move;
+            if (onWalk) {
+                onWalk(walked, camLat, camLon);
+            }
+        }
+    }
     if (f || r) {
+        walkTarget = null;
         const speed = keys.has('shift') ? 400 : 40;
         const step = speed * dt;
         const a = C.Math.toRadians(yawDeg);
@@ -256,9 +294,30 @@ function tick() {
 
 function bindInput(container) {
     let drag = null;
+    let press = null;
     container.addEventListener('pointerdown', e => {
         drag = {x: e.clientX, y: e.clientY};
+        press = {x: e.clientX, y: e.clientY, t: performance.now()};
         container.setPointerCapture(e.pointerId);
+    });
+    // A click (no drag) on the ground walks you there.
+    container.addEventListener('pointerup', e => {
+        if (!press || !viewer) {
+            return;
+        }
+        const moved = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+        const quick = performance.now() - press.t < 350;
+        press = null;
+        if (moved > 4 || !quick) {
+            return;
+        }
+        const rect = container.getBoundingClientRect();
+        const ray = viewer.camera.getPickRay(new C.Cartesian2(e.clientX - rect.left, e.clientY - rect.top));
+        const hit = ray ? viewer.scene.globe.pick(ray, viewer.scene) : undefined;
+        if (hit) {
+            const g = C.Cartographic.fromCartesian(hit, C.Ellipsoid.MOON);
+            walkTarget = {lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude)};
+        }
     });
     let pointQueued = false;
     container.addEventListener('pointermove', e => {
@@ -324,7 +383,7 @@ export async function openSurface(container, opts) {
     onPoint = opts.onPoint || null;
     if (!viewer) {
         onStatus('Loading the Moon surface...');
-        await createViewer(container, opts.token);
+        await createViewer(container, opts.token, opts.hasTerrain !== false);
         onStatus('');
     }
     site = {lat: opts.lat, lon: opts.lon};
@@ -358,9 +417,9 @@ export async function setLayer(kind) {
         return false;
     }
     if (kind === 'ion') {
-        const t = await tilesetReady;
+        const t = await loadTileset();
         if (!t) {
-            onStatus('Cesium Moon is not in your Cesium ion account yet. Add it from the ion Asset Depot. Showing NASA LOLA terrain.');
+            onStatus('Cesium Moon 3D needs a Cesium ion token with the "Cesium Moon" asset. Showing NASA LOLA terrain instead.');
             return false;
         }
         t.show = true;
@@ -436,4 +495,17 @@ export function setElevationColors(on, minM, maxM, rampHex) {
     m.uniforms.minimumHeight = minM;
     m.uniforms.maximumHeight = maxM;
     viewer.scene.globe.material = m;
+}
+
+/** 1 = real heights. Larger values stretch hills and craters so their shape is easier to see. */
+export function setExaggeration(x) {
+    exaggeration = x;
+    if (viewer) {
+        viewer.scene.verticalExaggeration = x;
+    }
+}
+
+/** Where the surface camera is and which way it looks (for the compass and mini-map). */
+export function getView() {
+    return {yaw: yawDeg, pitch: pitchDeg, lat: camLat, lon: camLon};
 }
