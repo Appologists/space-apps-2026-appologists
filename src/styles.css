@@ -2353,6 +2353,13 @@ button:active:not(:disabled) {
   width: 100%;
   min-width: 0;
 }
+.when-panel-form label:last-child {
+  grid-column: 1 / -1;
+}
+.when-panel .caveats {
+  font-size: 12px;
+  line-height: 1.45;
+}
 .when-others {
   margin: 6px 0 0;
   font-size: 13px;
