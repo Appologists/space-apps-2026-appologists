@@ -314,7 +314,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
   const profileButtons = missions.profiles.map((profile) =>
     h(
       'button',
-      { type: 'button', class: 'profile', onClick: () => useProfile(profile.id) },
+      { type: 'button', class: 'profile', 'data-profile': profile.id, onClick: () => chooseProfile(profile.id) },
       profile.pictures?.length
         ? h(
             'span',
@@ -331,14 +331,32 @@ export function createFlow({ app, globe, finder, surface, api }) {
         : null,
       h('strong', {}, profile.name),
       h('span', { class: 'profile-blurb' }, profile.blurb),
+      h('span', { class: 'profile-back', 'aria-hidden': 'true' }, '← Back'),
     ),
   );
   $('profiles').append(...profileButtons);
 
+  /** A tap on a mission card. With the custom form open, the other card is a "Back" to the choice of mission. */
+  function chooseProfile(id) {
+    if (id === profileId) return; // already chosen: keep whatever has been set
+    if (profileId === 'custom') {
+      profileId = null;
+      drawSetup();
+      drawNav();
+      save();
+      return;
+    }
+    useProfile(id);
+  }
+
   function drawSetup() {
-    missions.profiles.forEach((profile, i) => profileButtons[i].setAttribute('aria-pressed', String(profile.id === profileId)));
+    const compact = profileId === 'custom';
+    missions.profiles.forEach((profile, i) => {
+      profileButtons[i].setAttribute('aria-pressed', String(profile.id === profileId));
+      profileButtons[i].setAttribute('aria-label', compact && profile.id !== profileId ? 'Back to the choice of mission' : profile.name);
+    });
     // With the custom form open, the title goes and the cards shrink to one slim row, leaving the room to the form.
-    $('missionSection').classList.toggle('compact', profileId === 'custom');
+    $('missionSection').classList.toggle('compact', compact);
     const el = clear($('setup'));
     if (!profileId) return;
     const profile = missions.profiles.find((p) => p.id === profileId);

@@ -1603,3 +1603,38 @@ input.big {
     font-size: 24px;
   }
 }
+
+/* In the slim row the other card turns into a narrow "Back", and the chosen one takes the rest of the width. */
+.profiles {
+  transition: grid-template-columns 0.3s ease;
+}
+#missionSection.compact .profiles {
+  grid-template-columns: minmax(0, 0.32fr) minmax(0, 1fr);
+}
+.profile-back {
+  display: none;
+}
+#missionSection.compact .profile[aria-pressed='false'],
+.app[data-step='1'] #missionSection.compact .profile[aria-pressed='false'] {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  align-content: center;
+  padding-inline: 8px;
+}
+#missionSection.compact .profile[aria-pressed='false'] > :not(.profile-back) {
+  display: none;
+}
+#missionSection.compact .profile[aria-pressed='false'] .profile-back {
+  display: block;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] #missionSection.compact .profiles {
+    grid-template-columns: minmax(0, 0.32fr) minmax(0, 1fr);
+  }
+  .app[data-step='1'] #missionSection.compact .profile[aria-pressed='false'] .profile-back {
+    font-size: 22px;
+  }
+}
