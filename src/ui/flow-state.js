@@ -74,3 +74,17 @@ export function decodeFlow(text) {
   if (targets.length) out.targets = targets;
   return out;
 }
+
+// ---- The front's tabs (ui/shell.js) and the mission steps they stand for --------------------------------------
+/** The step a tab opens. The street view is its own page, not a step. */
+export const TAB_STEPS = { moon: 2, site: 3, ride: 5 };
+
+/**
+ * The tab that is on screen at a step, or null before the first search (step 1: the "Plan a mission" pop-up).
+ * Step 4, the old Surface step, has no tab of its own and can only come from an old saved address; it shows
+ * the ride's view standing still, so it counts as Ride.
+ */
+export function tabOfStep(step) {
+  if (!(step >= 2)) return null;
+  return step >= 4 ? 'ride' : step === 3 ? 'site' : 'moon';
+}

@@ -2,12 +2,14 @@
 // view, and presenter notes. It drives the mission steps (flow.js) instead of showing them:
 //   Moon        flow step 2: the globe, the best regions, and the chosen region's map as a pop-out card
 //   Site        flow step 3: the region's map full size, map layers and the rover's drive
-//   Street view the street view (public/Street-view/) at the landing spot, inside the app
+//   Street view the street view (public/Street-view/) at the landing spot, as its own page
+//   Ride        flow step 5: the rover's-eye ride along the planned drive, with the credits roll
 //   Learn       the education pages (education/)
 // The mission questions are the Mission step's own, not a copy: mission-questions.js (data/missions.json profiles).
 import missions from '../../data/missions.json';
 import { formatDuration } from '../mission.js';
 import { clear, h } from './dom.js';
+import { TAB_STEPS, tabOfStep } from './flow-state.js';
 import { GROUPS, choiceRow, dateRow, durationRow, groupSummary } from './mission-questions.js';
 
 const $ = (id) => document.getElementById(id);
@@ -19,10 +21,11 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   let tab = 'moon';
 
   // ---- top bar ---------------------------------------------------------------------------------------------
-  const tabs = { moon: $('tabMoon'), site: $('tabSite'), street: $('tabStreet') };
+  const tabs = { moon: $('tabMoon'), site: $('tabSite'), street: $('tabStreet'), ride: $('tabRide') };
   tabs.moon.onclick = () => show('moon');
   tabs.site.onclick = () => show('site');
   tabs.street.onclick = () => show('street');
+  tabs.ride.onclick = () => show('ride');
   $('changeMission').onclick = () => openSurvey();
   $('notesBtn').onclick = () => ($('notes').hidden = !$('notes').hidden);
   addEventListener('keydown', (e) => {
@@ -38,13 +41,22 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     if (next !== 'street') closeStreet();
     if (next === 'moon') {
       if (flow.getStep() < 2) return openSurvey();
-      await flow.go(2);
+      await flow.go(TAB_STEPS.moon);
     } else if (next === 'site') {
       if (flow.getStep() < 2) return openSurvey();
-      await flow.go(3);
-      if (flow.getStep() !== 3) return flash('Pick a region with room to land first.');
+      await flow.go(TAB_STEPS.site);
+      if (flow.getStep() !== TAB_STEPS.site) return flash('Pick a region with room to land first.');
     } else if (next === 'street') {
       if (!openStreet()) return;
+    } else if (next === 'ride') {
+      if (flow.getStep() < 2) return openSurvey();
+      // The ride follows the planned drive, so it opens from the drive's own view (the Site tab).
+      if (flow.getStep() < TAB_STEPS.site) await flow.go(TAB_STEPS.site);
+      const why = await flow.ride();
+      if (why) {
+        syncTab();
+        return flash(why);
+      }
     }
     tab = next;
     markTabs();
@@ -195,14 +207,17 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     canvas.style.transformOrigin = '0 0';
     canvas.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${s.toFixed(3)})`;
   }
+  /** Keep the tabs in step with what is on screen (a reload or a saved address can land on any view). */
+  function syncTab() {
+    const want = tabOfStep(flow.getStep());
+    if (tab === 'street' || !want || want === tab) return;
+    tab = want;
+    markTabs();
+    drawSummary();
+  }
   function drawLead() {
     requestAnimationFrame(drawLead);
-    // keep the tabs in step with what is on screen (a reload or a saved address can land on either view)
-    const step = flow.getStep();
-    if (tab !== 'street' && step >= 2) {
-      const want = step >= 3 ? 'site' : 'moon';
-      if (want !== tab) { tab = want; markTabs(); drawSummary(); }
-    }
+    syncTab();
     const svg = $('leadLine');
     const region = flow.getRegion?.();
     if (tab !== 'moon' || flow.getStep() !== 2 || !region || $('finder').hidden) {
@@ -281,8 +296,7 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   const began = Date.now();
   const waitForFlow = () => {
     if (flow.getStep() >= 2) {
-      if (flow.getStep() > 3) flow.go(3); // the old surface steps are now the street view tab
-      tab = flow.getStep() >= 3 ? 'site' : 'moon';
+      tab = tabOfStep(flow.getStep());
       markTabs();
       drawSummary();
       return;

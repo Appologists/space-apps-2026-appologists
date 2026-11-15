@@ -93,7 +93,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       if (!result.sites.length) return 'No landing passes in this region. Choose another, or go back and change the mission.';
     }
     if (from === 3 && !route?.start) return 'Tap the map to choose where the rover starts.';
-    if (from === 4 && !track) return 'No drive is planned yet. Go back a step and add a destination.';
+    if (from === 4 && !track) return 'No drive is planned yet. On the map, add a destination or press "Suggest a drive".';
     return null;
   }
 
@@ -167,6 +167,20 @@ export function createFlow({ app, globe, finder, surface, api }) {
     }
     drawNav();
     save();
+  }
+
+  /**
+   * Straight from the drive to the ride, without a stop at the Surface step (the Ride tab in ui/shell.js).
+   * Answers why it cannot, in words for the person, or null once the ride is on the stage.
+   */
+  async function ride() {
+    if (step === 5) return null;
+    if (step < 3) return 'Pick a region with room to land first.';
+    const why = blocked(3) ?? blocked(4);
+    if (why) return why;
+    furthest = STEPS.length;
+    await go(5);
+    return step === 5 ? null : 'The ride needs the terrain around the landing spot, which did not load.';
   }
 
   // ---- The address: a reload or a bookmark comes back to the same step (flow-state.js) -----------------------
@@ -750,5 +764,5 @@ export function createFlow({ app, globe, finder, surface, api }) {
   const saved = decodeFlow(location.hash); // read before go(1) writes the address
   go(1).then(() => restore(saved));
 
-  return { go, routeChanged, timeChanged, getStep: () => step, getRegion: () => REGIONS.find((r) => r.id === regionId) ?? null, debug: { scan: () => scan, clock, play, pause, useProfile } };
+  return { go, ride, routeChanged, timeChanged, getStep: () => step, getRegion: () => REGIONS.find((r) => r.id === regionId) ?? null, debug: { scan: () => scan, clock, play, pause, useProfile } };
 }

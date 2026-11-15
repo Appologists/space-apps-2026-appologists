@@ -234,7 +234,7 @@ window.dispatchEvent(new Event('vrtest-ready'));
 </script>
 </head>
 <body>
-<header id="appbar"><a class="brand" id="abHome"><b>◉</b> Lunar Landing Site Navigator</a><nav><a id="abMoon">Moon</a><a id="abSite">Site</a><a class="on">Street view</a><a href="/learn/" target="_blank" rel="noopener">Learn ↗</a></nav></header>
+<header id="appbar"><a class="brand" id="abHome"><b>◉</b> Lunar Landing Site Navigator</a><nav><a id="abMoon">Moon</a><a id="abSite">Site</a><a class="on">Street view</a><a id="abRide">Ride</a><a href="/learn/" target="_blank" rel="noopener">Learn ↗</a></nav></header>
 <canvas id="c"></canvas>
 <div id="vig"></div>
 <div id="cross"></div>
@@ -1184,7 +1184,7 @@ if(QS.has('vr')) document.body.classList.add('vr-ready');
 if(QS.has('app')){ // opened from the app: its top bar, links back to its Moon and Site views, and its numbers in the summary box
   document.body.classList.add('in-app');
   const back=QS.get('app'), at=(step)=>back.replace(/step=\d/,'step='+step);
-  document.getElementById('abMoon').href=at(2); document.getElementById('abSite').href=at(3); document.getElementById('abHome').href=at(2);
+  document.getElementById('abMoon').href=at(2); document.getElementById('abSite').href=at(3); document.getElementById('abRide').href=at(5); document.getElementById('abHome').href=at(2);
   try{ const sum=JSON.parse(QS.get('sum')||'null'); if(sum) addEventListener('load',()=>setTimeout(()=>window.StreetView.setSummary(sum),0)); }catch(e){}
 }   // opened from the app to go into VR: the button pulses   // inside the app: the app has its own navigation
 if(QS.has('lat')&&QS.has('lon')){ SITES.here.at={lat:+QS.get('lat'), lon:+QS.get('lon'), name:QS.get('name')||'Landing spot'}; }
