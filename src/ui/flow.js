@@ -64,9 +64,9 @@ const GROUPS = [
     id: 'rover',
     title: 'Rover',
     choices: [
-      { on: 'finder', key: 'maxDarknessHours', label: 'Darkness it survives', hint: 'Unbroken hours without sunlight', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, summary: (v) => `survives ${v} h dark` },
-      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Steepest slope it drives', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
-      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', hint: 'Metres an hour, stops included', options: [[36, '36'], [200, '200'], [720, '720']], format: (v) => `${v}`, summary: (v) => `${v} m an hour` },
+      { on: 'finder', key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, summary: (v) => `survives ${v} h dark` },
+      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']], format: (v) => `${v} m/hr`, summary: (v) => `${v} m/hr` },
       { on: 'finder', key: 'roverRangeKm', label: 'Range', options: [[5, '5 km'], [10, '10 km'], [20, '20 km']], format: (v) => `${v} km`, summary: (v) => `${v} km range` },
       { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['needs Earth to drive', null]) },
     ],
