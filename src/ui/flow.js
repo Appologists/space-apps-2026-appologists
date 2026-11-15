@@ -52,6 +52,9 @@ const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at to
  * @param {Object} options.api   what main.js lends: getMission(), setMission(patch), stepHours(), viewIndex(),
  *                               setViewIndex(i), standAt(site) and setStatus(message, hideAfterMs)
  */
+/** What ride() answers when the ground did not load: the surface view has already said why on the screen. */
+export const RIDE_FAILED = Symbol('the ride did not open');
+
 export function createFlow({ app, globe, finder, surface, api }) {
   let step = 1;
   let furthest = 1; // the last step reached, so the step bar can jump back and forth among visited steps
@@ -166,9 +169,17 @@ export function createFlow({ app, globe, finder, surface, api }) {
     save();
   }
 
+  /** True when the surface view is open at the drive's start, which the Surface and Ride steps need. */
+  function standing() {
+    const here = surface.getSite();
+    const { start } = finder.getRoute();
+    return !!(here && start && here.lat === start.lat && here.lon === start.lon);
+  }
+
   /**
    * Straight from the drive to the ride, without a stop at the Surface step (the Ride tab in ui/shell.js).
-   * Answers why it cannot, in words for the person, or null once the ride is on the stage.
+   * Answers why it cannot, in words for the person (or RIDE_FAILED when the screen already says why), or null
+   * once the ride is on the stage.
    */
   async function ride() {
     if (step === 5) return null;
@@ -177,7 +188,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
     if (why) return why;
     furthest = STEPS.length;
     await go(5);
-    return step === 5 ? null : 'The ride needs the terrain around the landing spot, which did not load.';
+    // The ride stands on the ground around the landing spot. If that could not be read (the hosted website
+    // saves it only at each region's first landing sites), go back to the drive; the reason is on the screen.
+    if (step === 5 && standing()) return null;
+    await go(3);
+    return RIDE_FAILED;
   }
 
   // ---- The address: a reload or a bookmark comes back to the same step (flow-state.js) -----------------------
@@ -229,6 +244,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         for (const target of saved.targets ?? []) finder.pick(target.lat, target.lon, 'dest');
         if (saved.routeChoice) finder.chooseRoute(saved.routeChoice);
         for (let next = 4; next <= saved.step && !blocked(next - 1); next++) await go(next);
+        if (step >= 4 && !standing()) await go(3); // the ground there could not be read: back to the drive
       }
     } finally {
       restoring = false;

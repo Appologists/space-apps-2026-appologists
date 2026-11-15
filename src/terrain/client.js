@@ -27,13 +27,28 @@ export function coverageText(info, sourceId = 'auto') {
   return `${Math.abs(Math.max(...list.map((s) => s.southOfLat)))}° S to the south pole`;
 }
 
+/** The name a saved spot goes by on the hosted website (tools/export-static.mjs): its place to 5 decimals, about a metre. */
+export const savedSpot = (lat, lon) => `${Number(lat).toFixed(5)}_${Number(lon).toFixed(5)}`;
+
+/** True if this is the terrain service's answer, not a missing address or a host's stand-in page. */
+const fromService = (response) => !!response && ![404, 405, 501].includes(response.status) && !response.headers.get('content-type')?.includes('text/html');
+
 /**
  * Terrain around a point.
  * @param {string} [sourceId] a dataset id, or 'auto' for the best available
  * @returns {Promise<import('./polar-grid.js').TerrainPatch>}
  */
 export async function fetchTerrainPatch(lat, lon, sourceId = 'auto') {
-  const response = await fetch(`/api/terrain/polar?lat=${lat}&lon=${lon}&source=${encodeURIComponent(sourceId)}`);
+  let response = await fetch(`/api/terrain/polar?lat=${lat}&lon=${lon}&source=${encodeURIComponent(sourceId)}`).catch(() => null);
+  if (!fromService(response)) {
+    // The hosted website has no server: it reads the ground saved ahead of time at each region's first landing
+    // sites (tools/export-static.mjs), which is where the ride starts unless the start was moved.
+    const saved = await fetch(`/static/polar/${savedSpot(lat, lon)}.bin`).catch(() => null);
+    if (!saved?.ok || saved.headers.get('content-type')?.includes('text/html')) {
+      throw new Error('The ground around this spot is not saved on the website. It is saved at each region\'s first landing sites; for any other spot, run the app on a computer (npm run dev).');
+    }
+    response = saved;
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error([body.error ?? `Terrain request failed (HTTP ${response.status})`, body.hint ? `Run: ${body.hint}` : ''].filter(Boolean).join(' '));

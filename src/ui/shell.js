@@ -10,6 +10,7 @@ import missions from '../../data/missions.json';
 import { formatDuration } from '../mission.js';
 import { clear, h } from './dom.js';
 import { TAB_STEPS, tabOfStep } from './flow-state.js';
+import { RIDE_FAILED } from './flow.js';
 import { GROUPS, choiceRow, dateRow, durationRow, groupSummary } from './mission-questions.js';
 
 const $ = (id) => document.getElementById(id);
@@ -52,10 +53,13 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
       if (flow.getStep() < 2) return openSurvey();
       // The ride follows the planned drive, so it opens from the drive's own view (the Site tab).
       if (flow.getStep() < TAB_STEPS.site) await flow.go(TAB_STEPS.site);
+      // No drive yet (the Moon tab plans one for its pop-out, but only once it has been on screen): plan the
+      // finder's own suggestion, so the ride is one click from any tab.
+      if (flow.getStep() === TAB_STEPS.site && !finder.getRoute()?.targets?.length) finder.suggestDrive();
       const why = await flow.ride();
       if (why) {
         syncTab();
-        return flash(why);
+        return why === RIDE_FAILED ? undefined : flash(why);
       }
     }
     tab = next;

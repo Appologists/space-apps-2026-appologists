@@ -11,7 +11,7 @@ Large files go to `data/raw/` and are never committed.
 | 4 | Sunlight and Earth maps for the seven regions | `npm run data:light` | 5 min, 344 MB | `npm run check:light` ends "Same answer, number for number." |
 | 5 | Start the app | `npm run dev` | seconds | It prints the address (normally http://localhost:5173) |
 | 6 | Ask the ready-made missions' searches in advance (second terminal, app running) | `npm run demo:warm` (add `-- --port 5190` if the app is on another port) | 30 s | Every region says "already kept" or "searched and kept"; none says FAILED or NOT kept |
-| 7 | Walk the five steps once in the browser | | 2 min | Regions lists 5 of 7 with sites for the Pre-set mission |
+| 7 | Walk the tabs once in the browser: "Find regions that fit", then Moon, Site, Street view, Ride | | 2 min | Best regions lists 5 of 7 with sites for the Pre-set mission; Ride plays and the credits roll |
 
 Step 4 is what makes a search in the seven regions take about a second instead of 10 to 20. Without it the app
 still works, just slowly: a minute or two before the Regions step has all seven regions.

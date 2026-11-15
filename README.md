@@ -6,10 +6,12 @@ Team Appologists' project for the NASA Space Apps Challenge 2026,
 A web app that runs on your own computer. You choose a landing date, how long the mission lasts and what
 matters most; it ranks landing sites and shows where the Sun and Earth are in each site's sky.
 
-**Start here:** the left panel is five steps. Choose a mission, see which regions near the south pole can
-take it, plan the rover's drive and play it back, stand at the landing spot, then ride along the route.
+**Start here:** "Plan a mission" opens first: take the Pre-set mission or set your own. Then the tabs along the
+top: **Moon** (which regions near the south pole can take the mission, with the chosen region's close-up beside
+the globe), **Site** (the region's map and the rover's drive, played back with day and night), **Street view**
+(stand at the landing spot) and **Ride** (the rover's view along the drive, with the credits).
 The older tools (ranked list of 23 sites, weights, terrain data) are off the page for the demo: add `?tools`
-to the address (`http://localhost:5173/?tools`) and they appear under "More tools" on the first step.
+to the address (`http://localhost:5173/?tools`).
 
 **What works today:** a 3D Moon with 23 sites, ranking by uninterrupted sunlight and Earth visibility, a
 time slider, your own points by click or coordinates, and a one-click check against NASA JPL Horizons.
