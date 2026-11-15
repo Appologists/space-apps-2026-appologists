@@ -1,6 +1,6 @@
 // The landing-site finder: runs the search, shows the result as a map over the stage, and lists the best
 // sites. Like surface-mode.js, it owns its part of the page and talks to main.js through callbacks.
-import { finderStepMinutes, searchLanding } from '../finder/client.js';
+import { searchLanding, searchQuestion } from '../finder/client.js';
 import { latLonToCell } from '../finder/grid.js';
 import { pathStats, reachFrom } from '../finder/route.js';
 import { MAX_DESTINATIONS, latestDeparture, planMission } from '../finder/planner.js';
@@ -90,20 +90,7 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
   /** The whole question for a search centred on a point: the form's values and the mission. */
   function paramsFor(center) {
     const { mission, weights, terrainSource } = getState();
-    // The rover's numbers do not change which ground can take a landing, so they stay out of the question
-    // (and out of the key the server keeps answers under).
-    const landing = Object.fromEntries(Object.entries(values).filter(([key]) => !key.startsWith('rover')));
-    return {
-      ...landing,
-      source: terrainSource,
-      center: { lat: center.lat, lon: center.lon },
-      start: mission.start.toISOString(),
-      durationHours: mission.durationHours,
-      stepMinutes: finderStepMinutes(mission.durationHours),
-      panelHeightM: mission.panelHeightM,
-      antennaHeightM: mission.antennaHeightM,
-      weights: { sunlight: weights.sunlight ?? 1, earthComms: weights.earthComms ?? 0 },
-    };
+    return searchQuestion({ center, values, mission, weights, source: terrainSource });
   }
 
   async function run() {

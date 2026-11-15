@@ -18,6 +18,7 @@ import { STATE } from '../finder/schedule.js';
 import { formatHours, formatUTC } from '../format.js';
 import { LUNAR_DAY_HOURS } from '../mission.js';
 import { clear, h } from './dom.js';
+import { decodeFlow, encodeFlow } from './flow-state.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -87,6 +88,8 @@ export function createFlow({ app, globe, finder, surface, api }) {
   let route = null; // the finder's latest { result, start, targets, plan }
   let track = null; // where the rover is at any hour of the plan (playback.js)
   // One clock for the map and the surface view: hours after landing. `fromHere` stops an echo when this file moves the app's time slider.
+  let searchFirst = null; // a region to search before the others (the one a saved address was showing)
+  let restoring = false; // while a saved address is being acted on, nothing is written back to it
   const clock = { hours: 0, playing: false, frame: 0, rate: 0, showTime: false, freeLook: false, yaw: null, fromHere: false, sunAt: 0 };
 
   // ---- Step bar and Back / Next ---------------------------------------------------------------------------
@@ -177,6 +180,61 @@ export function createFlow({ app, globe, finder, surface, api }) {
       drawClock();
     }
     drawNav();
+    save();
+  }
+
+  // ---- The address: a reload or a bookmark comes back to the same step (flow-state.js) -----------------------
+  function save() {
+    if (restoring) return;
+    const mission = api.getMission();
+    const { start, targets } = finder.getRoute();
+    const onMap = step >= 3 || (regionId && finder.getResult() === shownResult());
+    const text = encodeFlow({
+      step,
+      profile: profileId,
+      start: mission.start,
+      durationHours: mission.durationHours,
+      values: finder.values,
+      region: regionId,
+      startAt: onMap ? start : null,
+      targets: onMap ? targets : [],
+    });
+    history.replaceState(null, '', `#${text}`);
+  }
+
+  /** Act on a saved address: the same mission, then step by step up to where it was. */
+  async function restore(saved) {
+    const profile = missions.profiles.find((p) => p.id === saved.profile);
+    if (!profile) return;
+    restoring = true;
+    try {
+      profileId = profile.id;
+      Object.assign(finder.values, profile.finder, saved.values);
+      finder.drawForm();
+      api.setMission({ start: saved.start ?? new Date(profile.mission.start), durationHours: saved.durationHours ?? profile.mission.durationHours });
+      drawSetup();
+      drawNav();
+      if (!saved.step || saved.step === 1) return;
+      // Search the saved region first and wait only for it (about a second when the server has kept the answer).
+      const wanted = REGIONS.some((r) => r.id === saved.region) ? saved.region : null;
+      searchFirst = wanted;
+      await go(2);
+      const settled = () => scan.done || (wanted && ['done', 'error'].includes(scan.results.get(wanted)?.status));
+      while (!settled()) await new Promise((r) => setTimeout(r, 100));
+      if (wanted && scan.results.get(wanted)?.result) {
+        userChoseRegion = true;
+        showRegion(wanted);
+      }
+      if (saved.step >= 3 && !blocked(2)) {
+        await go(3);
+        if (saved.startAt) finder.pick(saved.startAt.lat, saved.startAt.lon, 'start');
+        for (const target of saved.targets ?? []) finder.pick(target.lat, target.lon, 'dest');
+        for (let next = 4; next <= saved.step && !blocked(next - 1); next++) await go(next);
+      }
+    } finally {
+      restoring = false;
+      save();
+    }
   }
 
   // ---- 1 Mission ----------------------------------------------------------------------------------------
@@ -188,6 +246,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     api.setMission({ start: new Date(profile.mission.start), durationHours: profile.mission.durationHours });
     drawSetup();
     drawNav();
+    save();
   }
 
   const same = (a, b) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 1e-6 : a === b);
@@ -204,6 +263,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         finder.drawForm();
       }
       drawSetup();
+      save();
     };
     return h(
       'div',
@@ -222,6 +282,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const shift = (days) => {
       api.setMission({ start: new Date(mission.start.getTime() + days * 86_400_000) });
       drawSetup();
+      save();
     };
     return h(
       'div',
@@ -238,6 +299,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
           if (Number.isNaN(date.getTime())) return;
           api.setMission({ start: date });
           drawSetup();
+          save();
         },
       }),
       h(
@@ -278,7 +340,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
             );
           }),
         ),
-        h('button', { type: 'button', onClick: () => { profileId = 'custom'; drawSetup(); } }, 'Change these numbers'),
+        h('button', { type: 'button', onClick: () => { profileId = 'custom'; drawSetup(); save(); } }, 'Change these numbers'),
       );
       return;
     }
@@ -300,7 +362,8 @@ export function createFlow({ app, globe, finder, surface, api }) {
     finder.close(); // the map on show answered a different mission
     drawRegions();
     drawNav();
-    for (const [i, region] of REGIONS.entries()) {
+    const order = [...REGIONS].sort((a, b) => (b.id === searchFirst) - (a.id === searchFirst));
+    for (const [i, region] of order.entries()) {
       scan.results.set(region.id, { status: 'searching' });
       drawRegions();
       if (step === 2) api.setStatus(`Checking ${region.name} against the terrain… (${i + 1} of ${REGIONS.length})`);
@@ -332,6 +395,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     if (step === 2 || step === 3) finder.showResult(result, region.name, { startAt: result.sites[0] ?? null });
     drawRegions();
     drawNav();
+    save();
   }
 
   function verdict(entry) {
@@ -407,6 +471,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     }
     drawClock();
     drawNav();
+    save();
   }
 
   /** Move the clock. The app's time slider, the globe and the surface view's Sun follow. */
@@ -558,7 +623,8 @@ export function createFlow({ app, globe, finder, surface, api }) {
 
   // ---- Start --------------------------------------------------------------------------------------------
   globe.view('south');
-  go(1);
+  const saved = decodeFlow(location.hash); // read before go(1) writes the address
+  go(1).then(() => restore(saved));
 
   return { go, routeChanged, timeChanged, getStep: () => step, debug: { scan: () => scan, clock, play, pause, useProfile } };
 }
