@@ -1063,3 +1063,16 @@ button {
         grid-template-columns: repeat(2, 140px);
     }
 }
+
+/* Keyboard focus: a clear ring on every link and control. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.top nav a:focus-visible,
+.back:focus-visible {
+    color: var(--text);
+}

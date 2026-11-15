@@ -43,6 +43,11 @@ let exaggeration = 1;
 let walkTarget = null;
 let sunlightOn = false;
 let elevationOn = false;
+// Tools: 'walk' (a click walks there) or 'measure' (two clicks give distance, height change and slope).
+let tool = 'walk';
+let onMeasure = null;
+const measure = {points: [], entities: []};
+let trackEntities = [];
 
 // Lighting: real Sun when "Real sunlight" is on; otherwise a fixed light from the north-west
 // (standard hill shading) whenever elevation colours are on, so the shape of the ground shows.
@@ -315,6 +320,10 @@ function bindInput(container) {
         const ray = viewer.camera.getPickRay(new C.Cartesian2(e.clientX - rect.left, e.clientY - rect.top));
         const hit = ray ? viewer.scene.globe.pick(ray, viewer.scene) : undefined;
         if (hit) {
+            if (tool === 'measure') {
+                addMeasurePoint(hit);
+                return;
+            }
             const g = C.Cartographic.fromCartesian(hit, C.Ellipsoid.MOON);
             walkTarget = {lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude)};
         }
@@ -381,6 +390,8 @@ export async function openSurface(container, opts) {
     onStatus = opts.onStatus || onStatus;
     onWalk = opts.onWalk || null;
     onPoint = opts.onPoint || null;
+    onMeasure = opts.onMeasure || onMeasure;
+    clearMeasure();
     if (!viewer) {
         onStatus('Loading the Moon surface...');
         await createViewer(container, opts.token, opts.hasTerrain !== false);
@@ -508,4 +519,118 @@ export function setExaggeration(x) {
 /** Where the surface camera is and which way it looks (for the compass and mini-map). */
 export function getView() {
     return {yaw: yawDeg, pitch: pitchDeg, lat: camLat, lon: camLon};
+}
+
+
+// ================= Tools =================
+
+export function setTool(name) {
+    tool = name;
+    if (viewer) {
+        viewer.container.style.cursor = name === 'measure' ? 'crosshair' : '';
+    }
+    if (name !== 'measure') {
+        clearMeasure();
+    }
+}
+
+export function clearMeasure() {
+    if (viewer) {
+        for (const e of measure.entities) {
+            viewer.entities.remove(e);
+        }
+    }
+    measure.points = [];
+    measure.entities = [];
+    if (onMeasure) {
+        onMeasure(null);
+    }
+}
+
+function addMeasurePoint(hit) {
+    if (measure.points.length === 2) {
+        clearMeasure();
+    }
+    const accent = C.Color.fromCssColorString('#ff6b3d');
+    measure.points.push(hit);
+    measure.entities.push(viewer.entities.add({
+        position: hit,
+        point: {pixelSize: 10, color: C.Color.WHITE, outlineColor: accent, outlineWidth: 3, disableDepthTestDistance: Number.POSITIVE_INFINITY},
+    }));
+    if (measure.points.length === 1) {
+        if (onMeasure) {
+            onMeasure({pending: true});
+        }
+        return;
+    }
+    const [a, b] = measure.points;
+    const ca = C.Cartographic.fromCartesian(a, C.Ellipsoid.MOON);
+    const cb = C.Cartographic.fromCartesian(b, C.Ellipsoid.MOON);
+    const geo = new C.EllipsoidGeodesic(ca, cb, C.Ellipsoid.MOON);
+    const groundM = geo.surfaceDistance;
+    // Picked heights include the vertical exaggeration; report real metres.
+    const dh = (cb.height - ca.height) / exaggeration;
+    const grade = C.Math.toDegrees(Math.atan2(Math.abs(dh), Math.max(groundM, 1e-6)));
+    const bearing = (C.Math.toDegrees(geo.startHeading) + 360) % 360;
+    const mid = C.Cartesian3.midpoint(a, b, new C.Cartesian3());
+    const dist = groundM < 1000 ? `${groundM.toFixed(0)} m` : `${(groundM / 1000).toFixed(2)} km`;
+    measure.entities.push(viewer.entities.add({
+        polyline: {positions: [a, b], width: 3, material: accent, depthFailMaterial: accent.withAlpha(0.35), arcType: C.ArcType.NONE},
+    }));
+    measure.entities.push(viewer.entities.add({
+        position: mid,
+        label: {
+            text: `${dist}  \u0394h ${dh >= 0 ? '+' : ''}${dh.toFixed(0)} m  ${grade.toFixed(1)}\u00b0`,
+            font: '600 14px "IBM Plex Mono", monospace',
+            fillColor: C.Color.WHITE,
+            showBackground: true,
+            backgroundColor: C.Color.fromCssColorString('#0e0e0d').withAlpha(0.85),
+            backgroundPadding: new C.Cartesian2(10, 6),
+            pixelOffset: new C.Cartesian2(0, -18),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+    }));
+    if (onMeasure) {
+        onMeasure({groundM, dh, grade, bearing});
+    }
+}
+
+/** The Sun's and Earth's paths across the sky over the mission, drawn as dotted arcs (one dot per step). */
+export function setSkyTracks(samples) {
+    if (!viewer || !site) {
+        return;
+    }
+    for (const e of trackEntities) {
+        viewer.entities.remove(e);
+    }
+    trackEntities = [];
+    if (!samples || !samples.length) {
+        return;
+    }
+    const base = C.Cartesian3.fromDegrees(site.lon, site.lat, 0, C.Ellipsoid.MOON);
+    const far = 2.9e6;
+    const at = (az, el) => C.Cartesian3.add(base, C.Cartesian3.multiplyByScalar(dirAt(site.lat, site.lon, az, el), far, new C.Cartesian3()), new C.Cartesian3());
+    const add = (key, color) => {
+        const positions = samples.map(x => at(x[key + '_az'], x[key + '_el']));
+        trackEntities.push(viewer.entities.add({
+            polyline: {positions, width: 2, arcType: C.ArcType.NONE, material: new C.PolylineDashMaterialProperty({color: color.withAlpha(0.75), dashLength: 10})},
+        }));
+    };
+    add('sun', C.Color.fromCssColorString('#e8b465'));
+    add('earth', C.Color.fromCssColorString('#7fb2ff'));
+}
+
+export function setTracksVisible(on) {
+    for (const e of trackEntities) {
+        e.show = on;
+    }
+}
+
+/** A PNG of the current view. */
+export function snapshot() {
+    if (!viewer) {
+        return null;
+    }
+    viewer.render();
+    return viewer.canvas.toDataURL('image/png');
 }
