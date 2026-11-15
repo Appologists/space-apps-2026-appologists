@@ -62,12 +62,14 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
   const layerButtons = MAP_LAYERS.map((layer) =>
     h('button', { type: 'button', 'aria-pressed': String(layer.id === layerId), onClick: () => chooseLayer(layer.id) }, layer.label),
   );
-  $('finderLayers').append(...layerButtons);
+  $('finderLayers')?.append(...layerButtons); // only with ?tools; the demo's map has its own toggle (flow.js)
+  let layerListener = null;
   function chooseLayer(id) {
     layerId = id;
     layerButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(MAP_LAYERS[i].id === id)));
     map?.setTime(null); // back from "sunlight at the time shown" to the chosen layer
     map?.setLayer(id);
+    layerListener?.(id);
   }
 
   /** Redraw the form. Call when the selected site or the terrain information changes. */
@@ -353,6 +355,11 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
     },
     pick,
     setClickMode,
+    /** Colour the map by one of MAP_LAYERS; `listenLayer(fn)` hears every such choice (the "why" box makes some). */
+    chooseLayer,
+    listenLayer: (fn) => {
+      layerListener = fn;
+    },
     suggestDrive,
     clearTargets: () => {
       targets = [];

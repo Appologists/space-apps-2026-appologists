@@ -53,11 +53,6 @@
           </section>
 
           <section data-steps="2 3">
-            <div class="legend" id="finderLegend" hidden></div>
-            <div class="lensbar" role="group" aria-label="Colour the map by">
-              <span class="eyebrow">Colour the map by</span>
-              <div class="lensbuttons" id="finderLayers"></div>
-            </div>
             <details class="explain">
               <summary>What these results leave out</summary>
               <p class="caveats" id="finderNotes"></p>
@@ -174,6 +169,11 @@
         <div class="finder" id="finder" hidden>
           <div class="finder-map" id="finderMap">
             <canvas id="finderCanvas" aria-label="Map of the search area, north up. Point at it to read values; click to select a spot."></canvas>
+            <!-- What the map is coloured by, and its key: on the map itself (flow.js). -->
+            <div class="map-key">
+              <div class="map-views" id="mapViews" role="group" aria-label="Colour the map by"></div>
+              <div class="legend map-legend" id="finderLegend" hidden></div>
+            </div>
             <div class="tip" id="finderTip" hidden></div>
           </div>
           <!-- The drive's timeline, beside the map rather than over it (step 3; see flow.js and styles.css). -->

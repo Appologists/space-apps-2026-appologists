@@ -3,7 +3,8 @@
 // Layer colours follow the lens rules in ../surface/lenses.js: one hue dark to light, drawn flat, so brightness is
 // the data. Only the "Landing sites" layer shows terrain shape, and only on ground that fails a check.
 import { FAIL, describeFail } from './score.js';
-import { BLUE_RAMP, ORANGE_RAMP, SLOPE_MAX_DEG, rampColor } from '../surface/lenses.js';
+import { BLUE_RAMP, ORANGE_RAMP, rampColor } from '../surface/lenses.js';
+import { SLOPE_BANDS, slopeBand } from './slope-bands.js';
 import { formatHours, formatLatLon } from '../format.js';
 import { cellToLatLon } from './grid.js';
 
@@ -103,8 +104,13 @@ export function layerPixel(layerId, result, index, shade, extra) {
       const f = result.earthFraction[index];
       return f === 0 ? NEVER : at(BLUE, f);
     }
-    case 'slope':
-      return at(ORANGE, Math.min(result.slope[index] / SLOPE_MAX_DEG, 1));
+    case 'slope': {
+      // The route's four bands (Daniel, 2026-11-14), lightly shaded by the relief so the ground keeps its shape;
+      // the shading changes brightness by at most a quarter, never the hue.
+      const rgb = BAND_RGB[slopeBand(result.slope[index]).id];
+      const k = 0.75 + (0.25 * shade) / 255;
+      return [Math.round(rgb[0] * k), Math.round(rgb[1] * k), Math.round(rgb[2] * k)];
+    }
     case 'reach': {
       if (!judged) return notChecked(shade);
       const reach = extra?.reach;
@@ -127,6 +133,7 @@ export function layerPixel(layerId, result, index, shade, extra) {
 }
 
 const pct = (v) => `${Math.round(v * 100)}%`;
+const BAND_RGB = Object.fromEntries(SLOPE_BANDS.map((band) => [band.id, [1, 3, 5].map((i) => parseInt(band.hex.slice(i, i + 2), 16))]));
 
 /** The distance the Reach layer's colours run up to: the rover's range, or with no range limit the farthest spot it reaches. */
 export const reachScaleM = (reach) => (Number.isFinite(reach.rangeM) ? reach.rangeM : Math.max(reach.farthestM ?? 0, 1));
@@ -162,8 +169,9 @@ export function layerLegend(layerId, result, extra) {
     case 'slope':
       return {
         title: 'Slope',
-        note: `Steepness of the ground at each point. ${SLOPE_MAX_DEG}° or more gets the lightest colour.`,
-        stops: withLabels(orange, '0°', `${SLOPE_MAX_DEG}°`),
+        note: 'Steepness of the ground at each point, in the same colours as the route.',
+        stops: [],
+        swatches: SLOPE_BANDS.map((band) => ({ hex: band.hex, label: band.label })),
       };
     case 'reach': {
       const reach = extra?.reach;
