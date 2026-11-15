@@ -3,7 +3,7 @@
 import { searchLanding, searchQuestion } from '../finder/client.js';
 import { latLonToCell } from '../finder/grid.js';
 import { pathStats, reachFrom } from '../finder/route.js';
-import { MAX_DESTINATIONS, latestDeparture, planMission } from '../finder/planner.js';
+import { MAX_DESTINATIONS, planMission } from '../finder/planner.js';
 import { destinationName, planText } from '../finder/plan-text.js';
 import { MAP_LAYERS, createFinderMap } from '../finder/map-view.js';
 import { defaultFinder } from '../finder/score.js';
@@ -164,7 +164,7 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
 
   const roverNow = () => ({
     maxSlopeDeg: values.roverMaxSlopeDeg,
-    rangeM: values.roverRangeKm * 1000,
+    rangeM: values.roverRangeKm > 0 ? values.roverRangeKm * 1000 : Infinity, // 0: no limit on the total drive
     speedMPerHour: values.roverSpeedMPerHour,
     maxDarknessHours: values.maxDarknessHours,
     needEarthToDrive: values.roverNeedsEarthToDrive,
@@ -209,7 +209,7 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       routeText = 'Click the map to choose where the rover starts.';
       map.setRoute(null);
     } else if (!targets.length) {
-      const limits = `within ${values.roverRangeKm} km on slopes up to ${values.roverMaxSlopeDeg}°`;
+      const limits = `${values.roverRangeKm > 0 ? `within ${values.roverRangeKm} km ` : ''}on slopes up to ${values.roverMaxSlopeDeg}°`;
       let cells = 0;
       for (let i = 0; i < reach.dist.length; i++) if (Number.isFinite(reach.dist[i])) cells++;
       const area = (cells * result.cellM * result.cellM) / 1e6;
@@ -239,23 +239,9 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
   }
 
   function drawSchedule(text) {
-    renderSchedule($('finderSchedule'), {
-      result,
-      plan,
-      text,
-      departHours,
-      onDepart: (hours) => {
-        departHours = Math.max(0, hours);
-        updateRoute();
-      },
-      onFindLatest: () => {
-        const found = latestDeparture(result, start, targets, roverNow());
-        if (found) {
-          departHours = found.departHours;
-          updateRoute();
-        }
-      },
-    });
+    renderSchedule($('finderSchedule'), { result, plan, text });
+    // How the plan is worked out, and what it leaves out: kept, but in the closed "What these results leave out".
+    $('planNotes').textContent = text?.notes ?? '';
   }
   const updateRouteSoon = debounce(updateRoute, 250);
 

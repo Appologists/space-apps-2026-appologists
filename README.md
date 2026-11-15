@@ -106,3 +106,7 @@ Details and assumptions: [docs/architecture.md](docs/architecture.md).
 - Libraries: [Astronomy Engine](https://github.com/cosinekitty/astronomy) by Don Cross (MIT),
   [three.js](https://threejs.org/) (MIT), [Vite](https://vite.dev/) and Vitest (MIT).
 - Site coordinates: see the `sources` section of `data/sites.json`.
+- Mission-card pictures (`public/images/`): NASA artist's concepts, public domain, via Wikimedia Commons:
+  [Starship HLS](https://commons.wikimedia.org/wiki/File:HLS_Starship_rendering.jpg) and
+  [VIPER](https://commons.wikimedia.org/wiki/File:Viper-ACD20-0047.jpg) (NASA Ames, Daniel Rutter).
+  `janky-rover.svg` is our own drawing.

@@ -23,6 +23,13 @@ export const MAP_LAYERS = [
 export const TIME_LAYER = 'now';
 
 const BACKGROUND = [6, 8, 12];
+// Ground the landing search did not judge (outside its circle, or so near the map's edge that the landing
+// accuracy would run off it): its relief, dimmed, so the map is one square of terrain. Darker than "fails".
+const NOT_CHECKED_HEX = '#1f2024';
+const notChecked = (shade) => {
+  const v = Math.round(14 + shade * 0.16);
+  return [v, v, v];
+};
 const NEVER = [16, 16, 20];
 const NEVER_HEX = '#101014';
 const FAIL_GREY_HEX = '#6a6a70';
@@ -75,9 +82,13 @@ export function hillshade(elevation, n, cellM) {
  */
 export function layerPixel(layerId, result, index, shade, extra) {
   const fail = result.fail[index];
-  if (fail & FAIL.OUTSIDE || Number.isNaN(result.elevation[index])) return BACKGROUND;
+  if (Number.isNaN(result.elevation[index])) return BACKGROUND; // no terrain data
+  // Sunlight, darkness, Earth and slope are measured on the whole square, so those layers show it all.
+  // Only the landing verdict and the rover's reach stop at the search area.
+  const judged = !(fail & FAIL.OUTSIDE);
   switch (layerId) {
     case 'result': {
+      if (!judged) return notChecked(shade);
       if (fail === 0) return at(BLUE, result.score[index]);
       const v = Math.round(28 + shade * 0.42);
       return [v, v, v];
@@ -95,9 +106,10 @@ export function layerPixel(layerId, result, index, shade, extra) {
     case 'slope':
       return at(ORANGE, Math.min(result.slope[index] / SLOPE_MAX_DEG, 1));
     case 'reach': {
+      if (!judged) return notChecked(shade);
       const reach = extra?.reach;
       const d = reach ? reach.dist[index] : Infinity;
-      if (Number.isFinite(d)) return at(BLUE, 1 - d / reach.rangeM);
+      if (Number.isFinite(d)) return at(BLUE, 1 - d / reachScaleM(reach));
       const v = Math.round(28 + shade * 0.42);
       return [v, v, v];
     }
@@ -115,6 +127,9 @@ export function layerPixel(layerId, result, index, shade, extra) {
 }
 
 const pct = (v) => `${Math.round(v * 100)}%`;
+
+/** The distance the Reach layer's colours run up to: the rover's range, or with no range limit the farthest spot it reaches. */
+export const reachScaleM = (reach) => (Number.isFinite(reach.rangeM) ? reach.rangeM : Math.max(reach.farthestM ?? 0, 1));
 
 /** What the legend shows for a layer, in the shape the surface view's legend uses, plus optional `swatches`. */
 export function layerLegend(layerId, result, extra) {
@@ -158,8 +173,8 @@ export function layerLegend(layerId, result, extra) {
         note: reach
           ? `How far the rover must drive from the start to get there, on slopes up to ${reach.maxSlopeDeg}°.`
           : 'Pick a start point to see how far the rover can drive. No reach data yet.',
-        stops: withLabels(blue, reach ? km(reach.rangeM) : 'range', '0 km'),
-        swatches: [{ hex: FAIL_GREY_HEX, label: 'too steep or out of range' }],
+        stops: withLabels(blue, reach ? km(reachScaleM(reach)) : 'range', '0 km'),
+        swatches: [{ hex: FAIL_GREY_HEX, label: reach && !Number.isFinite(reach.rangeM) ? 'too steep, or cut off by steep ground' : 'too steep or out of range' }],
       };
     }
     case TIME_LAYER:
@@ -177,7 +192,10 @@ export function layerLegend(layerId, result, extra) {
         title: 'Landing sites',
         note: 'Blue ground passes every check; lighter is better. Grey ground fails at least one.',
         stops: withLabels(blue, 'lower score', 'higher score'),
-        swatches: [{ hex: FAIL_GREY_HEX, label: 'fails a check' }],
+        swatches: [
+          { hex: FAIL_GREY_HEX, label: 'fails a check' },
+          { hex: NOT_CHECKED_HEX, label: 'not checked: outside the search circle' },
+        ],
       };
   }
 }
@@ -185,9 +203,14 @@ export function layerLegend(layerId, result, extra) {
 /** One plain-text line describing a cell, for the hover tooltip. */
 export function describeCell(result, row, col, extra) {
   const i = row * result.n + col;
-  if (result.fail[i] & FAIL.OUTSIDE || Number.isNaN(result.elevation[i])) return 'outside the search area';
+  if (Number.isNaN(result.elevation[i])) return 'no terrain data here';
+  const judged = !(result.fail[i] & FAIL.OUTSIDE);
   const { lat, lon } = cellToLatLon(result, result.center, row, col);
-  const verdict = result.fail[i] === 0 ? 'passes every check' : `fails: ${describeFail(result.fail[i]).join('; ')}`;
+  const verdict = !judged
+    ? 'not checked for landing: outside the search circle, or too near the map edge for the landing accuracy'
+    : result.fail[i] === 0
+      ? 'passes every check'
+      : `fails: ${describeFail(result.fail[i]).join('; ')}`;
   const reach = extra?.reach;
   const drive = !reach ? [] : [Number.isFinite(reach.dist[i]) ? `${(reach.dist[i] / 1000).toFixed(1)} km drive from the start` : 'not reachable from the start'];
   return [

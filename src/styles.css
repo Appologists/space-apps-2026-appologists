@@ -1186,10 +1186,31 @@ button:disabled {
 }
 .profile {
   display: grid;
-  gap: 4px;
-  min-height: 72px;
-  padding: 14px 16px;
+  gap: 2px;
+  min-height: 0;
+  padding: 8px 8px 10px;
   text-align: left;
+  line-height: 1.25;
+}
+/* Text sits a little in from the picture's edges. */
+.profile > strong,
+.profile > .profile-blurb {
+  padding-inline: 4px;
+}
+.profile-pictures {
+  display: flex;
+  gap: 4px;
+  height: 120px;
+  margin: 0 0 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #06080c;
+}
+.profile-pictures img {
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .profile strong {
   font-size: 18px;
@@ -1214,6 +1235,10 @@ button:disabled {
   color: var(--dim);
   font-size: 13px;
 }
+.choice-label small.inline {
+  display: inline;
+  margin-left: 8px;
+}
 .choice-options {
   display: grid;
   grid-auto-flow: column;
@@ -1229,6 +1254,50 @@ input.big {
   width: 100%;
   min-height: 48px;
   font-size: 16px;
+}
+/* The landing time: the date big in the middle, a week, a day and an hour back on the left, forward on the right. */
+.date-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.date-steps {
+  display: grid;
+  gap: 6px;
+}
+.date-steps button {
+  min-height: 44px;
+  padding-inline: 4px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.date-now {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: var(--space);
+  border-color: var(--regolith);
+}
+.date-day {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+.date-time {
+  font: 500 18px var(--font-num);
+  color: var(--regolith);
+}
+.date-input {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 .facts {
   margin: 0;
@@ -1463,9 +1532,14 @@ input.big {
     gap: 14px;
   }
   .app[data-step='1'] .profile {
-    min-height: 110px;
-    padding: 18px 20px;
+    min-height: 0;
+    padding: 8px 8px 10px;
+    gap: 2px;
     align-content: start;
+  }
+  .app[data-step='1'] .profile-pictures {
+    height: clamp(140px, 22vh, 220px);
+    margin: 0 0 6px;
   }
   .app[data-step='1'] .profile strong {
     font-size: 26px;
@@ -1473,16 +1547,8 @@ input.big {
   .app[data-step='1'] .profile span {
     font-size: 18px;
   }
-  /* The custom choices sit two to a row, so the whole mission fits on about one screen. */
   .app[data-step='1'] .setup {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 20px 24px;
-    align-items: start;
-  }
-  .app[data-step='1'] .setup > .eyebrow,
-  .app[data-step='1'] .setup > .facts,
-  .app[data-step='1'] .setup > button {
-    grid-column: 1 / -1;
+    gap: 20px;
   }
   .app[data-step='1'] .setup .eyebrow {
     font-size: 14px;
@@ -1505,8 +1571,22 @@ input.big {
     font-size: 21px;
   }
   .app[data-step='1'] input.big {
-    min-height: 60px;
+    min-height: 64px;
     font-size: 20px;
+  }
+  .app[data-step='1'] .date-row,
+  .app[data-step='1'] .date-steps {
+    gap: 8px;
+  }
+  .app[data-step='1'] .date-steps button {
+    min-height: 56px;
+    font-size: 20px;
+  }
+  .app[data-step='1'] .date-day {
+    font-size: 26px;
+  }
+  .app[data-step='1'] .date-time {
+    font-size: 24px;
   }
   .app[data-step='1'] .facts {
     gap: 10px;
@@ -1523,4 +1603,251 @@ input.big {
   .app[data-step='1'] .flow-hint {
     font-size: 17px;
   }
+}
+
+/* Step 1 with the custom form open: "Plan a mission" slides away and the two cards become one slim row, each
+   picture beside its name, so the form gets the height. */
+#missionSection .step-title {
+  max-height: 80px;
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.2s ease, margin 0.3s ease;
+}
+#missionSection.compact .step-title {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: -10px; /* takes back the section's gap */
+}
+.profile,
+.profile-pictures {
+  transition: height 0.3s ease, width 0.3s ease, min-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+}
+#missionSection.compact .profile {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 14px;
+  min-height: 0;
+  padding: 8px 12px 8px 8px;
+}
+#missionSection.compact .profile-pictures {
+  width: 96px;
+  height: 64px;
+  margin: 0;
+}
+#missionSection.compact .profile-blurb {
+  display: none;
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] #missionSection.compact .profile {
+    min-height: 0;
+    padding: 10px 16px 10px 10px;
+  }
+  .app[data-step='1'] #missionSection.compact .profile-pictures {
+    width: 104px;
+    height: 68px;
+    margin: 0;
+  }
+  .app[data-step='1'] #missionSection.compact .profile strong {
+    font-size: 24px;
+  }
+}
+
+/* In the slim row the other card turns into a narrow "Back", and the chosen one takes the rest of the width. */
+.profiles {
+  transition: grid-template-columns 0.3s ease;
+}
+#missionSection.compact .profiles {
+  grid-template-columns: minmax(0, 0.32fr) minmax(0, 1fr);
+}
+.profile-back {
+  display: none;
+}
+#missionSection.compact .profile[aria-pressed='false'],
+.app[data-step='1'] #missionSection.compact .profile[aria-pressed='false'] {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  align-content: center;
+  padding-inline: 8px;
+}
+#missionSection.compact .profile[aria-pressed='false'] > :not(.profile-back) {
+  display: none;
+}
+#missionSection.compact .profile[aria-pressed='false'] .profile-back {
+  display: block;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] #missionSection.compact .profiles {
+    grid-template-columns: minmax(0, 0.32fr) minmax(0, 1fr);
+  }
+  .app[data-step='1'] #missionSection.compact .profile[aria-pressed='false'] .profile-back {
+    font-size: 22px;
+  }
+}
+
+/* The custom form's groups: Mission, Lander, Rover. Closed, a group is one big row naming what is set. */
+.group {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--card);
+}
+.group > summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title chevron' 'said chevron';
+  align-items: center;
+  gap: 2px 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+}
+.group > summary::-webkit-details-marker {
+  display: none;
+}
+.group > summary::after {
+  content: '▾';
+  grid-area: chevron;
+  font-size: 20px;
+  color: var(--dim);
+  transition: transform 0.2s ease;
+}
+.group[open] > summary::after {
+  transform: rotate(180deg);
+}
+.group > summary:focus-visible {
+  outline: 2px solid var(--regolith);
+  outline-offset: -2px;
+}
+.group-title {
+  grid-area: title;
+  font-size: 18px;
+  font-weight: 600;
+}
+.group-summary {
+  grid-area: said;
+  font-size: 14px;
+  color: var(--dim);
+}
+.group-body {
+  display: grid;
+  gap: 14px;
+  padding: 4px 14px 16px;
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] .group > summary {
+    min-height: 76px;
+    padding: 12px 18px;
+  }
+  .app[data-step='1'] .group-title {
+    font-size: 24px;
+  }
+  .app[data-step='1'] .group-summary {
+    font-size: 17px;
+  }
+  .app[data-step='1'] .group > summary::after {
+    font-size: 26px;
+  }
+  .app[data-step='1'] .group-body {
+    gap: 20px;
+    padding: 4px 18px 20px;
+  }
+  .app[data-step='1'] .setup {
+    gap: 12px;
+  }
+}
+
+/* Mission length: a slider with the clean lengths as big buttons under it. The thumb's centre runs over the
+   same width as the buttons' positions (both inside .duration's padding). */
+.duration-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.duration-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--regolith);
+}
+.duration {
+  padding: 0 30px;
+}
+input[type='range'].duration-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: calc(100% + 32px);
+  margin: 0 -16px;
+  height: 44px;
+  background: transparent;
+  cursor: pointer;
+}
+.duration-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--rule);
+}
+.duration-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--rule);
+}
+.duration-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 32px;
+  height: 32px;
+  margin-top: -12px;
+  border-radius: 50%;
+  border: 3px solid var(--space);
+  background: var(--regolith);
+}
+.duration-slider::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--space);
+  background: var(--regolith);
+}
+.duration-slider:focus-visible {
+  outline: 2px solid var(--regolith);
+  outline-offset: 2px;
+}
+.duration-marks {
+  position: relative;
+  height: 48px;
+}
+.duration-mark {
+  position: absolute;
+  top: 0;
+  width: 58px;
+  height: 48px;
+  padding: 0;
+  transform: translateX(-50%);
+  font-size: 15px;
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] .duration-value {
+    font-size: 26px;
+  }
+  .app[data-step='1'] .duration {
+    padding: 0 34px;
+  }
+  .app[data-step='1'] .duration-marks {
+    height: 58px;
+  }
+  .app[data-step='1'] .duration-mark {
+    width: 66px;
+    height: 58px;
+    font-size: 18px;
+  }
+}
+
+/* An open group shows its questions, so the line that sums them up is hidden. */
+.group[open] .group-summary {
+  display: none;
+}
+.group[open] > summary {
+  min-height: 0;
 }
