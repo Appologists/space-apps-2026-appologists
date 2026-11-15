@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lunar Street View</title>
+<script>
+// Opened on a spot (from the app): show nothing but the app's bar and one loading line until the ground is drawn,
+// so the home screen and the empty panels never flash by (Daniel, 2026-11-15). The class comes off in the start-up
+// code at the bottom of the page, once the street view is on screen.
+(function(){ var q=location.search; if(/[?&]lat=/.test(q)&&/[?&]lon=/.test(q)){ var c=document.documentElement.classList; c.add('booting'); if(/[?&]app=/.test(q)) c.add('booting-app'); } })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -19,6 +25,9 @@
     --bad: #ff6b6b;
   }
   *{box-sizing:border-box}
+  html.booting body>*{visibility:hidden!important}
+  html.booting body>#loading{visibility:visible!important;display:block!important}
+  html.booting-app body>#appbar{visibility:visible!important;display:flex!important}
   html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--text);
     font-family:"IBM Plex Mono",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   #c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none;filter:contrast(1.1) saturate(1.04)}
@@ -757,7 +766,7 @@ function spawn(){
   else { cam.x=-22; cam.z=14; cam.yaw=-(105)*DEG; }
   cam.pitch=-0.04; cam.target=null;
 }
-// What in the picture is real and what is added for looks, in a few short lines. It is always on screen (#badge),
+// What in the picture is real and what is added for looks, in a few short lines. It is the hover text of the site card (decision 10),
 // and on the wrist panel in VR (short=true: fewer words). Keep it true when the decoration in SITES changes.
 function groundLabel(st,short){
   if(st.illustrative) return short
@@ -768,7 +777,9 @@ function groundLabel(st,short){
     ? [`Real: ground and hills (NASA LOLA ${st.meta.fineGround===false?'80 m':'5 m'}), Sun, Earth.`,'For looks: craters under 30 m, bumps, rocks; larger Sun, Earth.',`Hills drawn to ${SF/1000} km; the numbers use ${far} km.`]
     : [`Real: the ground and hills (NASA LOLA ${map}), and where the Sun and Earth are.`,'Added for looks: craters under 30 m, bumps and rocks. Sun and Earth are drawn larger than life.',`Hills are drawn to ${SF/1000} km; the numbers use terrain to ${far} km.`];
 }
-function showGroundLabel(){ document.getElementById('badge').replaceChildren(...groundLabel(site).map(line=>{ const d=document.createElement('div'); d.textContent=line; return d; })); placeGroundLabel(); }
+// The label is not drawn on the picture (Daniel, 2026-11-15, decision 10: it took room in the demo). The same words
+// are the hover text of the "You are standing at" card, and they stay on the wrist panel in VR.
+function showGroundLabel(){ document.getElementById('badge').style.display='none'; document.getElementById('site').title=groundLabel(site).join('\n'); }
 // In a narrow window (the CSS above) the label sits just above the highest of the panels along the bottom.
 function placeGroundLabel(){ const el=document.getElementById('badge');
   if(innerWidth>1000){ el.style.bottom=''; return; }
@@ -792,7 +803,8 @@ async function setSite(key){ const ld=document.getElementById('loading'); ld.sty
   applyHeights(); applyColors(); spawn(); scatterRocks(); buildPatch(); buildMinimap();
   const m=site.meta; document.getElementById('siteName').textContent=(site.at&&site.at.name)||m.name;
   document.getElementById('siteCoords').textContent=`${fmtLL(m)}  ·  ${m.near?Math.round(m.heightM)+' m':'height not baked'}`;
-  document.getElementById('siteSrc').textContent=m.pick;
+  // A spot from the finder needs no line saying where it came from (Daniel, 2026-11-15); the named sites keep theirs.
+  const src=document.getElementById('siteSrc'); src.textContent=site.at?'':m.pick; src.style.display=site.at?'none':'';
   showGroundLabel();
   analysisDirty=true; }
 
@@ -1205,10 +1217,14 @@ if(QS.has('lat')&&QS.has('lon')){ SITES.here.at={lat:+QS.get('lat'), lon:+QS.get
 const START_AT=QS.has('start')?new Date(QS.get('start')):null;
 if(START_AT&&!isNaN(START_AT)) document.getElementById('weekStart').value=START_AT.toISOString().slice(0,10);
 if(!SITES.here.at){ document.body.classList.add('hero'); setView('globe'); }
+// The page is shown once the street view has had two frames to draw (see the script in <head>). The timer is for a
+// tab that is not drawing frames: it must not stay blank.
+function bootDone(){ const show=()=>document.documentElement.classList.remove('booting','booting-app');
+  requestAnimationFrame(()=>requestAnimationFrame(show)); setTimeout(show,600); }
 Promise.all(Object.keys(SITE_LL).map(k=>fetch(`data/${k}/meta.json`).then(r=>r.json()).then(m=>{ SITE_LL[k]=[m.lat,m.lon];
   gMarkers[k].position.copy(llToVec(m.lat,m.lon,1.012)); const sb=document.getElementById('sb_'+k); if(sb) sb.textContent=fmtLL(m)+(m.near?` · ${Math.round(m.heightM)} m`:''); })))
   .catch(e=>console.warn('site list',e))
-  .then(()=>SITES.here.at?(hideHero(),setSite('here').then(()=>{ runAnalysis(); setView('street'); })):setSite('shackleton').then(()=>runAnalysis()))
+  .then(()=>SITES.here.at?(hideHero(),setSite('here').then(()=>{ runAnalysis(); setView('street'); bootDone(); })):setSite('shackleton').then(()=>runAnalysis()))
   .catch(e=>{ const ld=document.getElementById('loading'); ld.style.display='block'; ld.textContent='Could not open the street view here: '+e.message; });
 /* ---------- hook for part one (site filters) ----------
    StreetView.setSummary({ title:'Why this site', items:[{value:'82', unit:'%', label:'Sunlight, Jan 2027'}, ...] })
@@ -1217,7 +1233,7 @@ Promise.all(Object.keys(SITE_LL).map(k=>fetch(`data/${k}/meta.json`).then(r=>r.j
    StreetView.goTo('malapert') opens a site directly (keys: shackleton, ridge, malapert, apollo11). */
 window.StreetView={
   setSummary(sum){ customSummary=sum; const box=document.querySelector('#stats .statgrid'); box.textContent='';
-    document.getElementById('statsLabel').textContent=sum.title||'';
+    const lab=document.getElementById('statsLabel'); lab.textContent=sum.title||''; lab.style.display=sum.title?'':'none';   // no title: the numbers alone
     for(const it of sum.items||[]){ const d=document.createElement('div'); d.className='stat'; const v=document.createElement('div'); v.className='v'; v.textContent=it.value??'—';
       if(it.unit){ const u=document.createElement('small'); u.textContent=' '+it.unit; v.appendChild(u); }
       const k=document.createElement('div'); k.className='k'; k.textContent=it.label||''; d.append(v,k); box.appendChild(d); } },

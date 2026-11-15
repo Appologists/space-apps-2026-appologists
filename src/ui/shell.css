@@ -142,6 +142,11 @@ details.more[open] summary::before { content: '▾ '; }
 /* ---- Moon tab laid out like the mockup: floating cards over the whole globe ---- */
 .regions-card { display: none; }
 .mission-line .change { width: 100%; margin-top: 12px; padding: 10px; font: 500 12.5px var(--font-num); border-radius: 2px; cursor: pointer; }
+/* The Ride tab keeps the mission's name only: its panel is short of height, and "Change mission" is in the top bar. */
+.app[data-step='5'] .mission-line .change,
+.app[data-step='5'] .mission-line .more { display: none; }
+/* The Moon tab's small close-up: the landing sites key is the blue ramp alone (Daniel, 2026-11-15). */
+.app[data-step='2'] .map-legend[data-layer='result'] .legend-swatches { display: none; }
 .app[data-step='2'] .topbar-change { display: none; }
 @media (min-width: 901px) {
   .app[data-step='2'] { grid-template-columns: minmax(0, 1fr) !important; }

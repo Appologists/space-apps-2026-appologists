@@ -40,6 +40,7 @@ const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
 // beside it (ui/shell.js). It was 2.5, which Daniel asked for on 2026-11-14 when the globe shared the stage with the
 // map; the team's front replaced that layout (docs/decisions.md, AA).
 const REGION_ZOOM = 1.1;
+const RIDE_M_PER_SECOND = 25; // how fast the ground passes on the Ride step (see play())
 const WIDE_KM = Math.max(...REGIONS.map((r) => r.searchRadiusKm ?? 0));
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
@@ -556,10 +557,13 @@ export function createFlow({ app, globe, finder, surface, api }) {
     if (!track || !result) return;
     // Play from an hour before it sets off until it arrives (or an hour after it is lost), in 10 to 16
     // seconds. Each frame moves on from clock.hours, so "Next change" can move the clock while it plays.
+    // The Ride step is far slower (Daniel, 2026-11-15): the ground passes at about 25 m a second, so it reads
+    // as a drive, not a fast-forward. A 5 km drive takes a little over three minutes; the time bar still jumps.
     const from = Math.max(track.startHours - 1, 0);
     const to = playEnd(result);
     if (!(clock.hours >= from && clock.hours < to - 0.05)) setHours(from);
-    clock.rate = (to - from) / Math.min(Math.max((to - from) * 0.5, 10), 16);
+    const seconds = step === 5 ? Math.min(Math.max(track.lengthM / RIDE_M_PER_SECOND, 30), 300) : Math.min(Math.max((to - from) * 0.5, 10), 16);
+    clock.rate = (to - from) / seconds;
     clock.playing = true;
     clock.freeLook = false;
     let last = performance.now();
@@ -677,7 +681,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         'div',
         { class: 'play-row' },
         h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
-        clockParts.next,
+        step === 3 ? clockParts.next : null, // the Ride step has Play alone (Daniel, 2026-11-15)
       ),
     );
     if (step === 3) {
@@ -702,16 +706,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         h('ol', { class: 'tl-list', 'aria-label': 'What the rover does, from touchdown' }, clockParts.rows.map((r) => r.row)),
       );
     } else {
-      el.append(
-        clockParts.story,
-        meter,
-        clockParts.text,
-        h(
-          'p',
-          { class: 'caveats' },
-          'The view moves along the planned route over the same terrain. The Sun and Earth are drawn where they are at the landing spot; over this drive they move by under 0.2°. Speeded up: the rover is far slower.',
-        ),
-      );
+      el.append(clockParts.story, meter, clockParts.text);
     }
     updateClockText();
   }
@@ -724,6 +719,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     clockParts.text.textContent = `${dayText(clock.hours)} · ${km(now.distanceM)} of ${km(track.lengthM)} km driven`;
     const story = STATE_STORY[now.state] ?? '';
     if (clockParts.story.textContent !== story) clockParts.story.textContent = story;
+    clockParts.story.hidden = !story; // a state with no sentence (arrived) leaves no gap
     const max = route?.rover?.maxDarknessHours;
     const share = max > 0 ? Math.min(now.darkH / max, 1) : 0;
     clockParts.fill.style.width = `${(share * 100).toFixed(1)}%`;

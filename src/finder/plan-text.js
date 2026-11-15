@@ -12,7 +12,6 @@ export const STATE_STORY = Object.freeze({
   [STATE.WAIT_SUN]: 'Its spot has fallen into shadow. It must stop and wait for the light while the time in the dark counts up.',
   [STATE.WAIT_EARTH]: 'It has sunlight, but Earth is below the horizon and it needs Earth in view to drive. It waits.',
   [STATE.HOLD]: 'It waits on purpose in sunlight: the ground ahead is still dark, and setting off now would strand it there.',
-  [STATE.ARRIVED]: 'It has arrived and stays there for the rest of the mission.',
   [STATE.LOST]: 'It sat in the dark for longer than it can survive. The mission is lost here.',
 });
 

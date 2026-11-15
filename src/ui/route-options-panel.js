@@ -96,12 +96,16 @@ function drawProfile(canvas, result, plan) {
 function routeDetail(result, plan) {
   if (!plan?.path || plan.path.length < 2 || !plan.drive) return null;
   const canvas = h('canvas', { class: 'route-profile', 'aria-label': 'Height along the route, coloured by slope' });
-  const box = h('details', { class: 'explain route-detail' },
-    h('summary', {}, 'Height along the route'),
-    h('div', { class: 'route-sub' }, 'Elevation above the Moon\'s reference sphere'),
+  // Open from the start, and no line under the title (Daniel, 2026-11-15). Heights are above the Moon's reference sphere.
+  const box = h('details', { class: 'explain route-detail', open: true },
+    h('summary', {}, 'Elevation along the route'),
     canvas);
   box.addEventListener('toggle', () => {
     if (box.open) drawProfile(canvas, result, plan);
+  });
+  // Drawn once it is on the page (the canvas needs its width); the toggle event is not relied on for the first draw.
+  requestAnimationFrame(() => {
+    if (box.isConnected && box.open) drawProfile(canvas, result, plan);
   });
   return box;
 }

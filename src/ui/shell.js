@@ -273,7 +273,7 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
       name: region ? `${region.name} · landing spot` : 'Landing spot',
       start: getMission().start.toISOString(),
       app: location.pathname + location.search + location.hash,
-      sum: JSON.stringify({ title: region ? `Why ${region.name}` : 'Why this spot', items }),
+      sum: JSON.stringify({ items }), // the numbers alone, no "Why <region>" title (Daniel, 2026-11-15)
     });
     if (location.search.includes('vr-test')) q.set('vr-test', '');
     location.href = `/Street-view/index.html?${q}`;
