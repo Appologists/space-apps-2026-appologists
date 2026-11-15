@@ -65,7 +65,13 @@ export function layerImage(kind) {
     } else {
         images[kind] = elevationGrid().then(g => {
             if (!g) {
-                return null;
+                // No heights file (it is made by lunar-planner/build_terrain.py): use the LOLA picture in git.
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = () => resolve(null);
+                    img.src = '/textures/moon-elevation.png';
+                });
             }
             const W = 1440;
             const H = 720;
@@ -120,7 +126,12 @@ export async function layerLegend(kind) {
     if (kind === 'elevation') {
         const g = await elevationGrid();
         if (!g) {
-            return {title: 'Elevation: run build_terrain.py', gradient: null};
+            try {
+                const meta = await (await fetch('/textures/moon-elevation.json')).json();
+                return {title: 'Elevation · LOLA', lo: `${meta.legend_min_km} km`, hi: `+${meta.legend_max_km} km`, gradient: null};
+            } catch (e) {
+                return {title: 'Elevation: not on this computer', gradient: null};
+            }
         }
         return {title: 'Elevation · LOLA', lo: `${(g.lo / 1000).toFixed(1)} km`, hi: `+${(g.hi / 1000).toFixed(1)} km`, gradient: cssGradient(ELEV_COLORS, 0, 1)};
     }

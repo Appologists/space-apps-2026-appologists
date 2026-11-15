@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lunar Site Planner: set up (first time) and start. Run from this folder: ./start.sh
+# Lunar Site Planner: set up (first time) and start. Run from this folder: bash start.sh
 set -e
 cd "$(dirname "$0")"
 if [ ! -d .venv ]; then
@@ -24,7 +24,7 @@ fi
 # Live sync: pull the team's newest main from GitHub every minute; open pages reload themselves.
 # Run with NOSYNC=1 ./start.sh to leave it out.
 if [ -z "$NOSYNC" ] && command -v git >/dev/null; then
-    ./sync.sh >/tmp/lunar-sync.log 2>&1 &
+    bash ./sync.sh >/tmp/lunar-sync.log 2>&1 &
     SYNC_PID=$!
     trap 'kill $SYNC_PID 2>/dev/null' EXIT
     echo "Live sync is on (log: /tmp/lunar-sync.log)."
