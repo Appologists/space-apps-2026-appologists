@@ -1,0 +1,6 @@
+{
+  "source": "NASA LRO Diviner Level 4 global bolometric temperature snapshots (Williams et al. 2017, Icarus 283)",
+  "grid": "0.5 deg, lon -180..180 (columns), lat 90..-90 (rows)",
+  "storage": "kelvin = 30.0 + value * 1.5",
+  "note": "Converted from colour images with a scale learned from the snapshots given as numbers; colder than about 58 K reads as about 58 K."
+}
