@@ -144,14 +144,16 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     updateCamera();
     requestRender();
   }
+  // Sized to the canvas, not the stage: on the Regions step the canvas shares the stage with the finder's map.
   function resize() {
-    const rect = stage.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
     renderer.setSize(rect.width, rect.height, false);
     camera.aspect = rect.width / Math.max(rect.height, 1);
     updateCamera();
     requestRender();
   }
-  new ResizeObserver(resize).observe(stage);
+  new ResizeObserver(resize).observe(canvas);
 
   // ---- Orientation ------------------------------------------------------------------------------
   /** Rotation that puts (lat, lon) at the centre of the view with `upLocal` pointing up the screen. */
@@ -287,20 +289,21 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
   /**
    * Markers for the mission's regions, drawn instead of the site markers; an empty list brings the sites back.
    * While regions are shown, a tap on one calls `onPick(id)` and taps elsewhere on the Moon do nothing.
-   * @param {{id: string, name: string, lat: number, lon: number, color: string, selected?: boolean}[]} regions
+   * @param {{id: string, name: string, lat: number, lon: number, color: string, selected?: boolean, label?: boolean}[]} regions
+   *        `label: false` draws the marker without its name.
    * @param {{onPick?: (id: string) => void}} [options]
    */
   function setRegions(regions, { onPick: pick = null } = {}) {
     for (const entry of regionEntries) {
       moon.remove(entry.marker);
       entry.marker.children.forEach((child) => child.material.dispose());
-      removeLabel(entry.label);
+      if (entry.label) removeLabel(entry.label);
     }
     regionEntries = regions.map((region) => {
       const local = localOf(region.lat, region.lon);
       const marker = makeMarker(region.color, '#0b0f15', 0.009);
       placeOnSurface(marker, local, 1.003);
-      const label = addLabel(region.name, local.clone().multiplyScalar(1.01), `site region-lbl${region.selected ? ' on' : ''}`, -18);
+      const label = region.label === false ? null : addLabel(region.name, local.clone().multiplyScalar(1.01), `site region-lbl${region.selected ? ' on' : ''}`, -18);
       return { site: region, marker, local, label };
     });
     onRegionPick = pick;
