@@ -1357,8 +1357,7 @@ input.big {
   gap: 6px;
   font-size: 15px;
 }
-.facts a,
-.region-note a {
+.facts a {
   color: var(--earth);
 }
 .more {
@@ -1415,12 +1414,6 @@ input.big {
 }
 .region[aria-pressed='true'] .verdict {
   color: inherit;
-}
-.region-note {
-  display: block;
-  margin: 3px 2px 0;
-  font-size: 12.5px;
-  color: var(--dim);
 }
 
 /* The finder's map fills the stage; its lists and controls are in the left panel now. */
@@ -1940,4 +1933,35 @@ input[type='range'].duration-slider {
 }
 .group[open] > summary {
   min-height: 0;
+}
+
+/* 2 Regions: the globe (which part of the Moon) and the region's map (where it can land) share the stage.
+   The map gets the larger share: it carries the detail. The globe's view and zoom buttons step aside; it still
+   turns and zooms by dragging and scrolling. */
+@media (min-width: 901px) {
+  .app[data-step='2'] #globe,
+  .app[data-step='2'] #labels {
+    width: 40%;
+  }
+  .app[data-step='2'] .finder {
+    left: 40%;
+    border-left: 1px solid var(--rule);
+  }
+}
+@media (max-width: 900px) {
+  .app[data-step='2'] .stage {
+    height: 78vh;
+  }
+  .app[data-step='2'] #globe,
+  .app[data-step='2'] #labels {
+    height: 36%;
+  }
+  .app[data-step='2'] .finder {
+    top: 36%;
+    border-top: 1px solid var(--rule);
+  }
+}
+.app[data-step='2'] .views,
+.app[data-step='2'] .zoom {
+  display: none;
 }

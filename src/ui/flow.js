@@ -34,9 +34,8 @@ const STEPS = [
 const REGIONS = missions.regions.map((region) => {
   const site = region.site ? sitesData.sites.find((s) => s.id === region.site) : region;
   const sources = region.site ? sitesData.sources : missions.sources;
-  // A named crater stands for its middle. The site list's longer note is about the smooth-Moon ranking, not this.
-  const note = region.site ? 'The middle of the crater: a reference point, not a vetted landing site.' : (region.note ?? '');
-  return { id: region.id, name: site.name, lat: site.lat, lon: site.lon, note, source: sources[site.source] };
+  // A named crater stands for its middle (a reference point, not a vetted landing site); missions.json says so.
+  return { id: region.id, name: site.name, lat: site.lat, lon: site.lon, source: sources[site.source] };
 });
 
 // The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
@@ -74,8 +73,9 @@ const GROUPS = [
 
 // Region markers on the globe, coloured like the verdicts in the list (styles.css, .region .verdict).
 const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
-// How close the globe comes on step 2: the whole cluster of south-pole regions stays in view (our choice).
-const REGION_ZOOM = 12;
+// How close the globe comes on step 2. Daniel (2026-11-14) asked for it further out, so the view shows which part
+// of the Moon this is; in its narrower pane that needs the Moon's curved edge in view, which is about 2.5 (our choice).
+const REGION_ZOOM = 2.5;
 const FAIL_WORDS = { slope: 'the ground is too steep', noSun: 'no sunlight at touchdown', dark: 'darkness lasts too long', noEarth: 'Earth is not in view at touchdown' };
 
 /**
@@ -164,8 +164,8 @@ export function createFlow({ app, globe, finder, surface, api }) {
       const result = shownResult();
       if (result && finder.getResult() !== result) showRegion(regionId); // found while another step was on the stage
       if (step === 2) {
-        // The globe stays on the stage, turned to the region; the flat map comes in at step 3.
-        finder.close();
+        // The globe and the region's map share the stage (styles.css): where on the Moon, and where it can land.
+        if (result) finder.open();
         const region = REGIONS.find((r) => r.id === regionId);
         if (region) globe.focus(region.lat, region.lon, REGION_ZOOM);
         else globe.view('southClose');
@@ -546,10 +546,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     regionId = id;
     const region = REGIONS.find((r) => r.id === id);
     if (step === 2 || step === 3) finder.showResult(result, region.name, { startAt: result.sites[0] ?? null });
-    if (step === 2) {
-      finder.close(); // loaded for step 3, but step 2 shows the globe
-      globe.focus(region.lat, region.lon, REGION_ZOOM);
-    }
+    if (step === 2) globe.focus(region.lat, region.lon, REGION_ZOOM);
     drawRegions();
     drawNav();
     save();
@@ -562,12 +559,13 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const { counts, sites } = entry.result;
     if (sites.length) {
       const km2 = passingKm2(entry.result);
-      return ['pass', `${km2.toFixed(km2 < 10 ? 1 : 0)} km² can take the landing · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`];
+      return ['pass', `${km2.toFixed(km2 < 10 ? 1 : 0)} km² available for landing · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`];
     }
-    const [worst, cells] = Object.entries(FAIL_WORDS)
-      .map(([name]) => [name, counts[name] ?? 0])
+    // The check that rules out the most ground.
+    const [worst] = Object.keys(FAIL_WORDS)
+      .map((name) => [name, counts[name] ?? 0])
       .sort((a, b) => b[1] - a[1])[0];
-    return ['fail', `No landing passes. Most often: ${FAIL_WORDS[worst]} (${Math.round((100 * cells) / Math.max(counts.evaluated, 1))}% of the ground)`];
+    return ['fail', `No available sites. Cause: ${FAIL_WORDS[worst]}`];
   }
 
   function drawRegions() {
@@ -576,7 +574,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     const passing = done.filter((entry) => entry.result.sites.length).length;
     $('regionsLede').textContent =
       `Each region is searched for 10 km around the point named, on real terrain, for a landing on ${formatUTC(mission.start)} and ${formatHours(mission.durationHours)} on the Moon. ` +
-      (scan.done ? `${passing} of ${REGIONS.length} can take this mission.` : `${done.length} of ${REGIONS.length} searched so far.`) +
+      (scan.done ? `${passing} of ${REGIONS.length} have sites available for landing.` : `${done.length} of ${REGIONS.length} searched so far.`) +
       // A long mission is checked in longer steps (src/finder/client.js), which can miss short darkness.
       (done[0] && done[0].result.stepHours > 1
         ? ` Over a mission this long, sunlight is checked every ${formatHours(done[0].result.stepHours)}, so darkness shorter than that can be missed.`
@@ -600,6 +598,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
             {
               type: 'button',
               class: 'region',
+              title: region.source?.title ?? '', // the source stays on hover; the page shows no notes (Daniel)
               'aria-pressed': String(region.id === regionId),
               disabled: !entry?.result,
               onClick: () => chooseRegion(region.id),
@@ -607,7 +606,6 @@ export function createFlow({ app, globe, finder, surface, api }) {
             h('strong', {}, region.name),
             h('span', { class: `verdict ${kind}` }, text),
           ),
-          region.note ? h('small', { class: 'region-note', title: region.source?.title ?? '' }, region.note) : null,
         );
       }),
     );
@@ -627,6 +625,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         ...region,
         color: REGION_COLOURS[verdict(scan.results.get(region.id))[0]],
         selected: region.id === regionId,
+        label: region.id === regionId, // this far out the regions sit within a few pixels; the list names them all
       })),
       { onPick: chooseRegion },
     );
