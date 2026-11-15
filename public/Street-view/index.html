@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lunar Street View — prototype</title>
+<title>Lunar Street View</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -30,7 +30,23 @@
   .label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
 
   /* site panel */
-  #site{top:16px;left:16px;width:300px;padding:14px 16px}
+  #site{top:92px;left:16px;width:300px;padding:14px 16px}
+  /* top-left navigation: always visible in the street view */
+  /* Whole Moon (top left): a mini-Moon you click to go back to the globe */
+  #backGlobe{position:fixed;top:16px;left:16px;z-index:4;display:flex;align-items:center;gap:12px;cursor:pointer;
+    padding:6px 18px 6px 6px;border-radius:999px;border:1px solid rgba(255,106,61,.55);background:rgba(14,13,12,.9);color:var(--text);
+    box-shadow:0 6px 24px rgba(0,0,0,.5);transition:border-color .15s, box-shadow .15s}
+  #backGlobe:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,106,61,.25),0 6px 24px rgba(0,0,0,.5)}
+  #backGlobe .mini{width:52px;height:52px;border-radius:50%;flex:none;background:url(moon_color.jpg) 50% 50%/auto 100% no-repeat #777;
+    box-shadow:inset -9px -7px 16px rgba(0,0,0,.75), inset 3px 3px 8px rgba(255,255,255,.15), 0 0 12px rgba(160,190,255,.25)}
+  #backGlobe .txt{text-align:left;line-height:1.15}
+  #backGlobe .txt b{display:block;font:400 22px var(--serif);letter-spacing:0}
+  #backGlobe .txt small{display:block;font:500 10.5px var(--mono);color:var(--accent);letter-spacing:.14em;text-transform:uppercase;margin-bottom:2px}
+  /* Home (top right): a plain outlined house, so it never looks like the Moon button */
+  #homeBtn{position:fixed;top:16px;right:16px;z-index:4;display:flex;align-items:center;gap:8px;cursor:pointer;height:40px;padding:0 14px;
+    border-radius:2px;border:1px solid rgba(239,233,221,.55);background:rgba(14,13,12,.9);color:var(--text);font:500 12.5px var(--mono)}
+  #homeBtn:hover{border-color:#fff;background:rgba(239,233,221,.12)}
+  #homeBtn svg{width:16px;height:16px}
   #site h1{margin:6px 0 2px;font-size:20px;font-weight:700;letter-spacing:-.01em}
   #site .coords{font-size:12px;color:var(--muted)}
   .seg{display:flex;gap:4px;background:rgba(255,255,255,.05);padding:3px;border-radius:10px;margin-top:10px}
@@ -46,7 +62,7 @@
   .stat .v small{font-size:12px;color:var(--muted);font-weight:500}
 
   /* readout */
-  #readout{top:16px;right:16px;width:270px;padding:14px 16px}
+  #readout{top:68px;right:16px;width:270px;padding:14px 16px}
   .row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
   .row:last-child{border-bottom:0}
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:1px}
@@ -57,7 +73,8 @@
   .pill.earth{background:rgba(78,168,255,.16);color:var(--earth)}
 
   /* compass */
-  #compassWrap{top:16px;left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 660px));min-width:280px;height:46px;padding:0;overflow:hidden}
+  /* compass sits between the left panels (332px) and the readout (302px), so it never covers them */
+  #compassWrap{top:16px;left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 700px));height:46px;padding:0;overflow:hidden}
   #compass{width:100%;height:100%;display:block}
 
   /* crosshair + hover */
@@ -69,7 +86,9 @@
   #hover{position:fixed;pointer-events:none;padding:8px 10px;font-size:11.5px;line-height:1.5;border-radius:10px;display:none;white-space:nowrap}
 
   /* bottom bar */
-  #timebar{left:16px;right:236px;bottom:16px;padding:12px 16px 12px}
+  /* timeline centred between the summary box (left) and the minimap (right) */
+  #timebar{left:50%;transform:translateX(-50%);width:min(940px,calc(100vw - 2*348px));bottom:16px;padding:12px 16px 12px}
+  #timebar .top{flex-wrap:wrap;row-gap:6px}
   #timebar .top{display:flex;align-items:center;gap:12px;margin-bottom:8px}
   #play{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.08);
     color:var(--text);cursor:pointer;display:grid;place-items:center;flex:none}
@@ -94,13 +113,13 @@
   #legend .bar{height:8px;border-radius:4px;background:linear-gradient(90deg,#1b2a8f,#1f6fd6,#22c1c3,#7bd36a,#f2d04b,#f08a2c,#d7263d)}
   #legend .ends{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px}
 
-  #help{left:332px;top:16px;padding:9px 12px;font-size:11.5px;color:var(--muted);line-height:1.6}
+  #help{margin-top:6px;text-align:center;font-size:11px;color:var(--muted)}
   #help b{color:var(--text);font-weight:600}
-  #badge{position:fixed;left:50%;transform:translateX(-50%);top:70px;font-size:11px;color:var(--muted);
+  #badge{position:fixed;left:50%;transform:translateX(-50%);top:70px;max-width:min(560px,calc(100vw - 700px));white-space:normal!important;text-align:center;font-size:11px;color:var(--muted);
     padding:5px 10px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid var(--line);white-space:nowrap}
 
   body.globe #readout, body.globe #stats, body.globe #timebar, body.globe #compassWrap, body.globe #mapPanel,
-  body.globe #cross, body.globe #badge, body.globe #help, body.globe #site{display:none}
+  body.globe #cross, body.globe #badge, body.globe #help, body.globe #site, body.globe #backGlobe, body.globe #homeBtn{display:none}
   #globePanel{top:16px;left:16px;width:320px;padding:16px;display:none}
   body.globe #globePanel{display:block}
   #globePanel h1{margin:6px 0 4px;font-size:22px;letter-spacing:-.01em}
@@ -131,9 +150,6 @@
   .gLabel{position:fixed;transform:translate(12px,-50%);font:600 12px "IBM Plex Mono";color:#fff;pointer-events:none;
     text-shadow:0 1px 6px #000;white-space:nowrap;display:none}
   body.globe .gLabel{display:block}
-  #backGlobe{margin-top:10px;width:100%;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--text);
-    padding:8px;border-radius:9px;cursor:pointer;font:600 12px "IBM Plex Mono"}
-  #backGlobe:hover{background:rgba(255,255,255,.12)}
 
   /* ===== Field-notebook theme ===== */
   :root{ --glass:rgba(14,13,12,.88); --line:rgba(239,233,221,.14); --text:#efe9dd; --muted:#a39d91;
@@ -161,7 +177,6 @@
   #strip{border-radius:1px}
   #help{font-family:var(--mono);font-size:11px}
   #badge{font-family:var(--mono);border-radius:2px;background:rgba(14,13,12,.8);font-size:10.5px}
-  #backGlobe{border-radius:2px;font:500 12px var(--mono);text-align:left}
   #hover{font-family:var(--mono);border-radius:2px}
   .siteBtn{border-radius:0;border:0;border-top:1px solid var(--line);background:transparent;padding:12px 4px;margin:0;font:500 14px var(--sans)}
   .siteBtn:last-of-type{border-bottom:1px solid var(--line)}
@@ -185,7 +200,8 @@
   .homeBtn{margin-top:6px;width:100%;border:0;background:transparent;color:var(--muted);font:500 12px var(--mono);text-align:left;padding:6px 0;cursor:pointer}
   .homeBtn:hover{color:var(--accent)}
   #vig{background:radial-gradient(ellipse at 60% 50%,rgba(0,0,0,0) 50%,rgba(0,0,0,.45) 100%)}
-  @media (max-width:1100px){ #help{display:none} #compassWrap{width:min(420px,calc(100vw - 620px))} }
+  @media (max-width:1100px){ #timebar{left:16px;right:236px;width:auto;transform:none} #stats{bottom:150px!important} }
+  @media (max-width:1000px){ #compassWrap,#badge{display:none} }
   @media (max-width:820px){ #stats,#mapPanel,#compassWrap,#badge{display:none} #timebar{right:16px} #readout{width:220px} #site{width:240px} }
 </style>
 </head>
@@ -207,37 +223,40 @@
   <h1>Where to?</h1>
   <button class="homeBtn" id="homeBtn2" style="position:absolute;top:14px;right:14px;width:auto;margin:0">⌂ home</button>
   <p>Spin the Moon, then pick a site. We'll take you down to the surface and show you what your rover would see.</p>
-  <button class="siteBtn" data-go="pole"><span class="dot" style="background:#f5b942"></span><span>Shackleton Rim<small>89.5°S · 130°E · south pole</small></span></button>
-  <button class="siteBtn" data-go="malapert"><span class="dot" style="background:#3d6bff"></span><span>Malapert Mountain<small>86°S · 3°E · south polar massif</small></span></button>
-  <button class="siteBtn" data-go="apollo"><span class="dot" style="background:#ffd166"></span><span>Apollo 11 · Tranquility Base<small>0.67°N · 23.47°E</small></span></button>
+  <button class="siteBtn" data-go="shackleton"><span class="dot" style="background:#f5b942"></span><span>Shackleton crater rim<small id="sb_shackleton">south pole</small></span></button>
+  <button class="siteBtn" data-go="ridge"><span class="dot" style="background:#9bd17a"></span><span>Connecting ridge<small id="sb_ridge">south pole</small></span></button>
+  <button class="siteBtn" data-go="malapert"><span class="dot" style="background:#3d6bff"></span><span>Malapert massif<small id="sb_malapert">south polar mountain</small></span></button>
+  <button class="siteBtn" data-go="apollo11"><span class="dot" style="background:#ffd166"></span><span>Apollo 11 · Tranquility Base<small id="sb_apollo11">0.674°N · 23.473°E</small></span></button>
 </div>
 <div id="credit">Moon imagery: NASA's Scientific Visualization Studio · LROC WAC color mosaic &amp; LOLA elevation</div>
-<div class="gLabel" id="gl_pole">Shackleton Rim</div>
-<div class="gLabel" id="gl_apollo">Apollo 11</div>
-<div class="gLabel" id="gl_malapert">Malapert Mountain</div>
+<div class="gLabel" id="gl_shackleton">Shackleton rim</div>
+<div class="gLabel" id="gl_ridge">Connecting ridge</div>
+<div class="gLabel" id="gl_apollo11">Apollo 11</div>
+<div class="gLabel" id="gl_malapert">Malapert massif</div>
+<div id="loading" class="panel mono" style="left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;font-size:12px;display:none;z-index:9">Loading NASA terrain…</div>
 <div id="site" class="panel">
   <div class="label">You are standing at</div>
-  <h1 id="siteName">Shackleton Rim</h1>
+  <h1 id="siteName">—</h1>
   <div class="coords mono" id="siteCoords">—</div>
+  <div class="coords mono" id="siteSrc" style="margin-top:4px;line-height:1.4">—</div>
   <div class="seg" id="siteSeg">
-    <button data-site="pole" class="on">South Pole</button>
+    <button data-site="shackleton" class="on">Shackleton</button>
+    <button data-site="ridge">Ridge</button>
     <button data-site="malapert">Malapert</button>
-    <button data-site="apollo">Apollo 11</button>
+    <button data-site="apollo11">Apollo 11</button>
   </div>
   <div class="seg" id="modeSeg">
     <button data-mode="real" class="on">Realistic</button>
     <button data-mode="elev">Elevation</button>
   </div>
-  <div class="ctl" style="margin-top:12px;justify-content:space-between">
-    <span>Vertical exaggeration</span>
-    <span><input id="exag" type="range" min="1" max="5" step="0.5" value="1"> <span class="mono" id="exagV">1.0×</span></span>
-  </div>
-  <button id="backGlobe">← back to the whole Moon</button>
-  <button id="homeBtn" class="homeBtn">⌂ home</button>
 </div>
+<button id="backGlobe" title="Back to the whole Moon"><span class="mini"></span><span class="txt"><small>← back to</small><b>Whole Moon</b></span></button>
+<button id="homeBtn" title="Back to the start page"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7.5 8 2l6 5.5M3.8 6.2V14h3V10h2.4v4h3V6.2"/></svg>Home</button>
 
-<div id="stats" class="panel" style="top:auto;bottom:146px">
-  <div class="label">If you landed here this week</div>
+<!-- Summary box. For now it shows this week's sunlight here; part one (site filters) will fill it through
+     StreetView.setSummary(...) — see the bottom of the script. -->
+<div id="stats" class="panel" style="top:auto;bottom:16px">
+  <div class="label" id="statsLabel">If you landed here this week</div>
   <div class="statgrid">
     <div class="stat"><div class="v" id="sLongLit">—</div><div class="k">Longest stretch of sun</div></div>
     <div class="stat"><div class="v" id="sLongDark">—</div><div class="k">Longest night to survive</div></div>
@@ -246,12 +265,9 @@
   </div>
 </div>
 
-<div id="help" class="panel">
-  <b>drag</b> look around · <b>click</b> walk there · <b>WASD</b> move · <b>scroll</b> zoom
-</div>
 
 <div id="compassWrap" class="panel"><canvas id="compass"></canvas></div>
-<div id="badge">work in progress · sun &amp; earth positions simulated for now — JPL Horizons hookup next</div>
+<div id="badge">—</div>
 
 <div id="readout" class="panel">
   <div class="label">What's overhead</div>
@@ -259,7 +275,7 @@
   <div class="row"><span><span class="dot" style="background:var(--earth)"></span>Earth</span><span class="mono" id="rEarth">—</span></div>
   <div class="row"><span>Is the rover in sun?</span><span id="rLit" class="pill dark">—</span></div>
   <div class="row"><span>Can it call home?</span><span id="rComm" class="pill dark">—</span></div>
-  <div class="row"><span>Height</span><span class="mono" id="rElev">—</span></div>
+  <div class="row"><span>Height <small style="color:var(--muted)">(LOLA)</small></span><span class="mono" id="rElev">—</span></div>
   <div class="row"><span>Ground slope</span><span class="mono" id="rSlope">—</span></div>
 </div>
 
@@ -274,6 +290,7 @@
       <span><span class="sw" style="background:#7a5a2c"></span>Partial</span>
       <span><span class="sw" style="background:var(--earth)"></span>Earth in view</span>
     </div>
+    <div class="ctl"><span>Week of</span><input id="weekStart" type="date" style="background:transparent;color:var(--text);border:1px solid var(--line);font:11px var(--mono);padding:2px 4px;color-scheme:dark"></div>
     <div class="ctl"><span>Speed</span><input id="speed" type="range" min="1" max="24" step="1" value="6"><span class="mono" id="speedV">6 h/s</span></div>
   </div>
   <div id="stripWrap">
@@ -282,6 +299,7 @@
     <input id="scrub" type="range" min="0" max="168" step="0.25" value="8">
   </div>
   <div id="days"></div>
+  <div id="help"><b>drag</b> look around · <b>click</b> walk there · <b>WASD</b> move · <b>scroll</b> zoom</div>
 </div>
 
 <div id="mapPanel" class="panel">
@@ -309,103 +327,117 @@ function vnoise(x,z,s){ const ix=Math.floor(x), iz=Math.floor(z); let fx=x-ix, f
 function fbm(x,z,s,oct){ let v=0,a=0.5,f=1,n=0; for(let o=0;o<oct;o++){ v+=a*vnoise(x*f,z*f,s+o*17); n+=a; a*=0.5; f*=2.03; } return v/n; }
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 
-/* ---------- sites (demo models — replace with Horizons API output) ---------- */
+/* ---------- sites: real data baked from NASA files (see tools/ and data/<site>/meta.json) ---------- */
 const LUNAR_DAY = 24*29.53;
-function azelFromHourAngle(Hdeg, latDeg, decDeg){
-  const H=Hdeg*DEG, p=latDeg*DEG, d=decDeg*DEG;
-  const el=Math.asin(Math.sin(p)*Math.sin(d)+Math.cos(p)*Math.cos(d)*Math.cos(H));
-  const az=Math.atan2(-Math.cos(d)*Math.sin(H), Math.sin(d)*Math.cos(p)-Math.cos(d)*Math.cos(H)*Math.sin(p));
-  return {az:((az/DEG)%360+360)%360, el:el/DEG};
-}
 const SITES = {
-  pole: {
-    name:"Shackleton Rim", coords:"≈ 89.5°S · 130°E  ·  south polar highlands",
-    seed:7, amp:22, scale:420, fine:2.2, grey:0.64,
-    craters:{n:46, rmin:14, rmax:230},
-    hills:[ {az:0,d:0,h:46,s:260}, {az:80,d:720,h:150,s:120}, {az:112,d:900,h:85,s:90}, {az:200,d:650,h:60,s:160}, {az:300,d:800,h:95,s:140} ],
-    fixedCraters:[],
-    spawn:"highest",
-    sun:t=>({ az:(40 + t/LUNAR_DAY*360)%360, el:1.15+0.55*Math.sin(2*Math.PI*t/(24*27.32)+1.0) }),
-    earth:t=>({ az:(360+6*Math.sin(2*Math.PI*t/(24*27.21)))%360, el:1.0+5.5*Math.sin(2*Math.PI*t/(24*27.21)+2.2) })
-  },
-  malapert: {
-    name:"Malapert Mountain", coords:"≈ 86°S · 3°E  ·  5 km massif, Earth-facing slope",
-    seed:19, amp:26, scale:380, fine:2.2, grey:0.62,
-    craters:{n:38, rmin:12, rmax:180},
-    hills:[ {az:180,d:420,h:320,s:330}, {az:240,d:900,h:140,s:200}, {az:120,d:850,h:110,s:180}, {az:20,d:780,h:-60,s:260} ],
-    fixedCraters:[],
-    spawn:"highest",
-    sun:t=>({ az:(300 + t/LUNAR_DAY*360)%360, el:3.2+0.9*Math.sin(2*Math.PI*t/(24*27.32)+0.4) }),
-    earth:t=>({ az:(3+5*Math.sin(2*Math.PI*t/(24*27.21)))%360, el:4.5+5*Math.sin(2*Math.PI*t/(24*27.21)+2.0) })
-  },
-  apollo: {
-    name:"Tranquility Base", coords:"0.674°N · 23.473°E  ·  Apollo 11 landing site",
-    seed:31, amp:3.5, scale:300, fine:1.2, grey:0.52,
-    craters:{n:110, rmin:4, rmax:70},
-    hills:[],
-    fixedCraters:[[400,10,95,20],[-260,-180,40,8],[120,-320,28,6]],
-    spawn:"lander", lander:true,
-    sun:t=>azelFromHourAngle(-50 + t/LUNAR_DAY*360, 0.674, 1.2),
-    earth:t=>({ az:268+4*Math.sin(2*Math.PI*t/(24*27.21)), el:66.5+5*Math.sin(2*Math.PI*t/(24*27.21)+0.7) })
-  }
+  // deco = the original prototype's look (rolling relief, craters 12-230 m, fine bumps), layered on top of the real
+  // ground. It changes what you see, never the numbers on screen.
+  shackleton:{ seed:7,  grey:0.64, deco:{refSunAz:44,amp:22, scale:420, fine:2.2, craters:{n:46, rmin:14, rmax:230}, small:{n:200, rmin:3, rmax:14},
+    hills:[ {az:0,d:0,h:46,s:260}, {az:80,d:720,h:150,s:120}, {az:112,d:900,h:85,s:90}, {az:200,d:650,h:60,s:160}, {az:300,d:800,h:95,s:140} ]} },
+  ridge:     { seed:13, grey:0.64, deco:{refSunAz:44,amp:20, scale:400, fine:2.2, craters:{n:44, rmin:14, rmax:210}, small:{n:200, rmin:3, rmax:14},
+    hills:[ {az:0,d:0,h:40,s:240}, {az:40,d:760,h:130,s:140}, {az:150,d:820,h:95,s:110}, {az:250,d:700,h:70,s:170}, {az:320,d:880,h:110,s:150} ]} },
+  malapert:  { seed:19, grey:0.62, deco:{refSunAz:304,amp:26, scale:380, fine:2.2, craters:{n:38, rmin:12, rmax:180}, small:{n:180, rmin:3, rmax:12},
+    hills:[], realSummit:true} },  // Malapert is a real 5 km mountain: no made-up hills, start on its real summit
+  // Apollo 11: no 5 m elevation baked yet, so its ground is the old illustrative model (says so on screen). Its sky is real.
+  apollo11:  { grey:0.52, illustrative:true, seed:31, amp:3.5, scale:300, fine:1.2,
+    craters:{n:110, rmin:4, rmax:70}, hills:[], fixedCraters:[[400,10,95,20],[-260,-180,40,8],[120,-320,28,6]], lander:true }
 };
+const SITE_KEYS=Object.keys(SITES);
+let SKY_START=0;              // ms, first hour in the sky tables
+async function loadSite(key){
+  const st=SITES[key]; if(st.meta) return st;
+  const base=`data/${key}/`; const get=(f,T)=>fetch(base+f).then(r=>{ if(!r.ok) throw new Error(base+f+' '+r.status); return r.arrayBuffer(); }).then(b=>new T(b));
+  st.meta=await fetch(base+'meta.json').then(r=>r.json());
+  st.sky=await get(st.meta.sky.file,Float32Array); SKY_START=Date.parse(st.meta.sky.startUTC);
+  if(st.meta.near){
+    const m=st.meta, q=await get(m.near.file,Uint16Array); st.near=new Float32Array(q.length); for(let k=0;k<q.length;k++) st.near[k]=m.near.lo+q[k]*m.near.step;
+    const qf=await get(m.far.file,Uint16Array); st.far=new Float32Array(qf.length); for(let k=0;k<qf.length;k++) st.far[k]=m.far.lo+qf[k]*m.far.step;
+    st.err=await get(m.err.file,Uint8Array); st.distant=m.distantHorizon.elevDeg;
+  }
+  return st;
+}
+/* sky at hour h since SKY_START, linear between hourly rows (azimuth unwrapped) */
+function skyAt(st,h,which){ const n=st.meta.sky.count; h=Math.max(0,Math.min(n-1.001,h)); const i=Math.floor(h), f=h-i, o=which==='sun'?0:2;
+  const a0=st.sky[i*4+o], a1=st.sky[(i+1)*4+o]; let da=a1-a0; if(da>180) da-=360; if(da<-180) da+=360;
+  return { az:((a0+da*f)%360+360)%360, el:st.sky[i*4+o+1]*(1-f)+st.sky[(i+1)*4+o+1]*f }; }
 
 /* ---------- terrain grid ---------- */
 const N=401, S=1000, CELL=2*S/(N-1);
-const H=new Float32Array(N*N);
-let hMin=0,hMax=1, exag=1, site=SITES.pole, siteKey="pole", mode="real";
+const H=new Float32Array(N*N);      // what is drawn: LOLA + small filled-in detail
+const HR=new Float32Array(N*N);
+const HS=new Float32Array(N*N);     // drawn ground without the small bumps: what casts shadows on screen     // LOLA only: used for every number on screen and for sunlight
+const NF=481, SF=60000, CF=2*SF/(NF-1);
+let FAR=null;                        // LOLA 80 m heights around the site, or null
+let hMin=0,hMax=1, exag=1, site=SITES.shackleton, siteKey="shackleton", mode="real";
 
+function stampCraters(st,cr,x,z){ let h=0; for(const c of cr){ const dx=x-c[0], dz=z-c[1]; const R=c[2]; if(Math.abs(dx)>1.6*R||Math.abs(dz)>1.6*R) continue;
+    const d=Math.sqrt(dx*dx+dz*dz), rim=c[3]*0.28;
+    if(d<R){ const q=d/R; h+=-c[3]*(1-q*q)+rim*Math.pow(q,6); } else if(d<1.6*R){ const t=(d-R)/(0.6*R); h+=rim*(1-t)*(1-t); } } return h; }
+function randomCraters(seed,spec){ const rng=mulberry32(seed*999+3), cr=[];
+  for(let k=0;k<spec.n;k++){ const R=spec.rmin*Math.pow(spec.rmax/spec.rmin, Math.pow(rng(),2.6)); cr.push([(rng()*2-1)*S*1.05,(rng()*2-1)*S*1.05,R,R*(0.17+rng()*0.08)]); }
+  return cr; }
 function genTerrain(st){
-  const rng=mulberry32(st.seed*999+3);
-  const cr=[];
-  for(let k=0;k<st.craters.n;k++){
-    const R=st.craters.rmin*Math.pow(st.craters.rmax/st.craters.rmin, Math.pow(rng(),2.6));
-    cr.push([(rng()*2-1)*S*1.05,(rng()*2-1)*S*1.05,R,R*(0.17+rng()*0.08)]);
-  }
-  for(const c of st.fixedCraters) cr.push(c);
-  const hills=st.hills.map(m=>({x:Math.sin(m.az*DEG)*m.d, z:-Math.cos(m.az*DEG)*m.d, h:m.h, s:m.s}));
   hMin=Infinity; hMax=-Infinity;
-  for(let j=0;j<N;j++){ const z=-S+j*CELL;
-    for(let i=0;i<N;i++){ const x=-S+i*CELL;
+  if(st.near){
+    // NASA's 5 m map is the ground. LOLA can't see anything smaller than a few metres (most 5 m pixels are
+    // interpolated between laser tracks), so small bumps and craters under ~20 m are added for looks only.
+    const dc=st.deco;
+    // the original's big smooth hills (hand-placed there too), added on top of the real shape
+    // turned so they sit around today's real Sun the way they sat around the original's made-up Sun
+    const rot=site.lookRot||0;
+    const hills=(dc.hills||[]).map(m=>({x:Math.sin((m.az+rot)*DEG)*m.d, z:-Math.cos((m.az+rot)*DEG)*m.d, h:m.h, s:m.s}));
+    const crBig=randomCraters(st.seed,dc.craters), crSmall=randomCraters(st.seed+50,dc.small);
+    HR.set(st.near);
+    // For drawing only: smooth over ~35 m. The 5 m cells carry ~0.4 m of measurement noise, and with the Sun 1-2°
+    // up that noise flickers every facet between lit and dark. LOLA can't resolve detail that small anyway.
+    const SM=smoothGrid(HR,N,4,3);
+    for(let j=0;j<N;j++){ const z=-S+j*CELL; for(let i=0;i<N;i++){ const x=-S+i*CELL, k=j*N+i;
+      const real=HR[k];
+      let hl=0; for(const m of hills){ const dx=x-m.x, dz=z-m.z; hl+=m.h*Math.exp(-(dx*dx+dz*dz)/(2*m.s*m.s)); }
+      const big=SM[k] + hl + (fbm(x/dc.scale,z/dc.scale,st.seed,5)-0.5)*2*dc.amp + stampCraters(st,crBig,x,z);
+      HS[k]=big;   // only the big shapes cast shadows on screen (small bumps casting 20 m shadows made the ground grainy)
+      H[k]=big + (fbm(x/22,z/22,st.seed+5,3)-0.5)*2*dc.fine + (fbm(x/7,z/7,st.seed+9,2)-0.5)*dc.fine*0.7 + stampCraters(st,crSmall,x,z);
+      if(real<hMin)hMin=real; if(real>hMax)hMax=real; } }
+    FAR=st.far;
+  } else {
+    const cr=randomCraters(st.seed,st.craters); for(const c of st.fixedCraters) cr.push(c);
+    for(let j=0;j<N;j++){ const z=-S+j*CELL; for(let i=0;i<N;i++){ const x=-S+i*CELL;
       let h=(fbm(x/st.scale,z/st.scale,st.seed,5)-0.5)*2*st.amp + (fbm(x/22,z/22,st.seed+5,3)-0.5)*2*st.fine + (fbm(x/7,z/7,st.seed+9,2)-0.5)*st.fine*0.7;
-      for(const m of hills){ const dx=x-m.x, dz=z-m.z; h+=m.h*Math.exp(-(dx*dx+dz*dz)/(2*m.s*m.s)); }
-      for(const c of cr){ const dx=x-c[0], dz=z-c[1]; const R=c[2]; if(Math.abs(dx)>1.6*R||Math.abs(dz)>1.6*R) continue;
-        const d=Math.sqrt(dx*dx+dz*dz), rim=c[3]*0.28;
-        if(d<R){ const q=d/R; h+=-c[3]*(1-q*q)+rim*Math.pow(q,6); }
-        else if(d<1.6*R){ const t=(d-R)/(0.6*R); h+=rim*(1-t)*(1-t); } }
-      H[j*N+i]=h; if(h<hMin)hMin=h; if(h>hMax)hMax=h; } }
+      h+=stampCraters(st,cr,x,z); H[j*N+i]=h; HR[j*N+i]=h; if(h<hMin)hMin=h; if(h>hMax)hMax=h; } }
+    FAR=null;
+  }
 }
-function sampleH(x,z){
-  const gx=(x+S)/CELL, gz=(z+S)/CELL;
-  if(gx<0||gz<0||gx>N-1||gz>N-1) return -1e9;
-  const i=Math.min(N-2,Math.floor(gx)), j=Math.min(N-2,Math.floor(gz)), fx=gx-i, fz=gz-j;
-  const a=H[j*N+i], b=H[j*N+i+1], c=H[(j+1)*N+i], d=H[(j+1)*N+i+1];
-  return a+(b-a)*fx+(c-a)*fz+(a-b-c+d)*fx*fz;
-}
-function slopeAt(x,z){ const e=CELL; const gx=(sampleH(x+e,z)-sampleH(x-e,z))/(2*e), gz=(sampleH(x,z+e)-sampleH(x,z-e))/(2*e);
-  return Math.atan(Math.sqrt(gx*gx+gz*gz))/DEG; }
+function smoothGrid(A,n,r,passes){ let src=Float32Array.from(A), tmp=new Float32Array(n*n);
+  for(let p=0;p<passes;p++){
+    for(let j=0;j<n;j++){ for(let i=0;i<n;i++){ let v=0,c=0; for(let d=-r;d<=r;d++){ const ii=i+d; if(ii<0||ii>=n) continue; v+=src[j*n+ii]; c++; } tmp[j*n+i]=v/c; } }
+    for(let j=0;j<n;j++){ for(let i=0;i<n;i++){ let v=0,c=0; for(let d=-r;d<=r;d++){ const jj=j+d; if(jj<0||jj>=n) continue; v+=tmp[jj*n+i]; c++; } src[j*n+i]=v/c; } } }
+  return src; }
+function bil(A,n,gx,gz){ const i=Math.min(n-2,Math.floor(gx)), j=Math.min(n-2,Math.floor(gz)), fx=gx-i, fz=gz-j;
+  const a=A[j*n+i], b=A[j*n+i+1], c=A[(j+1)*n+i], d=A[(j+1)*n+i+1]; return a+(b-a)*fx+(c-a)*fz+(a-b-c+d)*fx*fz; }
+function sampleH(x,z){ const gx=(x+S)/CELL, gz=(z+S)/CELL; if(gx<0||gz<0||gx>N-1||gz>N-1) return -1e9; return bil(H,N,gx,gz); }
+function sampleR(x,z){ const gx=(x+S)/CELL, gz=(z+S)/CELL; if(gx<0||gz<0||gx>N-1||gz>N-1) return -1e9; return bil(HR,N,gx,gz); }
+function sampleF(x,z){ if(!FAR) return -1e9; const gx=(x+SF)/CF, gz=(z+SF)/CF; if(gx<0||gz<0||gx>NF-1||gz>NF-1) return -1e9; return bil(FAR,NF,gx,gz); }
+function slopeOf(f,x,z){ const e=CELL; const gx=(f(x+e,z)-f(x-e,z))/(2*e), gz=(f(x,z+e)-f(x,z-e))/(2*e); return Math.atan(Math.sqrt(gx*gx+gz*gz))/DEG; }
+const slopeAt=(x,z)=>slopeOf(sampleH,x,z), slopeReal=(x,z)=>slopeOf(sampleR,x,z);
+function errAt(x,z){ if(!site.err) return null; const n=site.meta.err.n, i=Math.round((x+S)/site.meta.err.cell), j=Math.round((z+S)/site.meta.err.cell);
+  if(i<0||j<0||i>=n||j>=n) return null; return site.err[j*n+i]*site.meta.err.unit; }
 function dirAzEl(az,el){ const a=az*DEG, e=el*DEG; return new THREE.Vector3(Math.sin(a)*Math.cos(e), Math.sin(e), -Math.cos(a)*Math.cos(e)); }
 
-/* ray-march the heightfield: is the direction blocked by terrain? */
-function blocked(px,py,pz,d,scale){
-  let t=2, step=1.5;
-  while(t<2400){ const x=px+d.x*t, z=pz+d.z*t, h=sampleH(x,z);
-    if(h===-1e9) return false;
-    if(h*scale>py+d.y*t) return true;
-    t+=step; step=Math.min(step*1.035,14); }
-  return false;
+/* How far (degrees) a direction clears the real terrain: 5 m LOLA to ~1.4 km, 80 m LOLA to 85 km, then the
+   baked 60-200 km horizon. Negative = the ground is in the way. The Moon's curvature is already in the heights. */
+function clearance(px,py,pz,az,el){
+  const d=dirAzEl(az,el); let m=Infinity, t=3, st=2;
+  while(true){ const x=px+d.x*t, z=pz+d.z*t; if(Math.abs(x)>=S||Math.abs(z)>=S) break; const h=sampleR(x,z); m=Math.min(m,(py+d.y*t-h)/t); t+=st; st=Math.min(st*1.045,25); }
+  if(FAR){ let st2=Math.max(st,120);
+    while(t<85000){ const x=px+d.x*t, z=pz+d.z*t; if(Math.abs(x)>=SF||Math.abs(z)>=SF) break; const h=sampleF(x,z); if(h>-1e8) m=Math.min(m,(py+d.y*t-h)/t); t+=st2; st2=Math.min(st2*1.03,600); } }
+  let a=m===Infinity?90:Math.atan(m)/DEG;
+  if(site.distant){ const D=site.distant, f=((az%360)+360)%360/0.5, i=Math.floor(f)%720, u=f-Math.floor(f); a=Math.min(a, el-(D[i]*(1-u)+D[(i+1)%720]*u)); }
+  return a;
 }
-/* Sun as a disk: test top, centre, bottom (±0.267°) */
-function sunFraction(x,z,sun,scale){
-  const y=sampleH(x,z)*scale+2; let vis=0;
-  for(const off of [0.267,0,-0.267]){ const el=sun.el+off; if(el<-0.6) continue;
-    if(!blocked(x,y,z,dirAzEl(sun.az,el),scale)) vis++; }
-  return vis/3;
-}
-function earthVisible(x,z,earth,scale){
-  if(earth.el<-0.6) return false;
-  const y=sampleH(x,z)*scale+2; return !blocked(x,y,z,dirAzEl(earth.az,earth.el),scale);
-}
+/* share of the Sun's disc (0.267° radius) above the terrain */
+function sunFraction(x,z,sun){ if(sun.el<-6) return 0; const y=sampleR(x,z)+2, a=clearance(x,y,z,sun.az,sun.el), h=Math.max(-1,Math.min(1,a/0.267));
+  return (Math.PI/2+Math.asin(h)+h*Math.sqrt(1-h*h))/Math.PI; }
+function earthVisible(x,z,earth){ if(earth.el<-6) return false; const y=sampleR(x,z)+2; return clearance(x,y,z,earth.az,earth.el)>0; }
 function marchHit(o,d,scale){
   let t=0.5, step=0.5, prev=0;
   while(t<2600){ const x=o.x+d.x*t, z=o.z+d.z*t, h=sampleH(x,z);
@@ -425,13 +457,13 @@ const srgb2lin=c=>{ c/=255; return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2
 
 /* ---------- three.js scene ---------- */
 const canvas=document.getElementById('c');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,logarithmicDepthBuffer:true});
 renderer.setPixelRatio(Math.min(Math.max(devicePixelRatio,1.5),2));
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1;
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFShadowMap;
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0x000000);
-const camera=new THREE.PerspectiveCamera(70,1,0.3,9000); camera.rotation.order='YXZ';
+const camera=new THREE.PerspectiveCamera(70,1,0.3,260000); camera.rotation.order='YXZ';
 
 // geometry
 const geo=new THREE.BufferGeometry();
@@ -475,13 +507,56 @@ function regolithTex(){
   const nt=new THREE.CanvasTexture(nc); nt.wrapS=nt.wrapT=THREE.RepeatWrapping; nt.repeat.set(200,200); nt.anisotropy=an;
   return {map:t, normal:nt}; }
 const reg=regolithTex();
-const groundMat=new THREE.MeshStandardMaterial({vertexColors:true,map:reg.map,normalMap:reg.normal,normalScale:new THREE.Vector2(1.35,1.35),roughness:1,metalness:0});
+const groundMat=new THREE.MeshStandardMaterial({vertexColors:true,map:reg.map,normalMap:reg.normal,normalScale:new THREE.Vector2(0.75,0.75),roughness:1,metalness:0});
 const patchU={value:new THREE.Vector3(0,0,-1)};
+/* Sunlight on every ground vertex: march toward the Sun over the real LOLA heights (5 m near, 80 m far) and
+   dim the direct light by how much of the Sun's disc is above them. Same rule as clearance() in JS. */
+const floatLinear=!!renderer.extensions.get('OES_texture_float_linear');
+function heightTex(arr,n){ const t=new THREE.DataTexture(arr,n,n,THREE.RedFormat,THREE.FloatType); t.minFilter=t.magFilter=floatLinear?THREE.LinearFilter:THREE.NearestFilter; t.needsUpdate=true; return t; }
+const TU={ uNearH:{value:heightTex(new Float32Array(N*N),N)}, uFarH:{value:heightTex(new Float32Array(NF*NF).fill(-1e5),NF)}, uSunDir:{value:new THREE.Vector3(0,1,0)},
+  uExag:{value:1}, uDistant:{value:1}, uHasFar:{value:0} };
+const SUNVIS_GLSL=`
+uniform sampler2D uNearH; uniform sampler2D uFarH; uniform vec3 uSunDir; uniform float uExag; uniform float uDistant; uniform float uHasFar;
+varying float vSunVis;
+float hN(vec2 p){ vec2 g=(p+${S}.)/${2*S}.*${N-1}.; return texture2D(uNearH,(g+0.5)/${N}.).r; }
+float hF(vec2 p){ vec2 g=(p+${SF}.)/${2*SF}.*${NF-1}.; return texture2D(uFarH,(g+0.5)/${NF}.).r; }
+float sunVis(vec3 p){
+  if(uSunDir.y < -0.105) return 0.0;
+  vec3 d=uSunDir; float m=1.0; float t=3.0; float st=2.0;
+  bool inNear = abs(p.x)<${S}. && abs(p.z)<${S}.;
+  // start from the real surface and skip the first 20 m: close-up shading comes from the surface normal (like the
+  // original look); this march adds the shadows other real terrain casts onto you
+  if(inNear){ p.y=hN(p.xz)*uExag+1.0; t=20.0; st=3.0;
+    for(int i=0;i<110;i++){ vec3 q=p+d*t; if(abs(q.x)>=${S}.||abs(q.z)>=${S}.) break; m=min(m,(q.y-hN(q.xz)*uExag)/t); t+=st; st=min(st*1.045,25.0); } }
+  else { p.y+=4.0; t=180.0; }
+  if(uHasFar>0.5){ float s2=max(st,120.0);
+    for(int i=0;i<150;i++){ vec3 q=p+d*t; if(abs(q.x)>=${SF}.||abs(q.z)>=${SF}.||t>85000.0) break;
+      if(abs(q.x)>=${S}.||abs(q.z)>=${S}.) m=min(m,(q.y-hF(q.xz)*uExag)/t); t+=s2; s2=min(s2*1.03,600.0); } }
+  float h=clamp(atan(m)/${(0.45*Math.PI/180).toFixed(6)},-1.0,1.0);  // slightly soft edge for looks; the numbers use the true 0.267°
+  float v=(1.5707963+asin(h)+h*sqrt(1.0-h*h))/3.1415927;
+  // for looks, like the original: shadows cast from terrain further away are kept soft, so the land stays readable.
+  // Only the picture; 'Is the rover in sun?' and the stats use the full, unsoftened answer.
+  return uDistant*mix(0.55,1.0,v);
+}
+`;
+function terrainLight(sh){ Object.assign(sh.uniforms,TU);
+  sh.vertexShader=SUNVIS_GLSL+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n vSunVis=sunVis((modelMatrix*vec4(transformed,1.0)).xyz);');
+  sh.fragmentShader='varying float vSunVis;\n'+sh.fragmentShader.replace('#include <lights_fragment_end>','#include <lights_fragment_end>\n reflectedLight.directDiffuse*=vSunVis; reflectedLight.directSpecular*=vSunVis;'); }
+groundMat.onBeforeCompile=terrainLight;
 const farMat=groundMat.clone();
-farMat.onBeforeCompile=sh=>{ sh.uniforms.uPatch=patchU;
+farMat.onBeforeCompile=sh=>{ terrainLight(sh); sh.uniforms.uPatch=patchU;
   sh.vertexShader='varying vec3 vWPos;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n vWPos=(modelMatrix*vec4(transformed,1.0)).xyz;');
   sh.fragmentShader='varying vec3 vWPos;\nuniform vec3 uPatch;\n'+sh.fragmentShader.replace('void main() {','void main() {\n if(abs(vWPos.x-uPatch.x)<uPatch.z && abs(vWPos.z-uPatch.y)<uPatch.z) discard;'); };
-const ground=new THREE.Mesh(geo,farMat); ground.castShadow=true; ground.receiveShadow=true; scene.add(ground);
+// big terrain shadows come from sunVis() (real LOLA); the shadow map is only for rocks, the lander and close-up detail
+const ground=new THREE.Mesh(geo,farMat); ground.castShadow=false; ground.receiveShadow=true; scene.add(ground);
+/* the land around you out to 60 km, from LOLA 80 m (no filled-in detail: you only see it from far away) */
+const fGeo=new THREE.BufferGeometry();
+const fPos=new Float32Array(NF*NF*3), fCol=new Float32Array(NF*NF*3), fUv=new Float32Array(NF*NF*2);
+for(let j=0;j<NF;j++)for(let i=0;i<NF;i++){ const k=j*NF+i, x=-SF+i*CF, z=-SF+j*CF; fPos[k*3]=x; fPos[k*3+2]=z; fUv[k*2]=(x+S)/(2*S); fUv[k*2+1]=(z+S)/(2*S); }
+{ const fi=new Uint32Array((NF-1)*(NF-1)*6); let q=0; for(let j=0;j<NF-1;j++)for(let i=0;i<NF-1;i++){ const a=j*NF+i,b=a+1,c=a+NF,d=c+1; fi[q++]=a;fi[q++]=c;fi[q++]=b; fi[q++]=b;fi[q++]=c;fi[q++]=d; }
+  fGeo.setIndex(new THREE.BufferAttribute(fi,1)); }
+fGeo.setAttribute('position',new THREE.BufferAttribute(fPos,3)); fGeo.setAttribute('color',new THREE.BufferAttribute(fCol,3)); fGeo.setAttribute('uv',new THREE.BufferAttribute(fUv,2));
+const farLand=new THREE.Mesh(fGeo,groundMat); farLand.receiveShadow=true; farLand.frustumCulled=false; scene.add(farLand);
 
 /* high-detail near patch (0.25 m grid) that follows the viewer */
 const NP=401, NS=50, NC=2*NS/(NP-1);
@@ -492,7 +567,7 @@ nGeo.setAttribute('position',new THREE.BufferAttribute(nPos,3)); nGeo.setAttribu
 const near=new THREE.Mesh(nGeo,groundMat); near.castShadow=true; near.receiveShadow=true; near.frustumCulled=false; scene.add(near);
 let patchC=null;
 function micro(x,z){
-  let h=(fbm(x/1.6,z/1.6,71,3)-0.5)*0.09+(fbm(x/0.5,z/0.5,73,2)-0.5)*0.035, dark=0;
+  let h=(fbm(x/1.6,z/1.6,71,3)-0.5)*0.05+(fbm(x/0.5,z/0.5,73,2)-0.5)*0.015, dark=0;
   const cx=Math.floor(x/4), cz=Math.floor(z/4);
   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){ const gx=cx+a, gz=cz+b; if(hash(gx,gz,501)>0.42) continue;
     const ox=(gx+hash(gx,gz,502))*4, oz=(gz+hash(gx,gz,503))*4, R=0.25+Math.pow(hash(gx,gz,504),2)*1.9, dep=R*(0.14+hash(gx,gz,505)*0.08);
@@ -549,7 +624,7 @@ function glowTex(stops){ const n=256,cv=document.createElement('canvas'); cv.wid
   for(const [o,c] of stops) gr.addColorStop(o,c); g.fillStyle=gr; g.fillRect(0,0,n,n); return new THREE.CanvasTexture(cv); }
 const sunCore=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex([[0,'#fff'],[0.42,'#fff'],[0.5,'rgba(255,240,210,.9)'],[0.6,'rgba(255,220,170,0)'],[1,'rgba(0,0,0,0)']]),blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));
 const sunGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex([[0,'rgba(255,230,190,.55)'],[0.15,'rgba(255,210,150,.18)'],[0.5,'rgba(255,190,120,.04)'],[1,'rgba(0,0,0,0)']]),blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));
-const SKY_R=3500; const sunAng=2*SKY_R*Math.tan(0.267*DEG)*2.4; sunCore.scale.set(sunAng,sunAng,1); sunGlow.scale.set(sunAng*14,sunAng*14,1);
+const SKY_R=200000; const sunAng=2*SKY_R*Math.tan(0.267*DEG)*2.4; sunCore.scale.set(sunAng,sunAng,1); sunGlow.scale.set(sunAng*14,sunAng*14,1);
 scene.add(sunGlow); scene.add(sunCore);
 
 // earth
@@ -559,7 +634,7 @@ function earthTex(){ const w=512,h=256,cv=document.createElement('canvas'); cv.w
     if(lat>0.84){ r=235;gg=240;b=245; } const cl=Math.max(0,(cloud-0.55)*3.2); r+= (245-r)*Math.min(1,cl); gg+=(248-gg)*Math.min(1,cl); b+=(255-b)*Math.min(1,cl);
     const k=(y*w+x)*4; im.data[k]=r; im.data[k+1]=gg; im.data[k+2]=b; im.data[k+3]=255; }
   g.putImageData(im,0,0); const t=new THREE.CanvasTexture(cv); t.encoding=THREE.sRGBEncoding; return t; }
-const earthR=3300*Math.tan(0.95*DEG)*1.6;
+const EARTH_D=190000, earthR=EARTH_D*Math.tan(0.95*DEG)*1.6;
 const earth=new THREE.Mesh(new THREE.SphereGeometry(earthR,48,32),new THREE.MeshStandardMaterial({map:earthTex(),roughness:0.8,metalness:0,emissive:0x0a1430,emissiveIntensity:0.25}));
 scene.add(earth);
 const earthHalo=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex([[0,'rgba(120,170,255,0)'],[0.55,'rgba(120,170,255,0)'],[0.62,'rgba(120,170,255,.22)'],[1,'rgba(0,0,0,0)']]),blending:THREE.AdditiveBlending,depthWrite:false}));
@@ -567,7 +642,7 @@ earthHalo.scale.set(earthR*2.6,earthR*2.6,1); scene.add(earthHalo);
 
 // stars
 (function(){ const n=3200, p=new Float32Array(n*3), c=new Float32Array(n*3); const r=mulberry32(77);
-  for(let k=0;k<n;k++){ const u=r()*2-1, th=r()*Math.PI*2, s=Math.sqrt(1-u*u); p[k*3]=s*Math.cos(th)*4500; p[k*3+1]=u*4500; p[k*3+2]=s*Math.sin(th)*4500;
+  for(let k=0;k<n;k++){ const u=r()*2-1, th=r()*Math.PI*2, s=Math.sqrt(1-u*u); p[k*3]=s*Math.cos(th)*230000; p[k*3+1]=u*230000; p[k*3+2]=s*Math.sin(th)*230000;
     const b=0.35+Math.pow(r(),3)*0.9, tint=r(); c[k*3]=b*(tint>.8?0.8:1); c[k*3+1]=b*0.95; c[k*3+2]=b*(tint<.2?0.8:1.05); }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); g.setAttribute('color',new THREE.BufferAttribute(c,3));
   window.__stars=new THREE.Points(g,new THREE.PointsMaterial({size:1.6,sizeAttenuation:false,vertexColors:true,transparent:true,opacity:0.85,depthWrite:false}));
@@ -607,6 +682,10 @@ function placePrints(){ const show=!!site.lander; window.__prints.forEach(m=>{ m
 
 /* ---------- apply site / mode / exaggeration ---------- */
 function applyHeights(){ for(let k=0;k<N*N;k++) pos[k*3+1]=H[k]*exag; geo.attributes.position.needsUpdate=true; geo.computeVertexNormals(); geo.computeBoundingSphere();
+  farLand.visible=!!FAR;
+  if(FAR){ for(let j=0;j<NF;j++)for(let i=0;i<NF;i++){ const k=j*NF+i, x=-SF+i*CF, z=-SF+j*CF; const inside=Math.abs(x)<S&&Math.abs(z)<S; fPos[k*3+1]=FAR[k]*exag-(inside?80:0); }
+    fGeo.attributes.position.needsUpdate=true; fGeo.computeVertexNormals(); }
+  TU.uExag.value=exag;
   if(site.lander){ lander.visible=true; lander.position.set(0,sampleH(0,0)*exag,0); } else lander.visible=false; if(typeof buildPatch==='function' && typeof cam!=='undefined' && rockData.length) buildPatch();
   if(rockData.length) placeRocks(); }
 function applyColors(){ const rng=mulberry32(4);
@@ -615,6 +694,10 @@ function applyColors(){ const rng=mulberry32(4);
     else { const i=k%N, j=(k/N)|0; const v=site.grey*(0.86+fbm(i/14,j/14,3,3)*0.28)+(rng()-0.5)*0.02; const tn=site.tint||[1.02,1,0.97]; const sat=1.6; r=v*(1+(tn[0]-1)*sat); g=v*(1+(tn[1]-1)*sat); b=v*(1+(tn[2]-1)*sat); r=Math.pow(r,2.2); g=Math.pow(g,2.2); b=Math.pow(b,2.2); }
     col[k*3]=r; col[k*3+1]=g; col[k*3+2]=b; }
   geo.attributes.color.needsUpdate=true;
+  if(FAR){ const tn=site.tint||[1.02,1,0.97]; for(let k=0;k<NF*NF;k++){ let r,g,b;
+      if(mode==="elev"){ const c=elevColor((FAR[k]-hMin)/(hMax-hMin)); r=srgb2lin(c[0]); g=srgb2lin(c[1]); b=srgb2lin(c[2]); }
+      else { const v=site.grey*(0.9+fbm((k%NF)/9,(k/NF|0)/9,5,3)*0.2); r=Math.pow(v*(1+(tn[0]-1)*1.6),2.2); g=Math.pow(v*(1+(tn[1]-1)*1.6),2.2); b=Math.pow(v*(1+(tn[2]-1)*1.6),2.2); }
+      fCol[k*3]=r; fCol[k*3+1]=g; fCol[k*3+2]=b; } fGeo.attributes.color.needsUpdate=true; }
   if(rockData.length) buildPatch();
   ambient.intensity = mode==="elev"?0.55:0.035;
   bounce.intensity = mode==="elev"?0.1:0.2;
@@ -625,31 +708,60 @@ function applyColors(){ const rng=mulberry32(4);
 
 const cam={x:0,z:0,yaw:0,pitch:-0.03,target:null};
 function spawn(){
-  if(site.spawn==="highest"){ let best=-1e9,bx=0,bz=0; for(let z=-300;z<=300;z+=10)for(let x=-300;x<=300;x+=10){ const h=sampleH(x,z); if(h>best){best=h;bx=x;bz=z;} } cam.x=bx; cam.z=bz; cam.yaw=-80*DEG; }
+  // like the original: start on the highest drawn ground within 300 m, Sun ~36° to your left so slopes are side-lit
+  if(!site.lander){ let best=-1e9,bx=0,bz=0; const f=site.deco&&site.deco.realSummit?sampleR:sampleH; for(let z=-300;z<=300;z+=10)for(let x=-300;x<=300;x+=10){ const h=f(x,z); if(h>best){best=h;bx=x;bz=z;} }
+    cam.x=bx; cam.z=bz; cam.yaw=-(80+(site.lookRot||0))*DEG; }  // the original's view direction, turned with the hills
   else { cam.x=-22; cam.z=14; cam.yaw=-(105)*DEG; }
   cam.pitch=-0.04; cam.target=null;
 }
-function setSite(key){ siteKey=key; site=SITES[key]; genTerrain(site); applyHeights(); applyColors(); spawn(); scatterRocks(); buildPatch(); buildMinimap();
-  document.getElementById('siteName').textContent=site.name; document.getElementById('siteCoords').textContent=site.coords; analysisDirty=true; }
+const fmtLL=m=>`${Math.abs(m.lat).toFixed(3)}°${m.lat<0?'S':'N'} · ${Math.abs(m.lon).toFixed(3)}°${m.lon<0?'W':'E'}`;
+async function setSite(key){ const ld=document.getElementById('loading'); ld.style.display='block';
+  try{ await loadSite(key); } catch(e){ ld.textContent='Could not load data/'+key+'/ — open this page through a web server (see README)'; throw e; }
+  ld.style.display='none';
+  siteKey=key; site=SITES[key];
+  setWeek(weekIn.value||null);
+  // open at the hour of this week when the Sun is highest (real data; you can scrub to any other hour)
+  { let best=-99; for(let h=0;h<=168;h+=0.5){ const e=SUN(h).el; if(e>best){ best=e; t=h; } } scrub.value=t; }
+  site.lookRot = site.deco ? SUN(t).az-site.deco.refSunAz : 0;
+  genTerrain(site);
+  if(site.near) TU.uNearH.value.image.data.set(HS); else TU.uNearH.value.image.data.set(H); TU.uNearH.value.needsUpdate=true;
+  if(FAR){ TU.uFarH.value.image.data.set(FAR); TU.uFarH.value.needsUpdate=true; } TU.uHasFar.value=FAR?1:0;
+  applyHeights(); applyColors(); spawn(); scatterRocks(); buildPatch(); buildMinimap();
+  const m=site.meta; document.getElementById('siteName').textContent=m.name;
+  document.getElementById('siteCoords').textContent=`${fmtLL(m)}  ·  ${m.near?Math.round(m.heightM)+' m':'height not baked'}`;
+  document.getElementById('siteSrc').textContent=m.pick;
+  document.getElementById('badge').textContent= site.illustrative
+    ? 'ground here is illustrative (no 5 m NASA map baked yet) · Sun & Earth are real for the dates shown'
+    : 'shape of the ground: NASA LOLA 5 m · hills to 60 km: LOLA 80 m · real Sun & Earth · craters, bumps & rocks added for looks';
+  analysisDirty=true; }
 
 /* ---------- time ---------- */
-const T0=Date.UTC(2026,10,14,0,0,0); let t=8, playing=false, speed=6;
+let T0=Date.UTC(2026,10,14,0,0,0), HOFF=0; let t=8, playing=false, speed=6;
+const SUN=h=>skyAt(site,HOFF+h,'sun'), EARTH=h=>skyAt(site,HOFF+h,'earth');
+const weekIn=document.getElementById('weekStart');
+function setWeek(iso){ if(!site.meta) return; const n=site.meta.sky.count, first=SKY_START, last=SKY_START+(n-1-168)*3600e3;
+  const iso10=ms=>new Date(ms).toISOString().slice(0,10); weekIn.min=iso10(first); weekIn.max=iso10(last);
+  let ms=iso?Date.parse(iso+'T00:00:00Z'):first; if(!(ms>=first)) ms=first; if(ms>last) ms=last;
+  T0=ms; HOFF=(T0-SKY_START)/3600e3; weekIn.value=iso10(T0); buildDays();
+  if(!customSummary) document.getElementById('statsLabel').textContent='If you landed here the week of '+fmtTime(0).day; analysisDirty=true; }
+weekIn.addEventListener('change',()=>setWeek(weekIn.value));
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtTime(h){ const d=new Date(T0+h*3600e3); const p=n=>String(n).padStart(2,'0');
-  return {day:`${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]} 2026`, clock:`${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`}; }
-(function(){ const el=document.getElementById('days'); let s=''; for(let k=0;k<=7;k++){ const d=new Date(T0+k*864e5); s+=`<span>${DAYS[d.getUTCDay()]} ${d.getUTCDate()}</span>`; } el.innerHTML=s; })();
+  return {day:`${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`, clock:`${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`}; }
+function buildDays(){ const el=document.getElementById('days'); let s=''; for(let k=0;k<=7;k++){ const d=new Date(T0+k*864e5); s+=`<span>${DAYS[d.getUTCDay()]} ${d.getUTCDate()}</span>`; } el.innerHTML=s; }
 
 /* ---------- 7-day analysis strip ---------- */
+let customSummary=null;   // set by part one through StreetView.setSummary
 let analysisDirty=true, lastMoveAt=0, sunTL=[], earthTL=[];
 const strip=document.getElementById('strip'), sctx=strip.getContext('2d');
 function runAnalysis(){
   sunTL=[]; earthTL=[];
-  for(let h=0;h<=168;h++){ sunTL.push(sunFraction(cam.x,cam.z,site.sun(h),1)); earthTL.push(earthVisible(cam.x,cam.z,site.earth(h),1)); }
+  for(let h=0;h<=168;h++){ sunTL.push(sunFraction(cam.x,cam.z,SUN(h))); earthTL.push(earthVisible(cam.x,cam.z,EARTH(h))); }
   let longLit=0,curL=0,longDark=0,curD=0,lit=0,both=0;
   for(let h=0;h<168;h++){ const L=sunTL[h]>=0.66; if(L){lit++;curL++;curD=0;} else {curD++;curL=0;} if(L&&earthTL[h])both++; longLit=Math.max(longLit,curL); longDark=Math.max(longDark,curD); }
   const fmt=v=>v>=48?`${(v/24).toFixed(1)}<small> days</small>`:`${v}<small> h</small>`;
-  document.getElementById('sLongLit').innerHTML=fmt(longLit); document.getElementById('sLongDark').innerHTML=fmt(longDark);
-  document.getElementById('sLit').innerHTML=`${Math.round(lit/168*100)}<small>%</small>`; document.getElementById('sBoth').innerHTML=fmt(both);
+  if(!customSummary){ document.getElementById('sLongLit').innerHTML=fmt(longLit); document.getElementById('sLongDark').innerHTML=fmt(longDark);
+  document.getElementById('sLit').innerHTML=`${Math.round(lit/168*100)}<small>%</small>`; document.getElementById('sBoth').innerHTML=fmt(both); }
   drawStrip(); analysisDirty=false;
 }
 function drawStrip(){ const r=strip.getBoundingClientRect(), dpr=Math.min(devicePixelRatio,2); strip.width=Math.max(1,r.width*dpr); strip.height=30*dpr;
@@ -714,15 +826,14 @@ function rayHit(cx,cy){ const r=canvas.getBoundingClientRect(); const v=new THRE
 let hoverTimer=0;
 function hoverAt(cx,cy){ const now=performance.now(); if(now-hoverTimer<40) return; hoverTimer=now; const hit=rayHit(cx,cy);
   if(!hit){ hoverEl.style.display='none'; return; }
-  const h=sampleH(hit.x,hit.z), sl=slopeAt(hit.x,hit.z); const safe=sl<8?'<span style="color:#5ee39a">● landable slope</span>':sl<15?'<span style="color:#f2d04b">● marginal</span>':'<span style="color:#ff6b6b">● too steep</span>';
-  hoverEl.innerHTML=`elev ${h>=0?'+':''}${h.toFixed(1)} m · slope ${sl.toFixed(1)}°<br>${Math.round(hit.t)} m away · ${safe}`;
+  const h=sampleR(hit.x,hit.z)+(site.meta.heightM||0), sl=slopeReal(hit.x,hit.z), er=errAt(hit.x,hit.z); const safe=sl<8?'<span style="color:#5ee39a">● landable slope</span>':sl<15?'<span style="color:#f2d04b">● marginal</span>':'<span style="color:#ff6b6b">● too steep</span>';
+  hoverEl.innerHTML=site.illustrative?`illustrative ground · slope ${sl.toFixed(1)}°<br>${Math.round(hit.t)} m away`:`height ${h.toFixed(1)} m${er!=null?' ± '+er.toFixed(1):''} · slope ${sl.toFixed(1)}°<br>${Math.round(hit.t)} m away · ${safe}`;
   hoverEl.style.display='block'; hoverEl.style.left=(cx+16)+'px'; hoverEl.style.top=(cy+16)+'px'; }
 
 /* ---------- UI wiring ---------- */
 function seg(id,attr,fn){ document.querySelectorAll(`#${id} button`).forEach(b=>b.addEventListener('click',()=>{ document.querySelectorAll(`#${id} button`).forEach(x=>x.classList.toggle('on',x===b)); fn(b.dataset[attr]); })); }
 seg('siteSeg','site',k=>setSite(k));
 seg('modeSeg','mode',m=>{ mode=m; applyColors(); });
-const exagIn=document.getElementById('exag'); exagIn.addEventListener('input',()=>{ exag=+exagIn.value; document.getElementById('exagV').textContent=exag.toFixed(1)+'×'; applyHeights(); });
 const scrub=document.getElementById('scrub'); scrub.addEventListener('input',()=>{ t=+scrub.value; });
 const speedIn=document.getElementById('speed'); speedIn.addEventListener('input',()=>{ speed=+speedIn.value; document.getElementById('speedV').textContent=speed+' h/s'; });
 const playBtn=document.getElementById('play'), playIcon=document.getElementById('playIcon');
@@ -737,7 +848,7 @@ addEventListener('resize',resize);
 let view="globe";
 const gScene=new THREE.Scene(); gScene.background=new THREE.Color(0x000000);
 const gCam=new THREE.PerspectiveCamera(40,1,0.01,100); gCam.position.set(0,0,4.6);
-const gStars=stars.clone(); gStars.scale.setScalar(0.004); gScene.add(gStars);
+const gStars=stars.clone(); gStars.scale.setScalar(0.004*4500/230000); gScene.add(gStars);
 const gSun=new THREE.DirectionalLight(0xfffaf0,3.0); gSun.position.set(-4,1.2,2.4); gScene.add(gSun);
 gScene.add(new THREE.AmbientLight(0xffffff,0.03));
 const rim=new THREE.DirectionalLight(0x5f8bff,1.6); rim.position.set(3,0.5,-3); gScene.add(rim);
@@ -750,7 +861,8 @@ const moon=new THREE.Mesh(new THREE.SphereGeometry(1,384,192),moonMat);
 const gGroup=new THREE.Group(); gGroup.add(moon); gScene.add(gGroup);
 gGroup.rotation.set(0.12,-Math.PI/2+0.25,0);
 function llToVec(lat,lon,r){ const phi=(lon+180)/360*Math.PI*2, th=(90-lat)*DEG; return new THREE.Vector3(-Math.cos(phi)*Math.sin(th)*r, Math.cos(th)*r, Math.sin(phi)*Math.sin(th)*r); }
-const SITE_LL={pole:[-89.5,130], malapert:[-86,3], apollo:[0.674,23.473]};
+// filled from data/<site>/meta.json at start-up (these are the same numbers, so the globe works while it loads)
+const SITE_LL={shackleton:[-89.7621,-157.075], ridge:[-89.4623,-137.087], malapert:[-85.9877,2.068], apollo11:[0.67416,23.47314]};
 const gMarkers={};
 for(const k in SITE_LL){ const m=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex([[0,'#fff'],[0.25,'#ffd27a'],[0.5,'rgba(255,181,71,.35)'],[1,'rgba(0,0,0,0)']]),depthTest:true,depthWrite:false,blending:THREE.AdditiveBlending}));
   m.scale.set(0.09,0.09,1); m.position.copy(llToVec(SITE_LL[k][0],SITE_LL[k][1],1.012)); m.userData.site=k; gGroup.add(m); gMarkers[k]=m; }
@@ -813,7 +925,7 @@ function sampleSoilTints(img){ try{ const cv=document.createElement('canvas'); c
     r/=n; gg/=n; b/=n; const L=(r+gg+b)/3||1; SITES[k].tint=[r/L,gg/L,b/L]; }
   if(view==="street") applyColors(); }catch(e){} }
 
-const gLabels={pole:document.getElementById('gl_pole'),apollo:document.getElementById('gl_apollo'),malapert:document.getElementById('gl_malapert')};
+const gLabels={}; for(const k in SITE_LL) gLabels[k]=document.getElementById('gl_'+k);
 let gDrag=null, gVel={x:0,y:0}, gZoom=4.6, flying=null;
 function enterSite(k){ flying={k, t0:performance.now(), from:gCam.position.z}; }
 let heroOn=true, heroShift=-0.95;
@@ -842,7 +954,7 @@ function globeFrame(now){
     else { gVel.x*=0.92; gVel.y*=0.92; gGroup.rotation.y+=gVel.y+0.0006; gGroup.rotation.x=Math.max(-1.5,Math.min(1.5,gGroup.rotation.x+gVel.x)); } }
   if(flying){ const u=Math.min(1,(now-flying.t0)/1100); const e=u*u*(3-2*u); gCam.position.z=flying.from+(1.08-flying.from)*e;
     const [lat,lon]=SITE_LL[flying.k]; gGroup.rotation.x+=(lat*DEG-gGroup.rotation.x)*0.15; let dy=-(lon+90)*DEG-gGroup.rotation.y; dy=((dy+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI; gGroup.rotation.y+=dy*0.15;
-    if(u>=1){ const k=flying.k; flying=null; gTarget=null; document.querySelectorAll('#siteSeg button').forEach(x=>x.classList.toggle('on',x.dataset.site===k)); setSite(k); runAnalysis(); setView("street"); } }
+    if(u>=1){ const k=flying.k; flying=null; gTarget=null; document.querySelectorAll('#siteSeg button').forEach(x=>x.classList.toggle('on',x.dataset.site===k)); setSite(k).then(()=>{ runAnalysis(); setView("street"); }); } }
   else gCam.position.z+=(gZoom-gCam.position.z)*0.12;
   heroShift+=((heroOn&&innerWidth>900?-0.95:0)-heroShift)*0.06; gCam.lookAt(heroShift,heroOn?0.05:0,0);
   for(const k in gMarkers){ const wp=gMarkers[k].getWorldPosition(new THREE.Vector3()); const facing=wp.clone().normalize().dot(gCam.position.clone().sub(wp).normalize())>0.05;
@@ -870,22 +982,26 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;
   camera.position.set(cam.x,gH*exag+2,cam.z); camera.rotation.set(cam.pitch,cam.yaw,0);
 
   // sky
-  const sun=site.sun(t), ep=site.earth(t); const sd=dirAzEl(sun.az,sun.el), ed=dirAzEl(ep.az,ep.el);
+  const sun=SUN(t), ep=EARTH(t); const sd=dirAzEl(sun.az,sun.el), ed=dirAzEl(ep.az,ep.el);
+  TU.uSunDir.value.copy(sd);
+  if(site.distant){ const D=site.distant, f=sun.az/0.5, i=Math.floor(f)%720, u=f-Math.floor(f), hz=D[i]*(1-u)+D[(i+1)%720]*u, hh=Math.max(-1,Math.min(1,(sun.el-hz)/0.267));
+    TU.uDistant.value=(Math.PI/2+Math.asin(hh)+hh*Math.sqrt(1-hh*hh))/Math.PI; } else TU.uDistant.value=1;
   sunCore.position.copy(camera.position).addScaledVector(sd,SKY_R); sunGlow.position.copy(sunCore.position);
-  earth.position.copy(camera.position).addScaledVector(ed,3300); earthHalo.position.copy(earth.position); earth.rotation.y=t*0.26;
+  earth.position.copy(camera.position).addScaledVector(ed,EARTH_D); earthHalo.position.copy(earth.position); earth.rotation.y=t*0.26;
   stars.position.copy(camera.position);
   const fx2=cam.x+Math.sin(heading*DEG)*150, fz2=cam.z-Math.cos(heading*DEG)*150;
   sunLight.target.position.set(fx2,gH*exag,fz2); sunLight.position.set(fx2,gH*exag,fz2).addScaledVector(sd,2500);
-  sunLight.intensity = sun.el>-0.6?5.2:0; earthshine.position.copy(ed).multiplyScalar(100);
+  sunLight.intensity = sun.el>-6?5.2:0; // the terrain decides; a high peak sees below the flat horizon earthshine.position.copy(ed).multiplyScalar(100);
   stars.material.opacity = 0.85;
 
   // readouts
-  const frac=sunFraction(cam.x,cam.z,sun,1), ev=earthVisible(cam.x,cam.z,ep,1);
+  const frac=sunFraction(cam.x,cam.z,sun), ev=earthVisible(cam.x,cam.z,ep);
   $('rSun').textContent=`az ${sun.az.toFixed(1)}° · el ${sun.el.toFixed(2)}°`;
   $('rEarth').textContent=`az ${ep.az.toFixed(1)}° · el ${ep.el.toFixed(2)}°`;
   const rl=$('rLit'); if(frac>=0.99){rl.className='pill lit'; rl.textContent='full sun';} else if(frac>0){rl.className='pill part'; rl.textContent=`partly · ${Math.round(frac*100)}%`;} else {rl.className='pill dark'; rl.textContent='in shadow';}
-  const rc=$('rComm'); if(ev){rc.className='pill earth'; rc.textContent='yes, clear line';} else {rc.className='pill dark'; rc.textContent= ep.el<0?'earth has set':'blocked by a ridge';}
-  $('rElev').textContent=`${gH>=0?'+':''}${gH.toFixed(1)} m`; $('rSlope').textContent=`${slopeAt(cam.x,cam.z).toFixed(1)}°`;
+  const rc=$('rComm'); if(ev){rc.className='pill earth'; rc.textContent='yes, clear line';} else {rc.className='pill dark'; rc.textContent= ep.el<-6?'earth has set':'below the skyline';}
+  if(site.illustrative){ $('rElev').textContent='illustrative'; $('rSlope').textContent=`${slopeAt(cam.x,cam.z).toFixed(1)}° (illustrative)`; }
+  else { const er=errAt(cam.x,cam.z); $('rElev').textContent=`${(sampleR(cam.x,cam.z)+site.meta.heightM).toFixed(1)} m${er!=null?' ± '+er.toFixed(1):''}`; $('rSlope').textContent=`${slopeReal(cam.x,cam.z).toFixed(1)}°`; }
   const ft=fmtTime(t); $('when').innerHTML=`${ft.day}<span class="mono">${ft.clock}</span>`;
   $('cursorLine').style.left=`calc(${t/168*100}% - 1px)`;
   if(analysisDirty && now-lastMoveAt>220) runAnalysis();
@@ -893,7 +1009,28 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;
   renderer.render(scene,camera); requestAnimationFrame(frame);
 }
 
-setSite('pole'); resize(); runAnalysis(); document.body.classList.add('hero'); setView('globe'); requestAnimationFrame(frame);
+resize(); document.body.classList.add('hero'); setView('globe'); requestAnimationFrame(frame);
+Promise.all(Object.keys(SITE_LL).map(k=>fetch(`data/${k}/meta.json`).then(r=>r.json()).then(m=>{ SITE_LL[k]=[m.lat,m.lon];
+  gMarkers[k].position.copy(llToVec(m.lat,m.lon,1.012)); const sb=document.getElementById('sb_'+k); if(sb) sb.textContent=fmtLL(m)+(m.near?` · ${Math.round(m.heightM)} m`:''); })))
+  .catch(e=>console.warn('site list',e))
+  .then(()=>setSite('shackleton')).then(()=>runAnalysis());
+/* ---------- hook for part one (site filters) ----------
+   StreetView.setSummary({ title:'Why this site', items:[{value:'82', unit:'%', label:'Sunlight, Jan 2027'}, ...] })
+     replaces the bottom-left box (up to 4 items in the 2x2 grid; more wrap onto new rows).
+   StreetView.clearSummary()   goes back to this week's sunlight numbers.
+   StreetView.goTo('malapert') opens a site directly (keys: shackleton, ridge, malapert, apollo11). */
+window.StreetView={
+  setSummary(sum){ customSummary=sum; const box=document.querySelector('#stats .statgrid'); box.textContent='';
+    document.getElementById('statsLabel').textContent=sum.title||'';
+    for(const it of sum.items||[]){ const d=document.createElement('div'); d.className='stat'; const v=document.createElement('div'); v.className='v'; v.textContent=it.value??'—';
+      if(it.unit){ const u=document.createElement('small'); u.textContent=' '+it.unit; v.appendChild(u); }
+      const k=document.createElement('div'); k.className='k'; k.textContent=it.label||''; d.append(v,k); box.appendChild(d); } },
+  clearSummary(){ customSummary=null; document.querySelector('#stats .statgrid').innerHTML=
+    '<div class="stat"><div class="v" id="sLongLit">—</div><div class="k">Longest stretch of sun</div></div><div class="stat"><div class="v" id="sLongDark">—</div><div class="k">Longest night to survive</div></div><div class="stat"><div class="v" id="sLit">—</div><div class="k">Time in sunlight</div></div><div class="stat"><div class="v" id="sBoth">—</div><div class="k">Power + signal home</div></div>';
+    setWeek(weekIn.value); },
+  goTo(key){ if(!SITES[key]) throw new Error('unknown site '+key); hideHero(); document.querySelectorAll('#siteSeg button').forEach(x=>x.classList.toggle('on',x.dataset.site===key));
+    return setSite(key).then(()=>{ runAnalysis(); setView('street'); }); },
+};
 })();
 </script>
 </body>
