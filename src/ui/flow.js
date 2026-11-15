@@ -819,31 +819,37 @@ export function createFlow({ app, globe, finder, surface, api }) {
   // ---- 5 Credits ----------------------------------------------------------------------------------------
   function drawCredits() {
     const line = (what, who) => h('div', { class: 'credit' }, what ? h('span', {}, what) : null, h('strong', {}, who));
-    clear($('credits')).append(
-      h(
-        'div',
-        { class: 'credits-roll' },
-        h('div', { class: 'credit-title' }, credits.teamName),
-        h('div', { class: 'credit-sub' }, credits.event),
-        ...credits.team.map((person) => line(person.role ?? '', person.name)),
-        ...credits.sections.flatMap((section) => [
-          h('div', { class: 'credit-sub' }, section.title),
-          ...section.items.map((entry) => line(entry.what, entry.who)),
-        ]),
-      ),
+    // The team rolls up once and stays at the top, its names close together; the data and tools then roll round
+    // in the space left underneath (Daniel, 2026-11-15; styles.css has the two animations).
+    const team = h(
+      'div',
+      { class: 'credits-team' },
+      h('div', { class: 'credit-title' }, credits.teamName),
+      h('div', { class: 'credit-sub' }, credits.event),
+      ...credits.team.map((person) => line(person.role ?? '', person.name)),
     );
-    // The site's address as a QR code under the credits, when data/credits.json gives one (`site.url`).
+    const roll = h(
+      'div',
+      { class: 'credits-roll' },
+      ...credits.sections.flatMap((section) => [
+        h('div', { class: 'credit-sub' }, section.title),
+        ...section.items.map((entry) => line(entry.what, entry.who)),
+      ]),
+    );
+    const rest = h('div', { class: 'credits-rest' }, roll);
+    clear($('credits')).append(team, rest);
+    // The site's address as a QR code over the right of the ride view, when data/credits.json gives one (`site.url`).
     const site = credits.site?.url ? credits.site : null;
     $('siteQr').hidden = !site;
-    $('rideSection').classList.toggle('with-qr', !!site);
     if (site) {
       $('siteQr').href = site.url;
       $('siteQrLabel').textContent = site.label ?? 'Try it yourself';
       $('siteQrUrl').textContent = site.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     }
-    // The same reading speed however long the list is: about 45 pixels a second.
-    const roll = $('credits').firstChild;
-    roll.style.animationDuration = `${Math.max(20, Math.round((roll.offsetHeight + $('credits').clientHeight) / 45))}s`;
+    // The roll starts just below its window and leaves at the top, at the same reading speed however long the list
+    // is: about 45 pixels a second.
+    $('credits').style.setProperty('--rest-h', `${rest.clientHeight}px`);
+    roll.style.animationDuration = `${Math.max(12, Math.round((roll.offsetHeight + rest.clientHeight) / 45))}s`;
   }
 
   // ---- Start --------------------------------------------------------------------------------------------

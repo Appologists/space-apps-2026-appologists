@@ -1523,15 +1523,36 @@ input.big {
   font-size: 17px;
 }
 
-/* 5 Credits: a slow roll, like the end of a film. */
+/* 5 Credits (Daniel, 2026-11-15): the team's names roll up from the bottom once, close together, and stay at the
+   top; everything else then rolls round and round in the space left under them, like the end of a film. */
 .credits {
-  /* As tall as the panel has room for (Daniel, 2026-11-15): the Ride tab's panel holds little else. */
+  /* As tall as the panel has room for: the Ride tab's panel holds little else. */
   --credits-h: clamp(230px, calc(100vh - 250px), 700px);
-  position: relative;
+  --team-seconds: 6s; /* how long the names take to reach the top */
+  display: flex;
+  flex-direction: column;
   height: var(--credits-h);
   overflow: hidden;
   border-block: 1px solid var(--rule);
-  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+.credits-team {
+  flex: none;
+  display: grid;
+  gap: 3px;
+  padding: 12px 0 10px;
+  text-align: center;
+  animation: credits-team var(--team-seconds) cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.credits-team .credit-sub {
+  margin: 2px 0 6px;
+}
+.credits-rest {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid var(--rule);
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
 }
 .credits-roll {
   position: absolute;
@@ -1540,18 +1561,33 @@ input.big {
   display: grid;
   gap: 12px;
   text-align: center;
-  animation: credits-roll 34s linear infinite;
+  /* Starts when the names have arrived; until then it waits just below its window. */
+  animation: credits-roll 34s linear var(--team-seconds) infinite backwards;
 }
-/* The site's QR code under the credits: big enough to scan from the back of a room, on white as scanners need. */
-.with-qr .credits {
-  --credits-h: clamp(160px, calc(100vh - 560px), 700px);
+@keyframes credits-team {
+  from {
+    transform: translateY(var(--credits-h, 230px));
+  }
+  to {
+    transform: none;
+  }
+}
+/* The site's QR code, in the top right corner of the ride view, just under the heading chip: big enough to scan
+   from the back of a room, on white as scanners need. */
+.site-qr-wrap {
+  position: fixed;
+  right: 14px;
+  top: 108px;
+  z-index: 6;
 }
 .site-qr {
   display: grid;
   justify-items: center;
   gap: 8px;
-  margin-top: 14px;
-  color: inherit;
+  padding: 12px 12px 10px;
+  border-radius: 8px;
+  background: rgba(14, 13, 12, 0.82);
+  color: var(--text, #efe9dd);
   text-decoration: none;
 }
 .site-qr[hidden] {
@@ -1577,7 +1613,7 @@ input.big {
 }
 @keyframes credits-roll {
   from {
-    transform: translateY(var(--credits-h, 230px));
+    transform: translateY(var(--rest-h, 230px));
   }
   to {
     transform: translateY(-100%);
@@ -1609,6 +1645,11 @@ input.big {
 @media (prefers-reduced-motion: reduce) {
   .credits {
     height: auto;
+  }
+  .credits-team {
+    animation: none;
+  }
+  .credits-rest {
     mask-image: none;
   }
   .credits-roll {
