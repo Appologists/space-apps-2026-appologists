@@ -23,12 +23,12 @@ To publish: drag this folder onto Netlify Drop, or point a Netlify site at it (n
 | Skyline from 60 to 200 km (blocks Sun and Earth) | Same 80 m map, worked out ahead of time per site |
 | Sun and Earth position, every hour for a year from 14 Nov 2026 | Team repo's `src/astro/` (Astronomy Engine, checked against NASA JPL Horizons) |
 | Shadows, "is the rover in sun?", the week strip and stats | Worked out in the page from the real heights above (Moon's curvature included) |
-| Starting view | Each site opens at the hour of the chosen week when the Sun is highest. The original's hills and view direction are turned to sit around that real Sun the way they sat around the original's made-up one. Shackleton and the ridge start on the highest drawn ground within 300 m of NASA's spot; Malapert starts on its real summit |
+| Starting view | Each site opens at the hour of the chosen week when the Sun is highest, facing the same way from that real Sun each time. Shackleton, the ridge and Malapert start on the highest real ground within 300 m of the spot; a spot from the finder starts exactly on it |
 | Where you stand | Shackleton rim and Connecting ridge: centres of NASA's best-lit regions in that product. Malapert: our pick, the summit in the 5 m map |
 | Smoothness of the ground you see | The drawn surface is the 5 m map smoothed over ~35 m (its cells carry ~0.4 m of noise, which flickers in low sunlight). Every number uses the unsmoothed map |
-| Big smooth hills (Shackleton, ridge), craters (3-230 m), rolling relief, fine bumps, rocks, dust texture | **Added for looks**, using the original prototype's recipe and hill list, layered on top of the real ground. Malapert gets no made-up hills: it is a real 5 km mountain. On screen, shadows come from the big shapes only and are kept soft, like the original. The numbers (height, slope, sunlight, Earth in view) use NASA data only |
-| Apollo 11 ground | **Illustrative.** No 5 m map baked for it yet; the page says so. Its Sun and Earth are real |
-| Earth's appearance | Illustrative texture |
+| Craters under 30 m across, fine bumps, rocks, dust texture | **Added for looks**, on top of the real ground: smaller than NASA's map can show. Nothing bigger is made up (no hills, no rolling ground, no big craters; team decision 9), so the hills and the skyline are the real ones. A label on the picture says this in every window size, and on the wrist panel in VR. The numbers (height, slope, sunlight, Earth in view) use the real map only |
+| Apollo 11 ground | **Made up.** No 5 m map baked for it yet; the label on the picture says so. Its Sun and Earth are real |
+| Earth's appearance; size of the Sun and Earth | Illustrative texture. Both discs are drawn larger than life (Sun 2.4 times, Earth 1.6 times) so they can be seen; the label says so. The numbers use their true sizes |
 | Globe | NASA SVS CGI Moon Kit (LROC colour, LOLA relief) |
 
 ## Rebuilding the data

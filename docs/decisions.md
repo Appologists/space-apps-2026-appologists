@@ -15,6 +15,7 @@ says so; do not rewrite history.
 | 6 | 2026-11-14 | First demo: recommend landing sites from chosen characteristics (sunlight, terrain, travel paths, possibly water in the regolith). | Something judges can use end to end. |
 | 7 | 2026-11-14 | Large datasets are not stored in git. The repo holds a catalog and a download script. | Keeps the repo small and clones fast. |
 | 8 | 2026-11-15 | **The team's front is the app's front (Daniel: "Yes, adopt it").** Top tabs Moon, Site, Street view and Ride, a "Plan a mission" pop-up, and the chosen region's close-up popped out beside the whole Moon (`src/ui/shell.js`). It sits on top of the mission steps, which still do the work (`src/ui/flow.js`): Moon is step 2, Site step 3, Ride step 5. With it: the Moon tab shows the whole Moon (`REGION_ZOOM` 1.1; it was 2.5, which Daniel asked for on 14 Nov when the globe shared the stage with the map); the old Surface step has no tab, the street view page stands in for it; the mission questions have one definition for the pop-up and the Mission step (`src/ui/mission-questions.js`); one plugin answers `/learn` (`server/learn-plugin.mjs`). | Two fronts for one app cannot both be shown in 120 seconds, and this is the one the team built and wants. |
+| 9 | 2026-11-15 | **The street view draws nothing made up that NASA's map could show (Daniel: "Yes, do that").** The made-up hills (60 to 150 m high, within a kilometre), the rolling ground (about ±18 m) and the made-up craters 28 to 400 m across are gone from `public/Street-view/index.html`: the hills and the skyline are the real ones. What stays is decoration smaller than the map shows (craters under 30 m, bumps, rocks), and a label on the picture says so in every window size and on the wrist panel in VR. The label also says the Sun and Earth are drawn larger than life, and that hills are drawn to 60 km while the numbers use terrain to 200 km. Drawing further than 60 km is left for after the event (about four times the data per spot). | Same rule as decision I: never show invented data as real. A skyline that was partly invented within a kilometre broke it, and the small print that said so was hidden in narrow windows and in VR. `tests/streetview-page.test.js` holds the rule. |
 
 ## Scaffold defaults, for the team to confirm or change
 
@@ -52,9 +53,6 @@ These were chosen to get a working skeleton. None is settled until the team says
 
 ## Open questions
 
-- The street view page (`public/Street-view/`) draws made-up hills, craters and rocks on top of the real ground and
-  says so only in small print; its numbers come from real data, and its drawn hills stop at 60 km. What to do about
-  that is Daniel's call (asked 2026-11-15).
 - Which licence for the repo?
 - Which sites should be on the list for the demo? (See plan, item 7.)
 - How much terrain can we do in the time left: slope only, or real horizons?
