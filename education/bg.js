@@ -2,6 +2,7 @@
 // latitude/longitude grid and teal glows at the landing sites), turning slowly behind everything.
 // In the hero it sits on the right; as you scroll it moves to the centre and dims, so text stays readable.
 import * as THREE from 'three';
+import { layerTexture } from './layers.js';
 
 const canvas = document.getElementById('bg');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -29,13 +30,16 @@ tilt.add(spin);
 const material = new THREE.MeshStandardMaterial({color: 0x8a8a8a, roughness: 1, metalness: 0});
 const moon = new THREE.Mesh(new THREE.SphereGeometry(1, 192, 96), material);
 spin.add(moon);
-new THREE.TextureLoader().load('/textures/moon-hd.jpg', t => {
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
-    material.map = t;
-    material.color.set(0xffffff);
-    material.needsUpdate = true;
-});
+/** Recolour the background Moon: 'photo', 'elevation' or 'heat' (see layers.js). */
+export async function setBgLayer(kind) {
+    const t = await layerTexture(kind);
+    if (t) {
+        material.map = t;
+        material.color.set(0xffffff);
+        material.needsUpdate = true;
+    }
+}
+setBgLayer('photo');
 fetch('/textures/moon-elevation-grid.bin').then(r => (r.ok ? r.arrayBuffer() : Promise.reject())).then(buf => {
     const m = new Int16Array(buf);
     if (m.length !== 1440 * 720) {
@@ -142,6 +146,7 @@ function place() {
     camera.setViewOffset(W, H, shift, -H * 0.02, W, H);
     camera.position.z = 4.3 + progress * 0.9;
     canvas.style.opacity = String(1 - 0.72 * progress);
+    document.documentElement.classList.toggle('past-hero', progress > 0.5);
 }
 
 window.addEventListener('resize', resize);
