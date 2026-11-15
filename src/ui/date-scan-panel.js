@@ -25,7 +25,13 @@ const wattHours = (wh) => (wh >= 1000 ? `${(wh / 1000).toFixed(wh >= 10_000 ? 0 
 function loadPanel() {
   try {
     const saved = JSON.parse(localStorage.getItem(PANEL_KEY) ?? 'null');
-    if (saved && typeof saved === 'object') return { ...EXAMPLE_PANEL, ...saved };
+    if (saved && typeof saved === 'object') {
+      // Only values that make sense are taken; anything else falls back to the example's.
+      const panel = { ...EXAMPLE_PANEL };
+      for (const field of ['areaM2', 'efficiency', 'otherLosses', 'loadW']) if (Number.isFinite(saved[field]) && saved[field] >= 0) panel[field] = saved[field];
+      if (Object.hasOwn(MOUNTS, saved.mount)) panel.mount = saved.mount;
+      return panel;
+    }
   } catch { /* storage unavailable: use the example */ }
   return { ...EXAMPLE_PANEL };
 }
@@ -259,14 +265,21 @@ export function createDateScan({ el, onUse }) {
     const end = new Date(anchor.getTime() + SCAN_DAYS * DAY_MS - 1);
     const range = `${dayLabel(anchor)} – ${dayLabel(end)}`;
     clear(el);
-    if (!ranked.length) {
+    const unchecked = rows.filter((r) => r.error);
+    if (!ranked.length && unchecked.length === rows.length) {
+      // No terrain for any spot: nothing was checked, which is not the same as nothing passing.
+      el.append(h('div', { class: 'when-answer none' },
+        h('div', { class: 'when-big' }, 'Landing times could not be checked'),
+        h('p', {}, `The terrain around the spots could not be read, so no landing time from ${range} was checked. ${unchecked[0].error}`)));
+    } else if (!ranked.length) {
       // Nothing passes: say what stands in the way most often.
       const counts = {};
       for (const r of rows) for (const d of r.days ?? []) for (const [reason, n] of Object.entries(d.reasonCounts ?? {})) counts[reason] = (counts[reason] ?? 0) + n;
       const worst = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      const missing = unchecked.length ? ` ${unchecked.length} of the ${rows.length} regions could not be checked (their terrain could not be read).` : '';
       el.append(h('div', { class: 'when-answer none' },
         h('div', { class: 'when-big' }, 'No landing time works'),
-        h('p', {}, `None of the spots passes on any hour from ${range}.${worst ? ` Most often: ${REASON_TEXT[worst]}.` : ''} Try a shorter stay, a longer darkness limit, or let Earth count when only its edge is in view (below).`)));
+        h('p', {}, `None of the spots checked passes on any hour from ${range}.${worst ? ` Most often: ${REASON_TEXT[worst]}.` : ''}${missing} Try a shorter stay, a longer darkness limit, or let Earth count when only its edge is in view (below).`)));
     } else {
       const { row, start } = picked;
       el.append(h('p', { class: 'when-lede' }, picked.row === ranked[0].row && picked.start === ranked[0].win.best ? `Best landing time from ${range}:` : 'Chosen landing time:'), answer(row, start));
