@@ -14,7 +14,7 @@ const horizonsProxy = {
 };
 
 export default defineConfig({
-  // learnPages: the education page at /learn (education/), its data, and live sync (server/learn-plugin.mjs).
+  // learnPages: the education page at /learn (education/), its data, and optional live sync (server/learn-plugin.mjs).
   plugins: [terrainApi(), learnPages()],
   server: { proxy: horizonsProxy },
   preview: { proxy: horizonsProxy },
