@@ -61,3 +61,18 @@ describe("the front's tabs", () => {
     expect(tabOfStep(decodeFlow(encodeFlow({ ...state, step: TAB_STEPS.ride })).step)).toBe('ride');
   });
 });
+
+describe('the route choice', () => {
+  it('is kept with the drive, so the ride follows the route that was chosen', () => {
+    const drive = { ...state, startAt: { lat: -89, lon: 122.7 }, targets: [{ lat: -88.8, lon: 123.7 }] };
+    expect(decodeFlow(encodeFlow({ ...drive, routeChoice: 'fastest' })).routeChoice).toBe('fastest');
+    expect(decodeFlow(encodeFlow({ ...drive, routeChoice: 'shortest' })).routeChoice).toBe('shortest');
+  });
+
+  it('is left out when it is the default, when there is no drive, and when it is not one of the three', () => {
+    const drive = { ...state, startAt: { lat: -89, lon: 122.7 }, targets: [{ lat: -88.8, lon: 123.7 }] };
+    expect(encodeFlow({ ...drive, routeChoice: 'safest' })).not.toContain('route=');
+    expect(encodeFlow({ ...state, targets: [], routeChoice: 'fastest' })).not.toContain('route=');
+    expect(decodeFlow(`${encodeFlow(drive)}&route=scenic`).routeChoice).toBeUndefined();
+  });
+});

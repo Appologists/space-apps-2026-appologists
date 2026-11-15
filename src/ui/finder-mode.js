@@ -366,6 +366,13 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       updateRoute();
     },
     getRoute: () => ({ start, targets, reach, plan }),
+    /** Which of the three route choices is asked for: 'safest' | 'fastest' | 'shortest' (the address keeps it). */
+    getRouteChoice: () => routeChoice,
+    chooseRoute: (id) => {
+      if (id === routeChoice) return;
+      routeChoice = id;
+      updateRoute();
+    },
     getMap: () => map,
     debug: { pick, route: () => ({ start, targets, reach, plan, options, routeChoice }) },
   };

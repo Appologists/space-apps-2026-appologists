@@ -17,6 +17,9 @@ const VALUE_KEYS = [
 ];
 const BOOLEAN = new Set(['needSunAtLanding', 'needEarthAtLanding', 'roverNeedsEarthToDrive']);
 
+/** The three route choices (src/finder/route-options.js); the first is what the app opens on. */
+const ROUTE_CHOICES = ['safest', 'fastest', 'shortest'];
+
 const point = (p) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
 function readPoint(text) {
   const [lat, lon] = String(text).split(',').map(Number);
@@ -33,9 +36,10 @@ function readPoint(text) {
  * @param {string|null} [state.region]       id of the region on the map
  * @param {{lat: number, lon: number}|null} [state.startAt]   where the rover starts
  * @param {{lat: number, lon: number}[]} [state.targets]      its destinations, in the order added
+ * @param {string} [state.routeChoice]       'safest' (the default, left out), 'fastest' or 'shortest'
  * @returns {string} for the address, without the leading "#"
  */
-export function encodeFlow({ step, profile, start, durationHours, values, region, startAt, targets }) {
+export function encodeFlow({ step, profile, start, durationHours, values, region, startAt, targets, routeChoice }) {
   const q = new URLSearchParams();
   q.set('step', String(step));
   if (profile) q.set('profile', profile);
@@ -45,13 +49,14 @@ export function encodeFlow({ step, profile, start, durationHours, values, region
   if (region) q.set('region', region);
   if (startAt) q.set('from', point(startAt));
   if (targets?.length) q.set('to', targets.map(point).join(';'));
+  if (targets?.length && ROUTE_CHOICES.includes(routeChoice) && routeChoice !== ROUTE_CHOICES[0]) q.set('route', routeChoice);
   return q.toString();
 }
 
 /**
  * The reverse. Anything missing or unreadable is left out, so a damaged address gives a normal start.
  * @returns {{step?: number, profile?: string, start?: Date, durationHours?: number, values?: Object, region?: string,
- *            startAt?: {lat: number, lon: number}, targets?: {lat: number, lon: number}[]}}
+ *            startAt?: {lat: number, lon: number}, targets?: {lat: number, lon: number}[], routeChoice?: string}}
  */
 export function decodeFlow(text) {
   const q = new URLSearchParams(String(text ?? '').replace(/^#/, ''));
@@ -72,6 +77,7 @@ export function decodeFlow(text) {
   if (startAt) out.startAt = startAt;
   const targets = (q.get('to') ?? '').split(';').filter(Boolean).map(readPoint).filter(Boolean);
   if (targets.length) out.targets = targets;
+  if (targets.length && ROUTE_CHOICES.includes(q.get('route'))) out.routeChoice = q.get('route');
   return out;
 }
 

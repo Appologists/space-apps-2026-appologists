@@ -71,6 +71,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
   const openGroups = new Set(); // which groups of the custom form are open; all start closed
   let searchFirst = null; // a region to search before the others (the one a saved address was showing)
   let restoring = false; // while a saved address is being acted on, nothing is written back to it
+  let stepListener = null; // told of every change of step (the front's tabs follow it: ui/shell.js)
   const clock = { hours: 0, playing: false, frame: 0, rate: 0, showTime: false, freeLook: false, yaw: null, fromHere: false, sunAt: 0 };
 
   // ---- Step bar and Back / Next ---------------------------------------------------------------------------
@@ -117,6 +118,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
     step = next;
     furthest = Math.max(furthest, step);
     app.dataset.step = String(step);
+    stepListener?.(step);
     for (const section of sections) section.hidden = !section.dataset.steps.split(' ').includes(String(step));
     $('flowBody').scrollTop = 0;
     drawNav();
@@ -198,6 +200,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       region: regionId,
       startAt: onMap ? start : null,
       targets: onMap ? targets : [],
+      routeChoice: finder.getRouteChoice(),
     });
     history.replaceState(null, '', `#${text}`);
   }
@@ -229,6 +232,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
         await go(3);
         if (saved.startAt) finder.pick(saved.startAt.lat, saved.startAt.lon, 'start');
         for (const target of saved.targets ?? []) finder.pick(target.lat, target.lon, 'dest');
+        if (saved.routeChoice) finder.chooseRoute(saved.routeChoice);
         for (let next = 4; next <= saved.step && !blocked(next - 1); next++) await go(next);
       }
     } finally {
@@ -762,7 +766,11 @@ export function createFlow({ app, globe, finder, surface, api }) {
   // ---- Start --------------------------------------------------------------------------------------------
   globe.view('south');
   const saved = decodeFlow(location.hash); // read before go(1) writes the address
-  go(1).then(() => restore(saved));
+  const ready = go(1).then(() => restore(saved)); // settles once a saved address has been acted on
 
-  return { go, ride, routeChanged, timeChanged, getStep: () => step, getRegion: () => REGIONS.find((r) => r.id === regionId) ?? null, debug: { scan: () => scan, clock, play, pause, useProfile } };
+  // The step a saved address asks for (1 on a first visit). The address itself is no use for this once go(1) has
+  // run: it has already been rewritten.
+  const savedStep = missions.profiles.some((p) => p.id === saved.profile) ? saved.step ?? 1 : 1;
+
+  return { go, ride, ready, savedStep, listenStep: (fn) => (stepListener = fn), routeChanged, timeChanged, getStep: () => step, getRegion: () => REGIONS.find((r) => r.id === regionId) ?? null, debug: { scan: () => scan, clock, play, pause, useProfile } };
 }

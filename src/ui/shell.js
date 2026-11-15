@@ -215,9 +215,9 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     markTabs();
     drawSummary();
   }
+  flow.listenStep(syncTab);
   function drawLead() {
     requestAnimationFrame(drawLead);
-    syncTab();
     const svg = $('leadLine');
     const region = flow.getRegion?.();
     if (tab !== 'moon' || flow.getStep() !== 2 || !region || $('finder').hidden) {
@@ -291,23 +291,30 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   }
 
   // ---- start ------------------------------------------------------------------------------------------------
-  // A saved address (a reload, a shared link) goes straight back; a first visit starts with the survey.
-  const savedStep = Number(/step=(\d)/.exec(location.hash)?.[1] ?? 1);
-  const began = Date.now();
-  const waitForFlow = () => {
+  // A saved address (a reload, a shared link, coming back from the street view page) goes straight back; a first
+  // visit starts with the survey. flow.savedStep says which: by now the address itself has been rewritten.
+  const begin = () => {
     if (flow.getStep() >= 2) {
       tab = tabOfStep(flow.getStep());
       markTabs();
       drawSummary();
-      return;
-    }
-    if (savedStep < 2 || Date.now() - began > 20000) {
+    } else {
       openSurvey();
       markTabs();
-      return;
     }
-    setTimeout(waitForFlow, 200);
   };
-  setTimeout(waitForFlow, 300);
+  if (flow.savedStep < 2) setTimeout(begin, 300);
+  else {
+    // Going back walks through the earlier views on the way to the saved one. Keep them off the screen until it
+    // is there: about a second with kept searches, 4 seconds at most (a slow search then shows its progress).
+    app.classList.add('restoring');
+    const lift = () => app.classList.remove('restoring');
+    flow.ready.finally(lift);
+    setTimeout(lift, 4000);
+    // The Moon tab comes first and the tabs follow from there (syncTab). If it never comes, start with the survey.
+    const began = Date.now();
+    const wait = () => (flow.getStep() >= 2 || Date.now() - began > 20000 ? begin() : setTimeout(wait, 100));
+    wait();
+  }
   return { show, openSurvey };
 }

@@ -185,13 +185,14 @@
         <div class="finder" id="finder" hidden>
           <div class="pop-head"><span class="eyebrow">Close-up · landing sites and the rover's drive</span><strong id="popTitle"></strong></div>
           <div class="pop-actions"><button type="button" id="popOpen">Open site ↗</button><button type="button" id="popStand" class="primary">Stand here →</button></div>
+          <!-- What the map is coloured by, and its key (flow.js). On the Site tab it sits on the map's top left corner;
+               in the Moon tab's small pop-out it is a row above the map, so it covers none of it (shell.css). -->
+          <div class="map-key">
+            <div class="map-views" id="mapViews" role="group" aria-label="Colour the map by"></div>
+            <div class="legend map-legend" id="finderLegend" hidden></div>
+          </div>
           <div class="finder-map" id="finderMap">
             <canvas id="finderCanvas" aria-label="Map of the search area, north up. Point at it to read values; click to select a spot."></canvas>
-            <!-- What the map is coloured by, and its key: on the map itself (flow.js). -->
-            <div class="map-key">
-              <div class="map-views" id="mapViews" role="group" aria-label="Colour the map by"></div>
-              <div class="legend map-legend" id="finderLegend" hidden></div>
-            </div>
             <div class="tip" id="finderTip" hidden></div>
           </div>
           <!-- The drive's timeline, beside the map rather than over it (step 3; see flow.js and styles.css). -->
