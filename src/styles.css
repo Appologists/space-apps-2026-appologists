@@ -1525,8 +1525,10 @@ input.big {
 
 /* 5 Credits: a slow roll, like the end of a film. */
 .credits {
+  /* As tall as the panel has room for (Daniel, 2026-11-15): the Ride tab's panel holds little else. */
+  --credits-h: clamp(230px, calc(100vh - 330px), 640px);
   position: relative;
-  height: 230px;
+  height: var(--credits-h);
   overflow: hidden;
   border-block: 1px solid var(--rule);
   mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
@@ -1538,11 +1540,11 @@ input.big {
   display: grid;
   gap: 12px;
   text-align: center;
-  animation: credits-roll 26s linear infinite;
+  animation: credits-roll 34s linear infinite;
 }
 @keyframes credits-roll {
   from {
-    transform: translateY(230px);
+    transform: translateY(var(--credits-h, 230px));
   }
   to {
     transform: translateY(-100%);
