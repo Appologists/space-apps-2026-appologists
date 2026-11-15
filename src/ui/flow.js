@@ -43,7 +43,7 @@ const REGIONS = missions.regions.map((region) => {
 const DAY = 24;
 const CHOICES = [
   { group: 'Mission' },
-  { on: 'mission', key: 'durationHours', label: 'How long it lasts', options: [[7 * DAY, '7 days'], [14 * DAY, '14 days'], [LUNAR_DAY_HOURS, '29.5 days']], format: (v) => formatHours(v) },
+  { on: 'mission', key: 'durationHours', label: 'Duration', options: [[7 * DAY, '7 days'], [14 * DAY, '14 days'], [LUNAR_DAY_HOURS, '29.5 days']], format: (v) => formatHours(v) },
   { group: 'Lander' },
   { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']], format: (v) => `${v} m` },
   { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°` },

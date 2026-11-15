@@ -22,7 +22,6 @@
         <div class="flow-body" id="flowBody">
           <section data-steps="1">
             <h2 class="step-title">Plan a mission</h2>
-            <p class="lede">Take a ready-made mission or set your own. Then see where on the Moon it can land, plan the rover's drive, and stand there.</p>
             <div id="profiles" class="profiles"></div>
             <div id="setup" class="setup"></div>
           </section>
@@ -87,7 +86,8 @@
           </section>
 
           <section data-steps="1">
-            <details class="more" id="moreTools">
+            <!-- Not part of the demo: shown only when the address has ?tools (see main.js). -->
+            <details class="more" id="moreTools" hidden>
               <summary>More tools: known sites ranked, weights, terrain data, exact numbers</summary>
               <div class="more-body">
                 <p class="notice" id="terrainNotice">

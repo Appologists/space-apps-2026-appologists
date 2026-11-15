@@ -319,7 +319,10 @@ flow = createFlow({
     setStatus,
   },
 });
-// The site card belongs to the ranked list, which now lives under "More tools".
+// The older tools (ranked list of known sites, weights, terrain data, exact-number form, and the site card
+// that goes with the list) are kept off the page for the demo. Add ?tools to the address to get them back
+// under "More tools" on the first step.
+$('moreTools').hidden = !new URLSearchParams(location.search).has('tools');
 $('moreTools').addEventListener('toggle', (e) => {
   document.querySelector('.app').classList.toggle('tools-open', e.target.open);
   drawDetail();
