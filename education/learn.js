@@ -7,6 +7,12 @@ import { Body, GeoMoon, GeoVector, Illumination, MoonPhase } from 'astronomy-eng
 import { BADGES, FACTS, QUIZ as OUR_QUIZ, SOURCES } from './content.js';
 import { QUIZ as EXPLORER_QUIZ } from '/lunar-game.js';
 import { createDots } from './dots.js';
+import { setBgLayer } from './bg.js';
+import { layerImage, layerLegend, layerTexture } from './layers.js';
+import { initTopics, renderTimeline } from './topics.js';
+import { initGuide } from './guide.js';
+import { renderFactGrid } from './factfx.js';
+import { HEAT_GRADIENT, burst, heatColor, mountCardArt, progressDots, scoreRing, siteLocator } from './gamefx.js';
 
 // The quiz: the explorer's own questions (/classic, lunar-game.js) plus ours, without repeats.
 const QUIZ = [...OUR_QUIZ];
@@ -75,7 +81,7 @@ function toast(title, text) {
 // ================= Progress (kept in this browser) =================
 const KEY = 'lunar-learn-v1';
 const XP_PER_LEVEL = 150;
-let me = {xp: 0, badges: {}, read: {}, sites: {}, sdo: {}, name: '', elsh: 1};
+let me = {xp: 0, badges: {}, read: {}, sites: {}, sdo: {}, topics: {}, history: {}, best: {}, name: '', elsh: 1};
 try {
     me = Object.assign(me, JSON.parse(localStorage.getItem(KEY) || '{}'));
 } catch (e) {
@@ -90,7 +96,21 @@ function save() {
     }
 }
 
+function renderPlayStats() {
+    const el = $('play-stats');
+    if (!el) {
+        return;
+    }
+    const tile = (n, l) => h('div', {}, h('b', {class: 'px'}, n), h('span', {}, l));
+    el.replaceChildren(
+        tile(me.best.quiz ? String(me.best.quiz) : '\u2013', 'your best quiz'),
+        tile(me.best.hotcold ? String(me.best.hotcold) : '\u2013', 'your best estimate'),
+        tile(`${Object.keys(me.badges).length} / ${BADGES.length}`, 'badges'),
+        tile(`LV ${Math.floor(me.xp / XP_PER_LEVEL) + 1}`, `${me.xp} XP`));
+}
+
 function renderMe() {
+    renderPlayStats();
     $('lvl').textContent = `LV ${Math.floor(me.xp / XP_PER_LEVEL) + 1}`;
     $('xpfill').style.width = `${(100 * (me.xp % XP_PER_LEVEL)) / XP_PER_LEVEL}%`;
     $('xptext').textContent = `${me.xp} XP`;
@@ -239,10 +259,12 @@ function buildMoon() {
     // A light over the viewer's left shoulder, so relief reads clearly from any side.
     const sun = new THREE.DirectionalLight(0xffffff, 2.6);
     scene.add(sun);
-    loadTexture('/textures/moon-hd.jpg').then(t => {
-        mat.map = t;
-        mat.needsUpdate = true;
-    }).catch(() => {});
+    layerTexture(currentLayer).then(t => {
+        if (t) {
+            mat.map = t;
+            mat.needsUpdate = true;
+        }
+    });
     // LOLA heights (made by lunar-planner/build_terrain.py): relief, drawn 4x taller than real.
     fetch('/textures/moon-elevation-grid.bin').then(r => (r.ok ? r.arrayBuffer() : Promise.reject())).then(buf => {
         const m = new Int16Array(buf);
@@ -276,7 +298,7 @@ function buildMoon() {
             renderInfo();
         }
     }).catch(() => {});
-    return {scene, distance: 4.2, min: 1.6, max: 9, pins: [], relief: false, light: sun};
+    return {scene, distance: 4.2, min: 1.6, max: 9, pins: [], relief: false, light: sun, mat, mesh};
 }
 
 let sites = [];
@@ -308,6 +330,7 @@ const fly = {t: 1, from: new THREE.Vector3(), to: new THREE.Vector3()};
 
 async function selectSite(s) {
     selectedSite = s;
+    drawLayerMap();
     for (const p of worlds.moon.pins) {
         p.el.classList.toggle('sel', p.site === s);
     }
@@ -338,6 +361,7 @@ async function selectSite(s) {
         if (r.ok && selectedSite === s) {
             const j = await r.json();
             const now = Date.now();
+            s.skySource = typeof j.source === 'string' && j.source.includes('Astronomy Engine') ? 'astronomy' : 'horizons';
             s.sky = j.samples.reduce((best, x) => (Math.abs(new Date(x.t) - now) < Math.abs(new Date(best.t) - now) ? x : best));
             renderInfo();
         }
@@ -346,44 +370,65 @@ async function selectSite(s) {
     }
 }
 
-/** A small sky chart: centre = straight up, edge = horizon, north at the top. */
+const POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+
+function point(az) {
+    return POINTS[Math.round((((az % 360) + 360) % 360) / 22.5) % 16];
+}
+
+/** Sky chart from the site: centre = straight up, edge = horizon; N, E, S, W and a tick every 30 degrees. */
 function skyCompass(x) {
-    const c = h('canvas', {class: 'skydial', width: 220, height: 220});
+    const c = h('canvas', {class: 'skydial', width: 300, height: 300});
     const g = c.getContext('2d');
-    const R = 92;
-    g.translate(110, 110);
-    g.strokeStyle = '#2e2e2e';
+    const R = 118;
+    g.translate(150, 150);
     g.lineWidth = 2;
-    for (const r of [R, R * 2 / 3, R / 3]) {
+    // Altitude rings: horizon, 30 and 60 degrees up.
+    for (const [r, label] of [[R, ''], [(R * 2) / 3, '30\u00b0'], [R / 3, '60\u00b0']]) {
+        g.strokeStyle = r === R ? '#3a3a3a' : '#242424';
         g.beginPath();
         g.arc(0, 0, r, 0, Math.PI * 2);
         g.stroke();
+        if (label) {
+            g.fillStyle = '#555';
+            g.font = '15px Geist Mono, monospace';
+            g.fillText(label, 4, -r + 16);
+        }
     }
-    g.fillStyle = '#6e6e6e';
-    g.font = '18px Geist Mono, monospace';
+    // Ticks every 30 degrees of azimuth, compass letters every 90.
+    for (let az = 0; az < 360; az += 30) {
+        const a = (az - 90) * DEG;
+        g.strokeStyle = az % 90 === 0 ? '#777' : '#3a3a3a';
+        g.beginPath();
+        g.moveTo(Math.cos(a) * R, Math.sin(a) * R);
+        g.lineTo(Math.cos(a) * (R + (az % 90 === 0 ? 10 : 6)), Math.sin(a) * (R + (az % 90 === 0 ? 10 : 6)));
+        g.stroke();
+    }
+    g.font = '600 18px Geist Mono, monospace';
     g.textAlign = 'center';
-    g.fillText('N', 0, -R - 6);
-    const dot = (az, el, color, label) => {
+    g.textBaseline = 'middle';
+    for (const [name, az] of [['N', 0], ['E', 90], ['S', 180], ['W', 270]]) {
+        const a = (az - 90) * DEG;
+        g.fillStyle = name === 'N' ? '#f5c96b' : '#9a9a9a';
+        g.fillText(name, Math.cos(a) * (R + 22), Math.sin(a) * (R + 22));
+    }
+    const dot = (az, el, color) => {
         const up = el >= 0;
         const r = up ? R * (1 - el / 90) : R;
         const a = (az - 90) * DEG;
-        const px = r * Math.cos(a);
-        const py = r * Math.sin(a);
         g.fillStyle = color;
         g.strokeStyle = color;
         g.lineWidth = 3;
         g.beginPath();
-        g.arc(px, py, 11, 0, Math.PI * 2);
+        g.arc(r * Math.cos(a), r * Math.sin(a), 12, 0, Math.PI * 2);
         if (up) {
             g.fill();
         } else {
             g.stroke();
         }
-        g.fillStyle = '#ededed';
-        g.fillText(label, px, py + (py > 60 ? -18 : 32));
     };
-    dot(x.sun_az, x.sun_el, '#f5c96b', 'Sun');
-    dot(x.earth_az, x.earth_el, '#5aa8ff', 'Earth');
+    dot(x.earth_az, x.earth_el, '#5aa8ff');
+    dot(x.sun_az, x.sun_el, '#f5c96b');
     return c;
 }
 
@@ -462,6 +507,21 @@ function tempTiles(lowK, highK) {
     return h('div', {class: 'tiles'}, tile('Night', lowK, 'cold'), tile('Noon', highK, 'hot'));
 }
 
+function skyDetail(s) {
+    const x = s.sky;
+    const sunKm = x.sun_au * AU_KM;
+    const row = (cls, name, el, az, dist) => h('div', {class: `sky-row ${cls}`},
+        h('i', {class: el > 0 ? 'up' : ''}), h('b', {}, name),
+        h('span', {}, `${el >= 0 ? '+' : ''}${el.toFixed(1)}\u00b0`), h('span', {}, `${az.toFixed(0)}\u00b0 ${point(az)}`), h('span', {}, dist));
+    return h('div', {class: 'sky-now'},
+        skyCompass(x),
+        h('div', {class: 'sky-table'},
+            h('div', {class: 'sky-row head'}, h('i'), h('b', {}, 'Sky now'), h('span', {}, 'altitude'), h('span', {}, 'direction'), h('span', {}, 'distance')),
+            row('sun', 'Sun', x.sun_el, x.sun_az, `${(sunKm / 1e6).toFixed(1)} M km`),
+            row('earth', 'Earth', x.earth_el, x.earth_az, `${Math.round(x.earth_km).toLocaleString('en-US')} km`),
+            h('p', {class: 'ratio'}, `The Sun is ${Math.round(sunKm / x.earth_km)}\u00d7 farther away than Earth. Filled dot = above the horizon.`)));
+}
+
 function moonInfo() {
     const s = selectedSite;
     if (!s) {
@@ -495,12 +555,13 @@ function moonInfo() {
         kids.push(h('p', {class: 'takeaway'}, 'Loading the measured temperature\u2026'));
     }
     if (s.sky) {
-        kids.push(h('div', {class: 'sky-now'}, skyCompass(s.sky), h('div', {},
-            h('span', {class: 'tag'}, 'SKY NOW'),
-            h('p', {}, s.sky.sun_el > 0 ? 'Sun up' : 'Sun down', ' \u00b7 ', s.sky.earth_el > 0 ? 'Earth up' : 'Earth down'),
-            h('small', {}, 'Filled = above the horizon'))));
+        kids.push(skyDetail(s));
     }
-    kids.push(sourcesLine([['LRO Diviner', SOURCES.diviner.url], ['JPL Horizons', SOURCES.horizons.url], [SHORT_SOURCE[s.source] || s.source, src ? src.url : '#']]));
+    const street = new URLSearchParams({view: 'surface', lat: s.lat.toFixed(5), lon: s.lon.toFixed(5), name: s.name});
+    kids.push(h('a', {class: 'btn primary street', href: `/classic?${street}`}, 'Open street view \u2192'));
+    // On the team's dev server (npm run dev) the sky comes from Astronomy Engine, which the team checks against Horizons.
+    const sky = s.skySource === 'astronomy' ? ['Astronomy Engine, checked with JPL Horizons', 'https://github.com/cosinekitty/astronomy'] : ['JPL Horizons', SOURCES.horizons.url];
+    kids.push(sourcesLine([['LRO Diviner', SOURCES.diviner.url], sky, [SHORT_SOURCE[s.source] || s.source, src ? src.url : '#']]));
     kids.push(h('button', {class: 'link-btn', onclick: () => {
         selectedSite = null;
         for (const p of worlds.moon.pins) {
@@ -796,7 +857,7 @@ function showWorld(name) {
     controls.maxDistance = world.max;
     controls.update();
     $('stage-note').textContent = {
-        moon: 'Relief 4× · markers from data/sites.json',
+        moon: 'Double-click any spot for street view · relief 4×',
         earth: 'NASA EPIC · DSCOVR',
         sun: 'NASA SDO · AIA and HMI',
         system: 'Positions: Astronomy Engine · distances not to scale',
@@ -882,7 +943,7 @@ function arenaTop(label, score) {
 
 // ---------- Mission quiz ----------
 function startQuiz() {
-    const game = {qs: shuffle(QUIZ).slice(0, 10), i: 0, score: 0, streak: 0};
+    const game = {qs: shuffle(QUIZ).slice(0, 10), i: 0, score: 0, streak: 0, results: []};
     quizQuestion(game);
     arena.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
@@ -904,7 +965,10 @@ function quizQuestion(game) {
         clearInterval(timerId);
         const left = Math.max(0, LIMIT - (performance.now() - started)) / 1000;
         let gained = 0;
+        game.results.push(Boolean(o && o.right));
+        arena.querySelector('.pdots').replaceWith(progressDots(game.qs.length, game.results));
         if (o && o.right) {
+            burst(buttons[order.indexOf(o)]);
             game.streak++;
             gained = Math.round((100 + left * 5) * (game.streak >= 3 ? 1.5 : 1));
             game.score += gained;
@@ -936,6 +1000,7 @@ function quizQuestion(game) {
     openArena(
         h('div', {class: 'arena-top'}, h('span', {}, `Question ${game.i + 1} of ${game.qs.length}`), h('span', {class: 'timer'}, bar),
             game.streak >= 2 ? h('span', {}, `Streak ${game.streak}`) : null, h('span', {class: 'score'}, String(game.score))),
+        progressDots(game.qs.length, game.results),
         h('p', {class: 'question'}, item.q),
         h('div', {class: 'options'}, buttons));
     clearInterval(timerId);
@@ -981,11 +1046,16 @@ async function hotColdRound(game) {
     const slider = h('input', {class: 'range', type: 'range', min: 40, max: 400, step: 1, value: 200, 'aria-label': 'Your estimate in kelvin'});
     const out = h('output', {}, '200 K');
     const celsius = h('span', {class: 'quiet mono'}, '-73 °C');
-    slider.addEventListener('input', () => {
+    const knob = h('span', {class: 'knob', style: 'left:44.4%'});
+    const thermo = h('div', {class: 'thermo', style: `background:${HEAT_GRADIENT}`}, knob);
+    const paint = () => {
         out.textContent = `${slider.value} K`;
+        out.style.color = heatColor(Number(slider.value));
         celsius.textContent = `${Math.round(slider.value - 273.15)} °C`;
-    });
-    const thermo = h('div', {class: 'thermo'});
+        knob.style.left = `${(100 * (slider.value - 40)) / 360}%`;
+    };
+    slider.addEventListener('input', paint);
+    paint();
     const pos = k2 => `${(100 * (k2 - 40)) / 360}%`;
     const go = h('button', {class: 'btn primary', onclick: () => {
         go.disabled = true;
@@ -993,6 +1063,9 @@ async function hotColdRound(game) {
         const guess = Number(slider.value);
         const err = Math.abs(guess - truth);
         const pts = Math.max(0, Math.round(200 - 2 * err));
+        if (pts >= 150) {
+            burst(go, heatColor(truth));
+        }
         game.score += pts;
         arena.querySelector('.score').textContent = String(game.score);
         thermo.append(h('span', {class: 'mark', style: `left:${pos(guess)}`}, h('b', {}, `you ${guess} K`)),
@@ -1014,7 +1087,9 @@ async function hotColdRound(game) {
     }}, 'Lock in estimate');
     openArena(
         arenaTop(`Round ${game.round + 1} of 5`, game.score),
-        h('p', {class: 'question'}, `${s.name} (${fmtLat(s.lat)}, ${fmtLon(s.lon)}) at ${hh}:${mm} local solar time. ${sunUp ? 'The Sun is up.' : 'The Sun is down.'} How warm is the surface?`),
+        h('div', {class: 'hc-row'},
+            h('p', {class: 'question'}, `${s.name} (${fmtLat(s.lat)}, ${fmtLon(s.lon)}) at ${hh}:${mm} local solar time. ${sunUp ? 'The Sun is up.' : 'The Sun is down.'} How warm is the surface?`),
+            h('figure', {class: 'hc-map'}, siteLocator(s), h('figcaption', {class: 'mono'}, sunUp ? '\u2600 Sun up' : '\u263e Sun down'))),
         h('div', {class: 'guess'}, slider, h('div', {}, out, h('br'), celsius)),
         thermo,
         go);
@@ -1023,6 +1098,8 @@ async function hotColdRound(game) {
 // ---------- Result and leaderboard ----------
 function finish(game, score, what) {
     clearInterval(timerId);
+    me.best[game] = Math.max(me.best[game] || 0, score);
+    save();
     addXp(Math.round(score / 20));
     if (game === 'quiz' && score >= 2000) {
         award('quiz');
@@ -1058,7 +1135,7 @@ function finish(game, score, what) {
     }}, 'Post to leaderboard');
     openArena(
         h('p', {class: 'kicker mono'}, `RESULT · ${what.toUpperCase()}`),
-        h('div', {class: 'final'}, String(score)),
+        h('div', {class: 'final-row'}, scoreRing(score, game === 'quiz' ? 2800 : 1000)),
         h('p', {class: 'quiet'}, `+${Math.round(score / 20)} XP`),
         h('div', {class: 'submit'}, name, post, h('button', {class: 'btn', onclick: () => (game === 'quiz' ? startQuiz() : startHotCold())}, 'Play again'), msg));
 }
@@ -1074,7 +1151,7 @@ async function showBoard(game) {
         const j = await (await fetch(`/api/learn/leaderboard?game=${game}`)).json();
         const rows = j.top.map((r, i) => h('li', {class: me.name && r.name.toLowerCase() === me.name.toLowerCase() ? 'me' : ''},
             h('span', {class: 'pos'}, String(i + 1).padStart(2, '0')), h('span', {class: 'who'}, r.name), h('span', {class: 'when'}, r.at), h('span', {class: 'pts'}, String(r.score))));
-        $('ranks').replaceChildren(...(rows.length ? rows : [h('li', {}, h('span', {class: 'empty'}, 'No scores yet. Be the first.'))]));
+        $('ranks').replaceChildren(...(rows.length ? rows : [h('li', {class: 'empty-row'}, h('span', {class: 'empty'}, 'No scores yet. Be the first.'))]));
     } catch (e) {
         $('ranks').replaceChildren(h('li', {}, h('span', {class: 'empty'}, 'The leaderboard needs the Flask server (lunar-planner).')));
     }
@@ -1121,16 +1198,211 @@ const sectionSpy = new IntersectionObserver(entries => {
         }
     }
 }, {rootMargin: '-45% 0px -50% 0px'});
-for (const id of ['hero', 'lab', 'facts', 'play', 'board']) {
+for (const id of ['hero', 'lab', 'facts', 'topics', 'guide', 'timeline', 'play', 'board', 'more']) {
     sectionSpy.observe(document.getElementById(id));
 }
 
+// ================= Double-click the Moon: open the explorer's street view at that spot =================
+const picker = new THREE.Raycaster();
+
+function streetViewUrl(lat, lon, name) {
+    const q = new URLSearchParams({view: 'surface', lat: lat.toFixed(5), lon: lon.toFixed(5), name});
+    return `/classic?${q}`;
+}
+
+canvas.addEventListener('dblclick', e => {
+    if (worldName !== 'moon' || !worlds.moon) {
+        return;
+    }
+    const r = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    picker.setFromCamera(ndc, camera);
+    const hit = picker.intersectObject(worlds.moon.mesh, false)[0];
+    if (!hit) {
+        return;
+    }
+    // Moon axes: x = (0 N, 0 E), y = north pole, z = (0 N, 90 W). See upAt().
+    const p = worlds.moon.mesh.worldToLocal(hit.point.clone()).normalize();
+    const lat = Math.asin(Math.max(-1, Math.min(1, p.y))) / DEG;
+    const lon = Math.atan2(-p.z, p.x) / DEG;
+    const name = `${fmtLat(lat)}, ${fmtLon(lon)}`;
+    toast('Opening street view', name);
+    canvas.classList.add('leaving');
+    setTimeout(() => {
+        window.location.href = streetViewUrl(lat, lon, name);
+    }, 450);
+});
+
+// ================= Colour layers (corner panel on the moving background) =================
+let currentLayer = 'photo';
+
+async function drawLayerMap() {
+    const cv = $('layer-map');
+    const g = cv.getContext('2d');
+    const W = cv.width;
+    const H = cv.height;
+    const img = await layerImage(currentLayer);
+    g.fillStyle = '#0a0a0a';
+    g.fillRect(0, 0, W, H);
+    if (img) {
+        g.drawImage(img, 0, 0, W, H);
+    }
+    g.strokeStyle = 'rgba(255,255,255,0.18)';
+    g.lineWidth = 1;
+    for (let lon = -150; lon < 180; lon += 30) {
+        const x = ((lon + 180) / 360) * W;
+        g.beginPath();
+        g.moveTo(x, 0);
+        g.lineTo(x, H);
+        g.stroke();
+    }
+    for (const lat of [-60, -30, 0, 30, 60]) {
+        const y = ((90 - lat) / 180) * H;
+        g.beginPath();
+        g.moveTo(0, y);
+        g.lineTo(W, y);
+        g.stroke();
+    }
+    for (const site of sites) {
+        const x = ((site.lon + 180) / 360) * W;
+        const y = ((90 - site.lat) / 180) * H;
+        const sel = selectedSite && selectedSite.id === site.id;
+        g.fillStyle = sel ? '#ffffff' : 'rgba(79,227,193,0.9)';
+        g.beginPath();
+        g.arc(x, y, sel ? 6 : 3, 0, Math.PI * 2);
+        g.fill();
+        if (sel) {
+            g.strokeStyle = '#000';
+            g.lineWidth = 2;
+            g.stroke();
+        }
+    }
+    const legend = await layerLegend(currentLayer);
+    $('layer-grad').style.background = legend.gradient || 'none';
+    $('layer-grad').hidden = !legend.gradient;
+    $('layer-lo').textContent = legend.lo || '';
+    $('layer-hi').textContent = legend.hi || '';
+    $('layer-title').textContent = legend.title;
+}
+
+async function setLayer(kind) {
+    currentLayer = kind;
+    for (const b of document.querySelectorAll('[data-layer]')) {
+        b.classList.toggle('on', b.dataset.layer === kind);
+    }
+    $('layer-map').classList.add('swap');
+    setBgLayer(kind);
+    const t = await layerTexture(kind);
+    if (t && worlds.moon) {
+        worlds.moon.mat.map = t;
+        worlds.moon.mat.needsUpdate = true;
+    }
+    await drawLayerMap();
+    $('layer-map').classList.remove('swap');
+}
+
+// A thin line under the top bar shows how far down the page you are.
+function scrollLine() {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    document.documentElement.style.setProperty('--scroll', max > 0 ? (window.scrollY / max).toFixed(4) : '0');
+}
+window.addEventListener('scroll', scrollLine, {passive: true});
+scrollLine();
+
+for (const b of document.querySelectorAll('[data-layer]')) {
+    b.addEventListener('click', () => setLayer(b.dataset.layer));
+}
+
+// ================= Tabs: Education and Our team =================
+function showTab() {
+    const team = window.location.hash === '#team';
+    $('team').hidden = !team;
+    $('view-learn').hidden = team;
+    document.body.classList.toggle('on-team', team);
+    $('tab-team').classList.toggle('on', team);
+    $('tab-learn').classList.toggle('on', !team);
+    $('tab-team').setAttribute('aria-selected', String(team));
+    $('tab-learn').setAttribute('aria-selected', String(!team));
+    if (team) {
+        window.scrollTo({top: 0});
+    }
+}
+
+window.addEventListener('hashchange', showTab);
+showTab();
+
 // ================= Start =================
 $('stat-q').textContent = QUIZ.length;
+mountCardArt();
 renderMe();
 renderBadges();
 showBoard('quiz');
 countPlayers();
 resize();
-loadSites().then(() => showWorld('moon'));
+let topicCount = 0;
+topicCount = initTopics($('topic-tabs'), $('topic-body'), id => {
+    if (!me.topics[id]) {
+        me.topics[id] = 1;
+        addXp(5);
+    }
+    if (topicCount && Object.keys(me.topics).filter(k => !k.startsWith('g-')).length >= topicCount) {
+        award('scholar');
+    }
+});
+$('topic-count').textContent = `${topicCount} short explainers, each with its numbers and sources.`;
+let guideCount = 0;
+guideCount = initGuide($('guide-tabs'), $('guide-body'), id => {
+    if (!me.topics[id]) {
+        me.topics[id] = 1;
+        addXp(5);
+    }
+    if (guideCount && Object.keys(me.topics).filter(k => k.startsWith('g-')).length >= guideCount) {
+        award('guide');
+    }
+});
+$('guide-count').textContent = `${guideCount} parts of our app: the main site's mission steps and rover tools, and the explorer. Each one opens the real thing.`;
+$('more-count').textContent = `${renderFactGrid($('fx-grid'), SOURCES)} facts, each drawn live. Numbers from NASA, with the source under each.`;
+loadSites().then(() => {
+    showWorld('moon');
+    drawLayerMap();
+    const n = renderTimeline($('timeline-list'), sites);
+    $('tl-count').textContent = `${n} landings with a known year, from our site list. Select one to see it on the 3D Moon.`;
+    for (const li of $('timeline-list').children) {
+        li.addEventListener('click', () => openFromTimeline(li.dataset.site));
+        li.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openFromTimeline(li.dataset.site);
+            }
+        });
+    }
+    const io = new IntersectionObserver(entries => {
+        for (const e of entries) {
+            if (e.isIntersecting) {
+                e.target.classList.add('in');
+                io.unobserve(e.target);
+            }
+        }
+    }, {rootMargin: '0px 0px -6% 0px'});
+    for (const li of $('timeline-list').children) {
+        io.observe(li);
+    }
+});
+
+function openFromTimeline(id) {
+    const s = sites.find(x => x.id === id);
+    if (!s) {
+        return;
+    }
+    me.history[id] = 1;
+    save();
+    if (Object.keys(me.history).length >= 3) {
+        award('historian');
+    }
+    $('lab').scrollIntoView({behavior: 'smooth'});
+    if (worldName !== 'moon') {
+        showWorld('moon');
+    }
+    selectSite(s);
+}
 frame();
