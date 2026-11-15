@@ -1,6 +1,6 @@
 // The three route choices (safest, fastest, shortest) as cards above the drive plan, like a road map's route
 // list. Clicking a card shows that route on the map and in the plan below.
-import { ROUTE_KINDS, SLOPE_BANDS, slopeBand } from '../finder/route-options.js';
+import { ROUTE_KINDS, slopeBand } from '../finder/route-options.js';
 import { profile } from '../finder/directions.js';
 import { formatHours } from '../format.js';
 import { WHY_COLOURS } from '../finder/why-not.js';
@@ -144,10 +144,7 @@ export function renderRouteOptions(el, { options, choice, rover, onChoose, resul
           h('span', { class: 'route-when' }, ` · ${whenText(s)}`),
           h('span', { class: 'route-km' }, ` · ${(s.distanceM / 1000).toFixed(1)} km`));
       })),
-    h('div', { class: 'route-key' }, 'Slope: ',
-      SLOPE_BANDS.map((band) => h('span', { class: 'schedule-key' }, h('i', { style: `background:${band.hex}` }), band.label)),
-      h('span', { class: 'schedule-key' }, h('i', { class: 'dash' }), 'other choices'),
-      h('span', { class: 'schedule-key' }, h('i', { class: 'ring' }), 'landing area')),
+    // The route's slope key lives on the map now (its Slope view); the panel shows none (Daniel, 2026-11-14).
     ...[result ? routeDetail(result, plan) : null].filter(Boolean),
   );
 }
