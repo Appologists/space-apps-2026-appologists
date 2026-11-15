@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SLOPE_BANDS } from '../src/finder/slope-bands.js';
 import { FAIL } from '../src/finder/score.js';
 import { MAP_LAYERS, describeCell, hillshade, layerLegend, layerPixel } from '../src/finder/map-layers.js';
 import { SLOPE_MAX_DEG } from '../src/surface/lenses.js';
@@ -89,6 +90,19 @@ describe('layerPixel', () => {
     expect(layerPixel('sun', r, 0, 0)).toEqual([16, 16, 20]);
     expect(layerPixel('earth', r, 0, 0)).toEqual([16, 16, 20]);
   });
+  it('colours slope by the route\'s bands: one colour per band, shaded only in brightness', () => {
+    const r = fakeResult();
+    r.slope[0] = 5;
+    r.slope[1] = 8;
+    r.slope[2] = 25;
+    expect(layerPixel('slope', r, 0, 255)).toEqual(layerPixel('slope', r, 1, 255)); // same band
+    expect(layerPixel('slope', r, 0, 255)).not.toEqual(layerPixel('slope', r, 2, 255)); // under 10° vs over 20°
+    const hex = (rgb) => `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    expect(hex(layerPixel('slope', r, 0, 255))).toBe(SLOPE_BANDS[0].hex); // full light: the band's own colour
+    const dim = layerPixel('slope', r, 0, 0);
+    expect(dim[0] / dim[1]).toBeCloseTo(0x7b / 0xd8, 1); // darker, same hue
+  });
+
   it('clamps slope at SLOPE_MAX_DEG', () => {
     const r = fakeResult();
     r.slope[0] = SLOPE_MAX_DEG;
@@ -105,14 +119,20 @@ describe('layerPixel', () => {
 });
 
 describe('layerLegend', () => {
-  it('has a title and at least two labelled stops for every layer', () => {
+  it('has a title and at least two labelled stops or swatches for every layer', () => {
     const r = fakeResult();
     for (const { id } of MAP_LAYERS) {
       const l = layerLegend(id, r);
       expect(l.title.length).toBeGreaterThan(0);
       expect(l.note.length).toBeGreaterThan(0);
-      expect(l.stops.filter((s) => s.label).length).toBeGreaterThanOrEqual(2);
+      const labelled = l.stops.filter((s) => s.label).length || (l.swatches ?? []).filter((s) => s.label).length;
+      expect(labelled, id).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it('keys the Slope view with the route\'s four bands', () => {
+    const l = layerLegend('slope', fakeResult());
+    expect(l.swatches.map((s) => s.hex)).toEqual(SLOPE_BANDS.map((b) => b.hex));
   });
 });
 
