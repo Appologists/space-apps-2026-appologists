@@ -832,9 +832,18 @@ export function createFlow({ app, globe, finder, surface, api }) {
         ]),
       ),
     );
+    // The site's address as a QR code under the credits, when data/credits.json gives one (`site.url`).
+    const site = credits.site?.url ? credits.site : null;
+    $('siteQr').hidden = !site;
+    $('rideSection').classList.toggle('with-qr', !!site);
+    if (site) {
+      $('siteQr').href = site.url;
+      $('siteQrLabel').textContent = site.label ?? 'Try it yourself';
+      $('siteQrUrl').textContent = site.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    }
     // The same reading speed however long the list is: about 45 pixels a second.
     const roll = $('credits').firstChild;
-    roll.style.animationDuration = `${Math.max(20, Math.round((roll.offsetHeight + 230) / 45))}s`;
+    roll.style.animationDuration = `${Math.max(20, Math.round((roll.offsetHeight + $('credits').clientHeight) / 45))}s`;
   }
 
   // ---- Start --------------------------------------------------------------------------------------------

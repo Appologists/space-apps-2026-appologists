@@ -1542,6 +1542,39 @@ input.big {
   text-align: center;
   animation: credits-roll 34s linear infinite;
 }
+/* The site's QR code under the credits: big enough to scan from the back of a room, on white as scanners need. */
+.with-qr .credits {
+  --credits-h: clamp(160px, calc(100vh - 560px), 700px);
+}
+.site-qr {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: inherit;
+  text-decoration: none;
+}
+.site-qr[hidden] {
+  display: none;
+}
+.site-qr img {
+  width: 230px;
+  height: 230px;
+  border-radius: 6px;
+  background: #fff;
+}
+.site-qr-text {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+  font-size: 13px;
+}
+.site-qr-text span {
+  font-family: var(--font-num, monospace);
+  font-size: 12px;
+  color: var(--dim, #a39d91);
+  overflow-wrap: anywhere;
+}
 @keyframes credits-roll {
   from {
     transform: translateY(var(--credits-h, 230px));
