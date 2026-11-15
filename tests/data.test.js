@@ -35,3 +35,25 @@ describe('data/catalog.json', () => {
     }
   });
 });
+
+describe('data/missions.json', () => {
+  it('gives every profile fact and every region a known source, and regions valid coordinates', async () => {
+    const { default: missions } = await import('../data/missions.json');
+    for (const profile of missions.profiles) {
+      expect(profile.name).toBeTruthy();
+      expect(Number.isNaN(new Date(profile.mission.start).getTime())).toBe(false);
+      for (const fact of profile.facts) expect(missions.sources[fact.source], `source of "${fact.text}"`).toBeTruthy();
+    }
+    const ids = new Set();
+    for (const region of missions.regions) {
+      expect(ids.has(region.id)).toBe(false);
+      ids.add(region.id);
+      const site = region.site ? sitesData.sites.find((s) => s.id === region.site) : region;
+      expect(site, `site of region ${region.id}`).toBeTruthy();
+      expect(Math.abs(site.lat)).toBeLessThanOrEqual(90);
+      expect(site.lon).toBeGreaterThan(-180);
+      expect(site.lon).toBeLessThanOrEqual(180);
+      expect(region.site ? sitesData.sources[site.source] : missions.sources[region.source], `source of region ${region.id}`).toBeTruthy();
+    }
+  });
+});

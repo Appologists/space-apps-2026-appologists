@@ -89,7 +89,7 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     app.classList.add('surface-open');
     $('surface').hidden = false;
     $('surfaceTip').hidden = true;
-    if (innerWidth <= 900) $('hudDetails').open = false; // on a phone the panel would cover the view
+    if (innerWidth <= 900 && $('hudDetails')) $('hudDetails').open = false; // on a phone the panel would cover the view
     if (!view) {
       view = createSurfaceView({
         canvas: $('surfaceCanvas'),
@@ -232,7 +232,22 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     current.profiles.eye = horizonProfile(current.patch, value);
     timeChanged();
   });
-  $('surfaceBack').addEventListener('click', close);
+  $('surfaceBack')?.addEventListener('click', close);
 
-  return { open, close, isOpen: () => !!current, missionChanged, timeChanged, getView: () => view };
+  return {
+    open,
+    close,
+    isOpen: () => !!current,
+    missionChanged,
+    timeChanged,
+    getView: () => view,
+    /** Where the open view is centred, or null. */
+    getSite: () => current?.site ?? null,
+    /** Drive the viewpoint over the open terrain: metres east and north of where the view was opened. */
+    setPosition: (eastM, northM, look) => {
+      if (!current) return;
+      view.setPosition(eastM, northM);
+      if (look) view.setLook(look);
+    },
+  };
 }

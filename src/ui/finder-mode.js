@@ -1,6 +1,6 @@
 // The landing-site finder: runs the search, shows the result as a map over the stage, and lists the best
 // sites. Like surface-mode.js, it owns its part of the page and talks to main.js through callbacks.
-import { finderStepMinutes, searchLanding } from '../finder/client.js';
+import { searchLanding, searchQuestion } from '../finder/client.js';
 import { latLonToCell } from '../finder/grid.js';
 import { pathStats, reachFrom } from '../finder/route.js';
 import { MAX_DESTINATIONS, latestDeparture, planMission } from '../finder/planner.js';
@@ -22,8 +22,10 @@ const percent = (fraction) => `${Math.round(fraction * 100)}%`;
  * @param {() => {mission: import('../mission.js').Mission, weights: Object<string, number>, terrain: object|null, site: {name: string, lat: number, lon: number}|null}} options.getState
  * @param {(message: string|null, hideAfterMs?: number) => void} options.setStatus
  * @param {(lat: number, lon: number) => void} options.onPick   the user chose a point on the map or in the list
+ * @param {(route: {result: object, start: object|null, targets: object[], plan: object|null}) => void} [options.onRoute]
+ *        the start, the destinations or the plan changed (the mission steps play the drive back from this)
  */
-export function createFinderMode({ app, getState, setStatus, onPick }) {
+export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) {
   const values = defaultFinder();
   let map = null; // created the first time a result is shown
   let result = null;
@@ -58,6 +60,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   function chooseLayer(id) {
     layerId = id;
     layerButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(MAP_LAYERS[i].id === id)));
+    map?.setTime(null); // back from "sunlight at the time shown" to the chosen layer
     map?.setLayer(id);
   }
 
@@ -84,24 +87,20 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     });
   }
 
+  /** The whole question for a search centred on a point: the form's values and the mission. */
+  function paramsFor(center) {
+    const { mission, weights, terrainSource } = getState();
+    return searchQuestion({ center, values, mission, weights, source: terrainSource });
+  }
+
   async function run() {
-    const { mission, weights, site, terrainSource } = getState();
+    const { site } = getState();
     if (!site || busy) return;
     busy = true;
     drawForm();
     setStatus('Searching for landing sites… this takes about 10 to 20 seconds.');
     try {
-      result = await searchLanding({
-        ...values,
-        source: terrainSource,
-        center: { lat: site.lat, lon: site.lon },
-        start: mission.start.toISOString(),
-        durationHours: mission.durationHours,
-        stepMinutes: finderStepMinutes(mission.durationHours),
-        panelHeightM: mission.panelHeightM,
-        antennaHeightM: mission.antennaHeightM,
-        weights: { sunlight: weights.sunlight ?? 1, earthComms: weights.earthComms ?? 0 },
-      });
+      result = await searchLanding(paramsFor(site));
       centreName = site.name;
       setStatus(null);
       show();
@@ -110,6 +109,39 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     }
     busy = false;
     drawForm();
+  }
+
+  /**
+   * Show a search that was run elsewhere (the mission steps search several regions and show one at a time).
+   * @param {{lat: number, lon: number}|null} [options.startAt]  where the rover starts; default: the middle
+   */
+  function showResult(next, name, { startAt = null } = {}) {
+    result = next;
+    centreName = name;
+    show();
+    if (startAt) pick(startAt.lat, startAt.lon, 'start');
+  }
+
+  /**
+   * Add one destination that gives a drive the rover survives: the farthest of the other found sites that works.
+   * @returns {boolean} false if no found site gives such a drive
+   */
+  function suggestDrive() {
+    if (!result || !start || !reach) return false;
+    const rover = roverNow();
+    const others = result.sites
+      .map((site) => ({ site, driveM: reach.dist[site.row * result.n + site.col] }))
+      .filter(({ driveM }) => Number.isFinite(driveM) && driveM > 3 * result.cellM)
+      .sort((a, b) => b.driveM - a.driveM);
+    for (const { site } of others) {
+      const target = { row: site.row, col: site.col, lat: site.lat, lon: site.lon };
+      if (planMission(result, start, [target], rover, { explain: false }).ok) {
+        targets = [target];
+        updateRoute();
+        return true;
+      }
+    }
+    return false;
   }
 
   /** A click on the map or on a listed site: sets the start or adds a destination. */
@@ -203,6 +235,7 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     $('finderRoute').textContent = routeText;
     drawDests();
     drawSchedule(text);
+    onRoute?.({ result, start, targets, plan });
   }
 
   function drawSchedule(text) {
@@ -288,7 +321,33 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     app.classList.remove('finder-open');
     $('finder').hidden = true;
   }
-  $('finderBack').addEventListener('click', close);
+  $('finderBack')?.addEventListener('click', close);
 
-  return { drawForm, close, isOpen: () => !$('finder').hidden, getResult: () => result, debug: { pick, route: () => ({ start, targets, reach, plan }) } };
+  return {
+    drawForm,
+    close,
+    isOpen: () => !$('finder').hidden,
+    getResult: () => result,
+    // For the mission steps (src/ui/flow.js):
+    values,
+    paramsFor,
+    showResult,
+    /** Bring the map of the last result back after close(). */
+    open: () => {
+      if (!result) return;
+      app.classList.add('finder-open');
+      $('finder').hidden = false;
+      map?.resize();
+    },
+    pick,
+    setClickMode,
+    suggestDrive,
+    clearTargets: () => {
+      targets = [];
+      updateRoute();
+    },
+    getRoute: () => ({ start, targets, reach, plan }),
+    getMap: () => map,
+    debug: { pick, route: () => ({ start, targets, reach, plan }) },
+  };
 }

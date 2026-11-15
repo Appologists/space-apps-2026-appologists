@@ -8,6 +8,8 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 - `npm run dev` runs the app. `npm test` must pass before you say a change is done.
 - `npm run check:horizons` compares our Sun/Earth maths with NASA JPL Horizons. Run it after touching
   `src/astro/`.
+- `npm run demo:warm` (with the app running) asks every search the ready-made missions need, so they are kept
+  and the steps open at once. Run it before showing the app to anyone.
 - `npm run check:landing` after changing the landing search; `npm run check:tiles` after changing how the
   59 m whole-Moon tiles are read (it compares them with the other terrain datasets you have downloaded).
 
@@ -28,6 +30,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 - The drive planner: the rover's rules and the step-by-step replay in `src/finder/schedule.js`, the search in
   `src/finder/planner.js`, its words in `src/finder/plan-text.js`. All three are pure (no browser code) and
   tested; `tests/finder-planner.test.js` checks the search against an exhaustive one on small maps.
+- The mission steps (the five views in the left panel): `src/ui/flow.js` says which view is on the stage and
+  runs the playback clock; it computes nothing. A new ready-made mission or region: `data/missions.json`, each
+  number with a source. What the address keeps: `src/ui/flow-state.js`. Credits: `data/credits.json`.
 - A new lens (a way to colour the ground in the surface view): one entry in `src/surface/lenses.js`, which
   also states the colour rules every lens follows. The switch and legend appear by themselves.
 
