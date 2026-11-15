@@ -9,31 +9,16 @@ import { h } from './dom.js';
 const km = (m) => `${(m / 1000).toFixed(m < 10000 ? 1 : 0)} km`;
 const ICON = { safest: '🛡', fastest: '⚡', shortest: '📏' };
 
-/** A thin bar showing how much of the drive is in each slope band. */
-function slopeBar(bandM, distanceM) {
-  if (!(distanceM > 0)) return null;
-  return h('div', { class: 'route-slopebar', title: 'Share of the drive in each slope band' },
-    SLOPE_BANDS.filter((band) => bandM[band.id] > 0).map((band) =>
-      h('i', { style: `width:${((bandM[band.id] / distanceM) * 100).toFixed(1)}%;background:${band.hex}`, title: `${band.label}: ${km(bandM[band.id])}` })));
-}
-
-function cardLines(kind, option, rover) {
+/** What a card says: when it arrives (or how it fails), and how far and how steep. */
+function cardLines(option) {
   const s = option.summary;
   const lines = [];
   if (!s.arrived) lines.push(h('span', { class: 'route-bad' }, s.lostAtHours != null ? `Lost in the dark ${formatHours(s.lostAtHours)} after landing` : 'Does not arrive in the mission'));
   else if (!s.survived) lines.push(h('span', { class: 'route-bad' }, `Arrives at ${formatHours(s.arrivalHours)}, then lost in the dark`));
   else lines.push(h('span', { class: 'route-big' }, `Arrives ${formatHours(s.arrivalHours)} after landing`));
   lines.push(`${km(s.distanceM)} · steepest ${s.steepestDeg.toFixed(0)}°`);
-  if (s.darkSpareH != null && s.survived) lines.push(`Longest dark ${formatHours(s.longestDarkH)} (${formatHours(Math.max(0, s.darkSpareH))} to spare)`);
-  if (s.earthFraction != null) lines.push(`Earth in view ${Math.round(s.earthFraction * 100)}% of the trip`);
-  if (kind === 'safest' && option.limits) {
-    lines.push(h('span', { class: 'route-note' }, `Kept to slopes ≤ ${option.limits.maxSlopeDeg}°${option.limits.margin ? ` and darkness ≤ ${formatHours(option.limits.maxDarknessHours)} (30% margin on ${formatHours(rover.maxDarknessHours)})` : ' (no darkness margin possible)'}`));
-  }
-  if (option.sameAs) {
-    const other = ROUTE_KINDS.find((k) => k.id === option.sameAs).label.toLowerCase();
-    const retimed = option.plan.drive.longestDarkH !== option.otherDarkH || option.summary.arrivalHours !== option.otherArrivalH;
-    lines.push(h('span', { class: 'route-note' }, retimed ? `Same path as ${other}, timed for less darkness` : `Same path and timing as ${other}`));
-  }
+  // Darkness to spare, Earth in view, the safest route's limits and "same path as" were taken off the cards to keep
+  // the Drive step short (Daniel, 2026-11-14); the limits are still in the "What these results leave out" note.
   return lines;
 }
 
@@ -166,10 +151,9 @@ export function renderRouteOptions(el, { options, choice, rover, onChoose, resul
         }
         return h('button', { type: 'button', class: `route-card${on ? ' on' : ''}${option.summary.ok ? '' : ' warn'}`, 'aria-pressed': String(on), onClick: () => onChoose(kind.id) },
           h('div', { class: 'route-title' }, `${ICON[kind.id]} ${kind.label}`, h('small', {}, ` ${kind.blurb}`)),
-          ...cardLines(kind.id, option, rover).map((line) => h('div', { class: 'route-line' }, line)),
-          slopeBar(option.summary.bandM, option.summary.distanceM));
+          ...cardLines(option).map((line) => h('div', { class: 'route-line' }, line)));
       })),
-    h('div', { class: 'route-key' }, 'Route colour by slope: ',
+    h('div', { class: 'route-key' }, 'Slope: ',
       SLOPE_BANDS.map((band) => h('span', { class: 'schedule-key' }, h('i', { style: `background:${band.hex}` }), band.label)),
       h('span', { class: 'schedule-key' }, h('i', { class: 'dash' }), 'other choices'),
       h('span', { class: 'schedule-key' }, h('i', { class: 'ring' }), 'landing area')),
