@@ -41,19 +41,37 @@ const REGIONS = missions.regions.map((region) => {
 
 // The custom mission's controls: a few big choices each, instead of number boxes. `on` says which object holds the value.
 const DAY = 24;
-const CHOICES = [
-  { on: 'mission', key: 'durationHours', label: 'Duration', options: [[7 * DAY, '7 days'], [14 * DAY, '14 days'], [LUNAR_DAY_HOURS, '29.5 days']], format: (v) => formatHours(v) },
-  { group: 'Lander' },
-  { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']], format: (v) => `${v} m` },
-  { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°` },
-  { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
-  { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
-  { group: 'Rover' },
-  { on: 'finder', key: 'maxDarknessHours', label: 'Darkness it survives', hint: 'Unbroken hours without sunlight', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h` },
-  { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Steepest slope it drives', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°` },
-  { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', hint: 'Metres an hour, stops included', options: [[36, '36'], [200, '200'], [720, '720']], format: (v) => `${v}` },
-  { on: 'finder', key: 'roverRangeKm', label: 'Range', options: [[5, '5 km'], [10, '10 km'], [20, '20 km']], format: (v) => `${v} km` },
-  { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']] },
+const yes = (when) => (v) => (v ? when[0] : when[1]);
+const GROUPS = [
+  {
+    id: 'mission',
+    title: 'Mission',
+    date: true, // the landing date comes first, with its own row
+    choices: [
+      { on: 'mission', key: 'durationHours', label: 'Duration', options: [[7 * DAY, '7 days'], [14 * DAY, '14 days'], [LUNAR_DAY_HOURS, '29.5 days']], format: (v) => formatHours(v), summary: (v) => `for ${v === LUNAR_DAY_HOURS ? '29.5 days' : formatHours(v).replace('.0 ', ' ')}` },
+    ],
+  },
+  {
+    id: 'lander',
+    title: 'Lander',
+    choices: [
+      { on: 'finder', key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']], format: (v) => `${v} m`, summary: (v) => `within ${v} m` },
+      { on: 'finder', key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['Earth in view', null]) },
+      { on: 'finder', key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['in sunlight', null]) },
+    ],
+  },
+  {
+    id: 'rover',
+    title: 'Rover',
+    choices: [
+      { on: 'finder', key: 'maxDarknessHours', label: 'Darkness it survives', hint: 'Unbroken hours without sunlight', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']], format: (v) => `${v} h`, summary: (v) => `survives ${v} h dark` },
+      { on: 'finder', key: 'roverMaxSlopeDeg', label: 'Steepest slope it drives', options: [[10, '10°'], [15, '15°'], [20, '20°']], format: (v) => `${v}°`, summary: (v) => `slopes up to ${v}°` },
+      { on: 'finder', key: 'roverSpeedMPerHour', label: 'Average speed', hint: 'Metres an hour, stops included', options: [[36, '36'], [200, '200'], [720, '720']], format: (v) => `${v}`, summary: (v) => `${v} m an hour` },
+      { on: 'finder', key: 'roverRangeKm', label: 'Range', options: [[5, '5 km'], [10, '10 km'], [20, '20 km']], format: (v) => `${v} km`, summary: (v) => `${v} km range` },
+      { on: 'finder', key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']], summary: yes(['needs Earth to drive', null]) },
+    ],
+  },
 ];
 
 const STATE_WORDS = {
@@ -87,6 +105,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
   let route = null; // the finder's latest { result, start, targets, plan }
   let track = null; // where the rover is at any hour of the plan (playback.js)
   // One clock for the map and the surface view: hours after landing. `fromHere` stops an echo when this file moves the app's time slider.
+  const openGroups = new Set(); // which groups of the custom form are open; all start closed
   let searchFirst = null; // a region to search before the others (the one a saved address was showing)
   let restoring = false; // while a saved address is being acted on, nothing is written back to it
   const clock = { hours: 0, playing: false, frame: 0, rate: 0, showTime: false, freeLook: false, yaw: null, fromHere: false, sunAt: 0 };
@@ -250,9 +269,22 @@ export function createFlow({ app, globe, finder, surface, api }) {
 
   const same = (a, b) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 1e-6 : a === b);
 
+  const valueOf = (def) => (def.on === 'mission' ? api.getMission()[def.key] : finder.values[def.key]);
+
+  /** One group of the custom form: a header that shows the current values, and its questions when open. */
+  function groupBlock(group) {
+    const date = (d) => `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}, ${d.toISOString().slice(11, 16)} UTC`;
+    const said = [group.date ? date(api.getMission().start) : null, ...group.choices.map((def) => def.summary(valueOf(def)))].filter(Boolean);
+    return h(
+      'details',
+      { class: 'group', open: openGroups.has(group.id), onToggle: (e) => (e.target.open ? openGroups.add(group.id) : openGroups.delete(group.id)) },
+      h('summary', {}, h('span', { class: 'group-title' }, group.title), h('span', { class: 'group-summary' }, said.join(' · '))),
+      h('div', { class: 'group-body' }, group.date ? dateRow() : null, ...group.choices.map(choiceRow)),
+    );
+  }
+
   function choiceRow(def) {
-    if (def.group) return h('div', { class: 'eyebrow' }, def.group);
-    const current = def.on === 'mission' ? api.getMission()[def.key] : finder.values[def.key];
+    const current = valueOf(def);
     // A value set elsewhere (the exact-number boxes under "More tools") gets a button of its own.
     const options = def.options.some(([value]) => same(value, current)) ? def.options : [...def.options, [current, def.format ? def.format(current) : String(current)]];
     const set = (value) => {
@@ -372,7 +404,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
       );
       return;
     }
-    el.append(h('div', { class: 'eyebrow' }, 'Mission'), dateRow(), ...CHOICES.map(choiceRow));
+    el.append(...GROUPS.map(groupBlock));
   }
 
   // ---- 2 Regions ----------------------------------------------------------------------------------------
