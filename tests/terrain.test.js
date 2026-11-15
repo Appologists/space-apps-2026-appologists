@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { fetchTerrainPatch, savedSpot } from '../src/terrain/client.js';
 import { horizonDipDeg, visibilityStats } from '../src/astro/sky.js';
 import { buildShadowGrid, litFraction, sampleGrid, sweepShadows } from '../src/surface/shadows.js';
 import {
@@ -204,5 +205,54 @@ describe.skipIf(!haveData)('real LOLA 80 m data', () => {
     const mean = wall.reduce((sum, v) => sum + v, 0) / wall.length;
     expect(mean).toBeGreaterThan(24);
     expect(mean).toBeLessThan(36);
+  });
+});
+
+describe('the ground for the ride on the hosted website (no server)', () => {
+  const reply = (status, type, body) => ({ ok: status >= 200 && status < 300, status, headers: { get: () => type }, arrayBuffer: async () => body, json: async () => ({}) });
+  const withFetch = async (answers, run) => {
+    const asked = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      asked.push(String(url));
+      const answer = answers(String(url));
+      if (answer === null) throw new Error('offline');
+      return answer;
+    };
+    try {
+      return { result: await run().then((value) => ({ value }), (error) => ({ error })), asked };
+    } finally {
+      globalThis.fetch = real;
+    }
+  };
+
+  it('names a saved spot by its place to 5 decimals', () => {
+    expect(savedSpot(-89.00320819404627, 122.70685772329182)).toBe('-89.00321_122.70686');
+    expect(savedSpot('-88.8', 5)).toBe('-88.80000_5.00000');
+  });
+
+  it('reads the saved ground when the terrain service is not there', async () => {
+    const bytes = encodePatch(fakePatch((d) => d / 100)).buffer;
+    for (const missing of [reply(404, 'text/html'), reply(501, 'text/html'), reply(200, 'text/html'), null]) {
+      const { result, asked } = await withFetch((url) => (url.startsWith('/api/') ? missing : reply(200, 'application/octet-stream', bytes)), () => fetchTerrainPatch(-89.00320819, 122.70685772));
+      expect(result.error).toBeUndefined();
+      expect(result.value.heights.length).toBeGreaterThan(0);
+      expect(asked[1]).toBe('/static/polar/-89.00321_122.70686.bin');
+    }
+  });
+
+  it('uses the terrain service when it answers, and passes on what it says went wrong', async () => {
+    const bytes = encodePatch(fakePatch((d) => d / 100)).buffer;
+    const live = await withFetch(() => reply(200, 'application/octet-stream', bytes), () => fetchTerrainPatch(-89, 122));
+    expect(live.asked).toHaveLength(1);
+    expect(live.result.value.heights.length).toBeGreaterThan(0);
+    const failed = await withFetch(() => ({ ...reply(400, 'application/json'), json: async () => ({ error: 'No terrain data here.', hint: 'npm run data:fetch' }) }), () => fetchTerrainPatch(10, 20));
+    expect(failed.result.error.message).toBe('No terrain data here. Run: npm run data:fetch');
+  });
+
+  it('says so in plain words when a spot is not saved', async () => {
+    // a host that answers a missing file with its front page (text/html, 200) must not be read as terrain
+    const { result } = await withFetch((url) => (url.startsWith('/api/') ? reply(404, 'text/html') : reply(200, 'text/html')), () => fetchTerrainPatch(-88.5, 10));
+    expect(result.error.message).toMatch(/not saved on the website/);
   });
 });

@@ -7,11 +7,19 @@ import { decodeRasters } from './wire.js';
  * @returns {Promise<import('./types.js').FinderResult>}
  */
 export async function searchLanding(params) {
-  const response = await fetch('/api/terrain/landing-search', {
+  let response = await fetch('/api/terrain/landing-search', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(params),
-  });
+  }).catch(() => null);
+  // The hosted website has no server: it reads the searches saved ahead of time (tools/export-static.mjs).
+  if (!response || response.status === 404 || response.status === 405 || !response.headers.get('content-type')?.match(/octet|json/)) {
+    const saved = await fetch(`/static/landing/${await staticKey(params)}.bin`).catch(() => null);
+    if (!saved?.ok || saved.headers.get('content-type')?.includes('text/html')) {
+      throw new Error('This mission is not saved on the website. The ready-made missions are; for your own settings, run the app on a computer (npm run dev).');
+    }
+    response = saved;
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error([body.error ?? `Search failed (HTTP ${response.status})`, body.hint ? `Run: ${body.hint}` : ''].filter(Boolean).join(' '));
@@ -50,4 +58,17 @@ export function searchQuestion({ center, values, mission, source = 'auto' }) {
 /** A time step that keeps a mission to about 340 Sun/Earth checks, and never finer than an hour. */
 export function finderStepMinutes(durationHours) {
   return Math.max(60, Math.ceil((durationHours * 60) / 340 / 30) * 30);
+}
+
+/** The same value with every object's keys sorted, so the same question always reads the same. */
+const inOrder = (value) =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, inOrder(value[key])]))
+    : value;
+
+/** File name of a saved search on the hosted website: SHA-1 of the question (browser and Node alike). */
+export async function staticKey(params) {
+  const bytes = new TextEncoder().encode(JSON.stringify(inOrder(params)));
+  const hash = await globalThis.crypto.subtle.digest('SHA-1', bytes);
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

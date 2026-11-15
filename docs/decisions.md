@@ -14,6 +14,7 @@ says so; do not rewrite history.
 | 5 | 2026-11-13 | Heights are user inputs: camera or eye, antenna, solar panel. | Height changes what is above the horizon. |
 | 6 | 2026-11-14 | First demo: recommend landing sites from chosen characteristics (sunlight, terrain, travel paths, possibly water in the regolith). | Something judges can use end to end. |
 | 7 | 2026-11-14 | Large datasets are not stored in git. The repo holds a catalog and a download script. | Keeps the repo small and clones fast. |
+| 8 | 2026-11-15 | **The team's front is the app's front (Daniel: "Yes, adopt it").** Top tabs Moon, Site, Street view and Ride, a "Plan a mission" pop-up, and the chosen region's close-up popped out beside the whole Moon (`src/ui/shell.js`). It sits on top of the mission steps, which still do the work (`src/ui/flow.js`): Moon is step 2, Site step 3, Ride step 5. With it: the Moon tab shows the whole Moon (`REGION_ZOOM` 1.1; it was 2.5, which Daniel asked for on 14 Nov when the globe shared the stage with the map); the old Surface step has no tab, the street view page stands in for it; the mission questions have one definition for the pop-up and the Mission step (`src/ui/mission-questions.js`); one plugin answers `/learn` (`server/learn-plugin.mjs`). | Two fronts for one app cannot both be shown in 120 seconds, and this is the one the team built and wants. |
 
 ## Scaffold defaults, for the team to confirm or change
 
@@ -51,6 +52,9 @@ These were chosen to get a working skeleton. None is settled until the team says
 
 ## Open questions
 
+- The street view page (`public/Street-view/`) draws made-up hills, craters and rocks on top of the real ground and
+  says so only in small print; its numbers come from real data, and its drawn hills stop at 60 km. What to do about
+  that is Daniel's call (asked 2026-11-15).
 - Which licence for the repo?
 - Which sites should be on the list for the demo? (See plan, item 7.)
 - How much terrain can we do in the time left: slope only, or real horizons?

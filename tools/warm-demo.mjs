@@ -8,6 +8,7 @@
 // Changing the landing date or a landing limit in the app asks new questions, which this does not cover.
 import { readFileSync } from 'node:fs';
 import { searchQuestion } from '../src/finder/client.js';
+import { missionRegions } from '../src/finder/regions.js';
 import { defaultFinder } from '../src/finder/score.js';
 import { defaultMission } from '../src/mission.js';
 
@@ -19,7 +20,7 @@ const portArg = process.argv.indexOf('--port');
 const port = portArg > 0 ? Number(process.argv[portArg + 1]) : 5173;
 const url = `http://localhost:${port}/api/terrain/landing-search`;
 
-const regions = missions.regions.map((region) => (region.site ? { ...sites.sites.find((s) => s.id === region.site), id: region.id, searchRadiusKm: region.searchRadiusKm } : region));
+const regions = missionRegions(missions, sites); // the app's own regions, so the questions are the app's
 let failed = 0;
 let notKept = 0;
 console.log(`Asking the app on port ${port} (${url})`);

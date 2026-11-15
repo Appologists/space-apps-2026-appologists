@@ -6,10 +6,12 @@ Team Appologists' project for the NASA Space Apps Challenge 2026,
 A web app that runs on your own computer. You choose a landing date, how long the mission lasts and what
 matters most; it ranks landing sites and shows where the Sun and Earth are in each site's sky.
 
-**Start here:** the left panel is five steps. Choose a mission, see which regions near the south pole can
-take it, plan the rover's drive and play it back, stand at the landing spot, then ride along the route.
+**Start here:** "Plan a mission" opens first: take the Pre-set mission or set your own. Then the tabs along the
+top: **Moon** (which regions near the south pole can take the mission, with the chosen region's close-up beside
+the globe), **Site** (the region's map and the rover's drive, played back with day and night), **Street view**
+(stand at the landing spot) and **Ride** (the rover's view along the drive, with the credits).
 The older tools (ranked list of 23 sites, weights, terrain data) are off the page for the demo: add `?tools`
-to the address (`http://localhost:5173/?tools`) and they appear under "More tools" on the first step.
+to the address (`http://localhost:5173/?tools`).
 
 **What works today:** a 3D Moon with 23 sites, ranking by uninterrupted sunlight and Earth visibility, a
 time slider, your own points by click or coordinates, and a one-click check against NASA JPL Horizons.
@@ -24,6 +26,22 @@ drivable **route** to a destination.
 
 **What does not work yet:** the ranking itself still assumes a smooth Moon, so no ridge or crater rim casts
 a shadow in the scores. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
+
+## The website (no server)
+
+The hosted site is the same app reading saved answers instead of the server: the ready-made missions'
+searches and the street view terrain at their landing spots. With the app running (`npm run dev`):
+
+```bash
+npm run export:static
+npm run build:site
+```
+
+Then upload the `dist` folder to Netlify (drag it onto the site's Deploys page). Missions with other settings
+say they are not saved on the website; they work when the app runs on a computer.
+
+To try VR on a Meta Quest without hosting: `npm run dev:quest`, then open the address it prints in the
+Quest's Browser (same Wi-Fi; tap "Advanced" > "Proceed" on the certificate warning).
 
 ## Start
 
@@ -51,6 +69,14 @@ Then choose a south-pole site and press "Look around from here", or double-click
 
 **Showing the demo to anyone?** Follow [docs/demo-runbook.md](docs/demo-runbook.md): it adds the stored
 sunlight maps (`npm run data:light`) that make each region's search take about a second, and the warm-up.
+
+For the sharpest street view (5 m ground at the four regions the finder favours: Connecting ridge, Shackleton rim,
+Peak near Shackleton, Malapert), also get NASA Goddard's 5 m maps (387 MB). Without them the street view uses
+the 80 m data and says so.
+
+```bash
+npm run data:fetch -- pgda-lola-5mpp
+```
 
 | Command | What it does |
 | --- | --- |
