@@ -686,6 +686,14 @@ def sites():
 
 @app.get('/')
 def index():
+    # The team's app (index.html and src/ at the repo root), served by team_api.py. Without it: the classic pages.
+    if team_api.team_app_present():
+        return team_api.team_index()
+    return app.send_static_file('lunar.html')
+
+
+@app.get('/classic')
+def classic():
     return app.send_static_file('lunar.html')
 
 
@@ -732,6 +740,15 @@ def site():
     )
 
 
+import team_api  # noqa: E402  (needs fetch above)
+
+team_api.HORIZONS_FETCH = fetch
+app.register_blueprint(team_api.bp)
+
+import learn_api  # noqa: E402  (the education section, ../education/, at /learn)
+
+app.register_blueprint(learn_api.bp)
+
 if __name__ == '__main__':
-    print('Open http://127.0.0.1:8002')
+    print('Open http://127.0.0.1:8002  (the team app; the classic planner is at /classic)')
     app.run(host='127.0.0.1', port=8002, debug=False, threaded=True)

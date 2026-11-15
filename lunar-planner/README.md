@@ -1,8 +1,49 @@
 # Lunar Site Planner (Flask version)
 
-A second front end for the Lunar Landing Site Navigator. It runs with Python only: no Node.js or npm.
-It uses the team's site list (`../data/sites.json`), the same ranking idea (unbroken sunlight and Earth
-contact) and the same lens colour rules (`src/surface/lenses.js`).
+Runs the team's Lunar Landing Site Navigator with Python only: no Node.js and no npm.
+
+- **http://127.0.0.1:8002** is the team's own app: `index.html` and `src/` at the repo root, unchanged.
+  Ranking, the 3D Moon, the surface view with real terrain and lenses, and the mission wizard (landing-site
+  finder, reach and route, drive planner). When the team changes `main`, this page changes with it.
+- **http://127.0.0.1:8002/learn** is the education section (`../education/`): 3D Moon, Earth and Sun with live
+  NASA data, facts, a quiz, a temperature exercise and a leaderboard.
+- **http://127.0.0.1:8002/classic** is the older Flask planner described below (Diviner temperatures, the
+  5 m south-pole page, the Cesium surface view, heatmaps, missions and quiz).
+
+## How the team app runs without npm
+
+`team_api.py` is a Python version of the team's dev-server plugin (`server/*.mjs`). It answers the same
+requests with the same binary formats, so the browser code does not know the difference:
+
+| Request | What it gives | Node version |
+| --- | --- | --- |
+| `GET /api/terrain/info` | the terrain datasets and which are downloaded | `server/terrain-sources.mjs` |
+| `GET /api/terrain/polar` | the ground around a point, for the surface view | `samplePolarPatch` |
+| `POST /api/terrain/landing-search` | the landing-site finder, with the same shadow sweep | `server/landing-search.mjs` |
+| `GET /api/horizons` | JPL Horizons, forwarded | the proxy in `vite.config.js` |
+
+It also serves `src/*.js` with the two things only Vite understands rewritten (a CSS import and a JSON
+import). `three` (0.187) and `astronomy-engine` (2.1.19) are single files in `public/vendor/team/`, the same
+versions as `package-lock.json`, so nothing is installed from npm.
+
+Checked against the Node version on the same data: the surface-view terrain is identical; the landing
+search gives the same heights, slopes, scores and best sites, in about the same time (4 to 5 s for a 10 km
+search). One difference: Sun and Earth directions come from JPL Horizons at the search centre, where the
+Node version uses Astronomy Engine. When the Sun is right on the horizon this changes a few hundred of
+about 1.3 million cell-hours.
+
+Not read here yet: the 59 m whole-Moon tiles (`lola-global-512`, 34 GB). The other datasets work:
+
+```powershell
+python lunar-planner\fetch_data.py --list
+python lunar-planner\fetch_data.py lola-south-80s-80m     # 115 MB, the finder's best data at the south pole
+python lunar-planner\fetch_data.py ldem-64 --large        # 1.06 GB, whole Moon at 470 m
+```
+
+`start.ps1` downloads the 80 m south-pole grid the first time. The whole-Moon 1.9 km data comes from
+`build_terrain.py` (also run by `start.ps1`).
+
+## The classic planner (/classic)
 
 ## What it does
 
@@ -92,6 +133,9 @@ To build them again from the NASA files, put the files in `data/south-pole/` and
 | --- | --- |
 | `lunar_server.py` | Flask: Horizons queries and analysis, terrain tiles, NASA EPIC, keys |
 | `start.ps1`, `start.sh` | First-time setup and start |
+| `team_api.py` | The team app's server in Python (see above) |
+| `fetch_data.py` | Downloads a dataset from `data/catalog.json` into `data/raw/` |
+| `public/vendor/team/` | `three` and `astronomy-engine` for the team app, one file each |
 | `build_terrain.py` | Downloads and prepares LOLA terrain |
 | `build_south_pole.py` | Makes the south-pole maps and `public/south-pole/sites.json` from the LOLA 5 m tiles |
 | `build_diviner.py` | Turns the Diviner snapshot images into `derived/diviner_tbol.npz` |
