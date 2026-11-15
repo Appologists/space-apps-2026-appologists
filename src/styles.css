@@ -1757,3 +1757,89 @@ input.big {
     gap: 12px;
   }
 }
+
+/* Mission length: a slider with the clean lengths as big buttons under it. The thumb's centre runs over the
+   same width as the buttons' positions (both inside .duration's padding). */
+.duration-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.duration-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--regolith);
+}
+.duration {
+  padding: 0 30px;
+}
+input[type='range'].duration-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: calc(100% + 32px);
+  margin: 0 -16px;
+  height: 44px;
+  background: transparent;
+  cursor: pointer;
+}
+.duration-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--rule);
+}
+.duration-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--rule);
+}
+.duration-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 32px;
+  height: 32px;
+  margin-top: -12px;
+  border-radius: 50%;
+  border: 3px solid var(--space);
+  background: var(--regolith);
+}
+.duration-slider::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--space);
+  background: var(--regolith);
+}
+.duration-slider:focus-visible {
+  outline: 2px solid var(--regolith);
+  outline-offset: 2px;
+}
+.duration-marks {
+  position: relative;
+  height: 48px;
+}
+.duration-mark {
+  position: absolute;
+  top: 0;
+  width: 58px;
+  height: 48px;
+  padding: 0;
+  transform: translateX(-50%);
+  font-size: 15px;
+}
+@media (min-width: 901px) {
+  .app[data-step='1'] .duration-value {
+    font-size: 26px;
+  }
+  .app[data-step='1'] .duration {
+    padding: 0 34px;
+  }
+  .app[data-step='1'] .duration-marks {
+    height: 58px;
+  }
+  .app[data-step='1'] .duration-mark {
+    width: 66px;
+    height: 58px;
+    font-size: 18px;
+  }
+}
