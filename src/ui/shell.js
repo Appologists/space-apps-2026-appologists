@@ -268,6 +268,9 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   requestAnimationFrame(drawLead);
 
   // ---- street view, inside the app ---------------------------------------------------------------------------
+  // The street view opens as its own page (same tab), with the app's top bar: VR can only start from a top-level
+  // page with some browsers and emulators, and this keeps "Enter VR" one click. Moon / Site there come back here
+  // (the address keeps the mission, region and route, so the app restores itself).
   function openStreet() {
     const start = finder.getRoute()?.start;
     const region = flow.getRegion?.();
@@ -275,34 +278,27 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
       flash('Pick a region with room to land first: the street view opens at its landing spot.');
       return false;
     }
-    const name = region ? `${region.name} · landing spot` : 'Landing spot';
-    const url = `/Street-view/index.html?embed&lat=${start.lat.toFixed(5)}&lon=${start.lon.toFixed(5)}&name=${encodeURIComponent(name)}&start=${getMission().start.toISOString()}${location.search.includes('vr-test') ? '&vr-test' : ''}`;
-    const frame = $('svFrame');
-    if (frame.dataset.url !== url) {
-      frame.dataset.url = url;
-      frame.src = url;
-      frame.onload = () => {
-        const sv = () => frame.contentWindow?.StreetView;
-        const fill = () => {
-          if (!sv()) return setTimeout(fill, 200);
-          const result = finder.getResult?.();
-          const items = [];
-          if (result) {
-            const km2 = (result.counts.passing * result.cellM * result.cellM) / 1e6;
-            items.push({ value: km2.toFixed(km2 < 10 ? 1 : 0), unit: 'km²', label: 'Ground that passes every check' });
-            items.push({ value: String(result.sites.length), label: result.sites.length === 1 ? 'Landing site found' : 'Landing sites found' });
-          }
-          const v = finder.values;
-          items.push({ value: String(v.maxLandingSlopeDeg), unit: '°', label: 'Steepest it may land on' });
-          items.push({ value: String(v.maxDarknessHours), unit: 'h', label: 'Darkness the rover survives' });
-          sv().setSummary({ title: region ? `Why ${region.name}` : 'Why this spot', items });
-        };
-        fill();
-      };
+    const result = finder.getResult?.();
+    const items = [];
+    if (result) {
+      const km2 = (result.counts.passing * result.cellM * result.cellM) / 1e6;
+      items.push({ value: km2.toFixed(km2 < 10 ? 1 : 0), unit: 'km²', label: 'Ground that passes every check' });
+      items.push({ value: String(result.sites.length), label: result.sites.length === 1 ? 'Landing site found' : 'Landing sites found' });
     }
-    $('svWrap').hidden = false;
-    app.classList.add('street-open');
-    return true;
+    const v = finder.values;
+    items.push({ value: String(v.maxLandingSlopeDeg), unit: '°', label: 'Steepest it may land on' });
+    items.push({ value: String(v.maxDarknessHours), unit: 'h', label: 'Darkness the rover survives' });
+    const q = new URLSearchParams({
+      lat: start.lat.toFixed(5),
+      lon: start.lon.toFixed(5),
+      name: region ? `${region.name} · landing spot` : 'Landing spot',
+      start: getMission().start.toISOString(),
+      app: location.pathname + location.search + location.hash,
+      sum: JSON.stringify({ title: region ? `Why ${region.name}` : 'Why this spot', items }),
+    });
+    if (location.search.includes('vr-test')) q.set('vr-test', '');
+    location.href = `/Street-view/index.html?${q}`;
+    return false; // this page is leaving
   }
   function closeStreet() {
     $('svWrap').hidden = true;

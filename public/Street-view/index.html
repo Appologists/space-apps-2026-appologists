@@ -52,6 +52,16 @@
     border-radius:2px;border:0;background:var(--accent);color:#140c08;font:600 12.5px var(--mono);box-shadow:0 4px 18px rgba(255,106,61,.35)}
   #vrBtn:hover{filter:brightness(1.1)}
   #vrBtn svg{width:20px;height:20px}
+  /* opened from the app (?app=<its address>): the app's top bar, the page's own navigation steps aside */
+  #appbar{position:fixed;left:0;right:0;top:0;height:56px;z-index:30;display:none;align-items:center;gap:18px;padding:0 18px;background:rgba(8,8,9,.92);border-bottom:1px solid var(--line)}
+  body.in-app #appbar{display:flex}
+  #appbar .brand{font:400 23px var(--serif);white-space:nowrap;color:var(--text);text-decoration:none} #appbar .brand b{color:var(--accent);font-weight:400}
+  #appbar nav{display:flex;height:100%;margin-left:10px}
+  #appbar nav a{display:flex;align-items:center;padding:0 14px;color:var(--muted);text-decoration:none;font:500 13.5px var(--sans);border-bottom:2px solid transparent}
+  #appbar nav a:hover{color:var(--text)} #appbar nav a.on{color:var(--text);border-bottom-color:var(--accent)}
+  body.in-app #backGlobe, body.in-app #homeBtn, body.in-app #siteSeg, body.in-app #hero{display:none!important}
+  body.in-app #site{top:72px} body.in-app #vrBtn{top:72px;right:16px} body.in-app #readout{top:124px}
+  body.in-app #compassWrap{top:72px} body.in-app #badge{top:126px}
   @keyframes vrPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,106,61,.7)}50%{box-shadow:0 0 0 10px rgba(255,106,61,0)}}
   body.vr-ready #vrBtn:not(.off){animation:vrPulse 1.6s ease-in-out infinite}
   #vrBtn.off{background:rgba(14,13,12,.9);color:var(--muted);border:1px dashed rgba(239,233,221,.35);box-shadow:none;cursor:help}
@@ -224,6 +234,7 @@ window.dispatchEvent(new Event('vrtest-ready'));
 </script>
 </head>
 <body>
+<header id="appbar"><a class="brand" id="abHome"><b>◉</b> Lunar Landing Site Navigator</a><nav><a id="abMoon">Moon</a><a id="abSite">Site</a><a class="on">Street view</a><a href="/education/" target="_blank" rel="noopener">Learn ↗</a></nav></header>
 <canvas id="c"></canvas>
 <div id="vig"></div>
 <div id="cross"></div>
@@ -1163,7 +1174,13 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;   // run
 resize(); renderer.setAnimationLoop(frame);
 const QS=new URLSearchParams(location.search), EMBED=QS.has('embed');
 if(EMBED) document.body.classList.add('embed');
-if(QS.has('vr')) document.body.classList.add('vr-ready');   // opened from the app to go into VR: the button pulses   // inside the app: the app has its own navigation
+if(QS.has('vr')) document.body.classList.add('vr-ready');
+if(QS.has('app')){ // opened from the app: its top bar, links back to its Moon and Site views, and its numbers in the summary box
+  document.body.classList.add('in-app');
+  const back=QS.get('app'), at=(step)=>back.replace(/step=\d/,'step='+step);
+  document.getElementById('abMoon').href=at(2); document.getElementById('abSite').href=at(3); document.getElementById('abHome').href=at(2);
+  try{ const sum=JSON.parse(QS.get('sum')||'null'); if(sum) addEventListener('load',()=>setTimeout(()=>window.StreetView.setSummary(sum),0)); }catch(e){}
+}   // opened from the app to go into VR: the button pulses   // inside the app: the app has its own navigation
 if(QS.has('lat')&&QS.has('lon')){ SITES.here.at={lat:+QS.get('lat'), lon:+QS.get('lon'), name:QS.get('name')||'Landing spot'}; }
 // &start=<ISO time>: open on that week, at that hour (the app passes the moment of touchdown)
 const START_AT=QS.has('start')?new Date(QS.get('start')):null;
