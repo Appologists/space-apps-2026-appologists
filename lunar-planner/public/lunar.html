@@ -7,7 +7,7 @@
     <link rel="icon" href="data:,">
     <link rel="preload" href="/fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/lunar.css">
-    <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+    <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/","astronomy-engine":"/vendor/team/astronomy.js"}}</script>
 </head>
 <body data-mode="globe">
 
@@ -32,6 +32,7 @@
         <div class="home-actions">
             <button id="home-start" class="accent">Choose a landing site &rarr;</button>
             <button id="home-drop">Drop me on the surface</button>
+            <a id="home-learn" class="home-link" href="/learn">Education</a>
         </div>
         <div class="home-cards">
             <button data-go="globe"><b>Explore the Moon</b><span></span></button>
@@ -95,6 +96,12 @@
             <button id="sf-elev">Elevation</button>
         </div>
         <label class="slider-row" for="sf-exag"><span>Vertical exaggeration</span><input id="sf-exag" type="range" min="1" max="5" step="0.5" value="1"><b id="sf-exag-v">1.0&times;</b></label>
+        <div class="seg tools" id="sf-tools" role="group" aria-label="Surface tools">
+            <button data-tool="walk" class="active" title="Click the ground to walk there (W A S D also walk)">Walk</button>
+            <button data-tool="measure" title="Click two points: distance, height change and slope (M)">Measure <kbd>M</kbd></button>
+            <button id="sf-horizon" title="Real terrain horizon with this week's Sun and Earth tracks (H)">Horizon <kbd>H</kbd></button>
+            <button id="sf-snap" title="Save this view as a PNG (P)">Snapshot <kbd>P</kbd></button>
+        </div>
         <div class="icon-row">
             <button id="sf-sun" title="Turn to face the Sun">Face Sun</button>
             <button id="sf-earth" title="Turn to face Earth">Face Earth</button>
@@ -104,9 +111,26 @@
         <div class="icon-row">
             <button id="sf-trek" class="active" title="NASA LOLA terrain with the NASA Moon Trek photo">LOLA + Trek</button>
             <button id="sf-3d" title="Cesium Moon 3D tiles (needs the asset in your ion account)">Cesium 3D</button>
-            <button id="sf-add" title="Add this spot to the ranking">+ Add site</button>
+            <button id="sf-tracks" class="active" title="Show the Sun's and Earth's paths across the sky this week">Sky paths</button>
+            <button id="sf-add" title="Add this spot to the ranking">+ Site</button>
         </div>
-        <button id="sf-back" class="back">&larr; back to the whole Moon</button>
+        <button id="sf-back" class="back" hidden>&larr; back to the whole Moon</button>
+    </section>
+
+    <!-- Surface: measurement result and the horizon drawer -->
+    <div id="measure-out" class="measure-out" hidden></div>
+    <section id="horizon-panel" class="panel horizon-panel" aria-label="Real terrain horizon" aria-hidden="true">
+        <header>
+            <p class="kicker">Real horizon &middot; <span id="hz-source">NASA LOLA</span></p>
+            <div class="hz-stats" id="hz-stats"></div>
+            <div class="seg small">
+                <button id="hz-near" class="active">Near horizon</button>
+                <button id="hz-full">Full sky</button>
+            </div>
+            <button id="hz-close" class="close" aria-label="Close the horizon chart">&times;</button>
+        </header>
+        <div class="hz-plot"><canvas id="hz-chart"></canvas></div>
+        <p class="hz-note" id="hz-note"></p>
     </section>
 
     <!-- "If you landed here this week": globe (selected site) and surface (where you stand) -->
@@ -163,6 +187,8 @@
         <button id="mode-timeline" title="Timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Timeline</span></button>
         <button id="mode-past" title="Past missions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></svg><span>Past missions</span></button>
         <button id="mode-missions" title="Missions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .6-4.6 4.1 1.4 5.9L12 16.1 6.6 19.2 8 13.3 3.4 9.2l6-.6z"/></svg><span>Missions</span></button>
+        <span class="nav-sep" aria-hidden="true"></span>
+        <a id="nav-learn" class="nav-link" href="/learn" title="Education" aria-label="Education"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.6v4.6c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.6"/><path d="M21.5 9.5v5"/></svg><span>Education</span></a>
     </nav>
     <div class="top-right">
     <button id="open-palette" class="search-btn" title="Search (Ctrl+K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Search</span><kbd>Ctrl K</kbd></button>

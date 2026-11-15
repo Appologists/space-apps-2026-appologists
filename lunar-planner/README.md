@@ -7,7 +7,7 @@ Runs the team's Lunar Landing Site Navigator with Python only: no Node.js and no
   finder, reach and route, drive planner). When the team changes `main`, this page changes with it.
 - **http://127.0.0.1:8002/learn** is the education section (`../education/`): 3D Moon, Earth and Sun with live
   NASA data, facts, a quiz, a temperature exercise and a leaderboard.
-- **http://127.0.0.1:8002/classic** is the older Flask planner described below (Diviner temperatures, the
+- **http://127.0.0.1:8002/classic** is our Flask planner described below (street view with measure, real-horizon chart, sky paths and snapshots; Diviner temperatures, the
   5 m south-pole page, the Cesium surface view, heatmaps, missions and quiz).
 
 ## How the team app runs without npm
