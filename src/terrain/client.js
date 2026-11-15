@@ -59,6 +59,9 @@ export function fetchTerrainPatch(lat, lon, sourceId = 'auto') {
 const PATCH_CACHE_SIZE = 24; // about 2 MB each
 const patchCache = new Map();
 
+/** Forget the terrain kept in memory, so the next request asks again (the tests use it between cases). */
+export const forgetTerrainPatches = () => patchCache.clear();
+
 async function loadPatch(lat, lon, sourceId) {
   let response = await fetch(`/api/terrain/polar?lat=${lat}&lon=${lon}&source=${encodeURIComponent(sourceId)}`).catch(() => null);
   if (!fromService(response)) {

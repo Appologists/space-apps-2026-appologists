@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { fetchTerrainPatch, savedSpot } from '../src/terrain/client.js';
+import { fetchTerrainPatch, forgetTerrainPatches, savedSpot } from '../src/terrain/client.js';
 import { horizonDipDeg, visibilityStats } from '../src/astro/sky.js';
 import { buildShadowGrid, litFraction, sampleGrid, sweepShadows } from '../src/surface/shadows.js';
 import {
@@ -211,6 +211,7 @@ describe.skipIf(!haveData)('real LOLA 80 m data', () => {
 describe('the ground for the ride on the hosted website (no server)', () => {
   const reply = (status, type, body) => ({ ok: status >= 200 && status < 300, status, headers: { get: () => type }, arrayBuffer: async () => body, json: async () => ({}) });
   const withFetch = async (answers, run) => {
+    forgetTerrainPatches(); // each case asks afresh, not from the terrain kept in memory
     const asked = [];
     const real = globalThis.fetch;
     globalThis.fetch = async (url) => {
