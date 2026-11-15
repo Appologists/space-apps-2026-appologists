@@ -197,7 +197,8 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     $('surveyBack').onclick = () => q > 0 && (q--, drawSurvey());
   }
   $('surveyClose').onclick = () => {
-    if (flow.getStep() >= 2) $('survey').hidden = true; // nothing to close back to before the first search
+    if (flow.getStep() >= 2) $('survey').hidden = true;
+    else finishSurvey(); // first visit: closing it runs the ready-made mission as it stands
   };
   async function finishSurvey() {
     flow.debug.useProfile(answer.lander);
