@@ -5,6 +5,8 @@ import { latLonToCell } from '../finder/grid.js';
 import { pathStats, reachFrom } from '../finder/route.js';
 import { MAX_DESTINATIONS, latestDeparture, planMission } from '../finder/planner.js';
 import { destinationName, planText } from '../finder/plan-text.js';
+import { routeOptions } from '../finder/route-options.js';
+import { whyNot } from '../finder/why-not.js';
 import { MAP_LAYERS, createFinderMap } from '../finder/map-view.js';
 import { defaultFinder } from '../finder/score.js';
 import { coverageText, terrainCovers } from '../terrain/client.js';
@@ -12,6 +14,8 @@ import { formatHours, formatLatLon } from '../format.js';
 import { clear, debounce, h } from './dom.js';
 import { renderFinderForm } from './finder-form.js';
 import { renderSchedule } from './finder-schedule.js';
+import { renderRouteOptions } from './route-options-panel.js';
+import { createSimulation } from './simulation-panel.js';
 
 const $ = (id) => document.getElementById(id);
 const percent = (fraction) => `${Math.round(fraction * 100)}%`;
@@ -37,6 +41,10 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   let reach = null;
   let plan = null; // the latest plan, or null when there are no destinations
   let departHours = 0; // "leave no earlier than", hours after landing
+  let options = null; // the three route choices (route-options.js), or null when there are no destinations
+  let why = null; // why the planner found no drive (why-not.js), or null
+  const simulation = createSimulation({ el: $('finderSim'), getMap: () => map });
+  let routeChoice = 'safest'; // which choice the map and the plan show: 'safest' | 'fastest' | 'shortest'
 
   const CLICK_MODES = [
     ['start', 'Start'],
@@ -171,6 +179,8 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
     map.setReach(reach);
     map.setSelected(start ? { lat: start.lat, lon: start.lon } : null);
     plan = null;
+    options = null;
+    why = null;
     let text = null;
     let routeText = '';
     if (!start) {
@@ -187,20 +197,49 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
           : `From the start the rover can reach ${area.toFixed(area < 10 ? 1 : 0)} km² ${limits}. Choose "Add destination" and click the map to plan a drive. The "Reach" layer shows how far each spot is.`;
       map.setRoute(null);
     } else {
-      plan = planMission(result, start, targets, rover);
+      const fastest = planMission(result, start, targets, rover);
+      options = routeOptions(result, start, targets, rover, { fastest });
+      why = whyNot(result, start, targets, rover, fastest, options.shortest?.plan ?? null);
+      // Show the chosen route; if it has none, the first choice that has one (so a lone "shortest" is drawn in
+      // colour with its warning, not left as a faint dashed line).
+      const shownId = [routeChoice, 'fastest', 'safest', 'shortest'].find((id) => options[id]?.plan?.path) ?? routeChoice;
+      const chosen = options[shownId] ?? null;
+      plan = chosen?.plan ?? fastest;
       text = planText(result, plan, { rover, destinations: targets });
+      if (chosen && shownId === 'shortest' && !plan.ok) {
+        // The shortest way ignores sunlight; say plainly why it fails instead of the planner's "no way" text.
+        text.headline = plan.drive.arrived
+          ? `The shortest way gets there ${formatHours(plan.drive.arrivalHours)} after landing, but the rover is then lost in the dark ${formatHours(plan.drive.lostAtHours)} after landing.`
+          : `The shortest way does not work: driving it as soon as the rules allow, the rover is caught in the dark and lost ${formatHours(plan.drive.lostAtHours)} after landing. The fastest and safest routes plan around the shadows.`;
+      }
+      if (plan !== fastest && !fastest.ok) {
+        // Keep the planner's own explanation of why no sunlit drive works (e.g. which limit would have to change).
+        const why = planText(result, fastest, { rover, destinations: targets });
+        text.lines = [`Why no planned drive works: ${why.headline}`, ...why.lines, ...text.lines];
+      }
+      if (chosen && shownId === 'safest' && chosen.limits) {
+        text.notes = `The safest route is the planner run again with stricter limits (slopes up to ${chosen.limits.maxSlopeDeg}°${chosen.limits.margin ? `, darkness up to ${formatHours(chosen.limits.maxDarknessHours)}` : ''}); the bands and the 30% margin are our estimate. ${text.notes}`;
+      }
       if (plan.path) {
         const s = pathStats(result, plan.path, { speedMPerHour: rover.speedMPerHour });
         const km = s.distanceM / 1000;
-        routeText = `Planned route: ${km.toFixed(km < 10 ? 1 : 0)} km, steepest slope ${s.steepestDeg.toFixed(0)}°, climbing ${Math.round(s.climbM)} m and descending ${Math.round(s.descentM)} m.`;
+        routeText = `Route shown: ${km.toFixed(km < 10 ? 1 : 0)} km, steepest slope ${s.steepestDeg.toFixed(0)}°, climbing ${Math.round(s.climbM)} m and descending ${Math.round(s.descentM)} m.`;
       }
+      const shown = shownId;
       map.setRoute({
         path: plan.path,
         stops: targets.map((t, i) => ({ row: t.row, col: t.col, label: destinationName(i) })),
         waits: plan.waits ?? [],
+        alternatives: Object.entries(options).filter(([id, o]) => id !== shown && o && !o.sameAs && o.plan.path !== plan.path).map(([, o]) => o.plan.path),
+        ellipseM: values.ellipseRadiusM,
+        bySlope: true,
+        problems: why?.marks ?? [],
       });
     }
     $('finderRoute').textContent = routeText;
+    const shownChoice = options ? [routeChoice, 'fastest', 'safest', 'shortest'].find((id) => options[id]?.plan?.path) ?? routeChoice : routeChoice;
+    renderRouteOptions($('finderRouteOptions'), { options, choice: shownChoice, rover, result, plan, why, onLayer: chooseLayer, onChoose: (id) => { routeChoice = id; updateRoute(); } });
+    simulation.setPlan(result, plan, rover);
     drawDests();
     drawSchedule(text);
   }
@@ -285,10 +324,11 @@ export function createFinderMode({ app, getState, setStatus, onPick }) {
   }
 
   function close() {
+    simulation.stop();
     app.classList.remove('finder-open');
     $('finder').hidden = true;
   }
   $('finderBack').addEventListener('click', close);
 
-  return { drawForm, close, isOpen: () => !$('finder').hidden, getResult: () => result, debug: { pick, route: () => ({ start, targets, reach, plan }) } };
+  return { drawForm, close, isOpen: () => !$('finder').hidden, getResult: () => result, debug: { pick, route: () => ({ start, targets, reach, plan, options, routeChoice }) } };
 }
