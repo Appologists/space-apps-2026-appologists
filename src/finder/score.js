@@ -27,7 +27,7 @@ export function defaultFinder() {
     // The rover, for reach and routes (stage 2). Also placeholders.
     roverMaxSlopeDeg: 15,
     roverSpeedMPerHour: 200,
-    roverRangeKm: 20,
+    roverRangeKm: 0, // longest total drive; 0 means no limit (Daniel, 2026-11-14: real rovers have no single range figure)
     roverNeedsEarthToDrive: false,
   };
 }

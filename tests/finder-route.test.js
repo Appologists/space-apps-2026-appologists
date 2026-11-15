@@ -110,3 +110,24 @@ describe('pathStats', () => {
     expect(s.minEarthFraction).toBeCloseTo(0.1);
   });
 });
+
+describe('reach with no range limit', () => {
+  it('reaches every drivable cell and reports the farthest drive', async () => {
+    const { layerPixel, reachScaleM } = await import('../src/finder/map-layers.js');
+    const n = 6;
+    const r = {
+      n,
+      cellM: 100,
+      elevation: new Float32Array(n * n),
+      slope: new Float32Array(n * n).fill(2),
+      fail: new Uint8Array(n * n),
+    };
+    const reach = reachFrom(r, { row: 0, col: 0 }, { maxSlopeDeg: 15, rangeM: Infinity });
+    expect([...reach.dist].every(Number.isFinite)).toBe(true);
+    expect(reach.farthestM).toBeCloseTo(5 * 100 * Math.SQRT2, 3); // the far corner, on the diagonal
+    expect(reachScaleM(reach)).toBe(reach.farthestM);
+    // The start is drawn lightest and the far corner darkest, as with a range.
+    const sum = (rgb) => rgb[0] + rgb[1] + rgb[2];
+    expect(sum(layerPixel('reach', r, 0, 100, { reach }))).toBeGreaterThan(sum(layerPixel('reach', r, n * n - 1, 100, { reach })));
+  });
+});
