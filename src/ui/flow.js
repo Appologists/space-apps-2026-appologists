@@ -747,13 +747,17 @@ export function createFlow({ app, globe, finder, surface, api }) {
 
   // ---- What the map is coloured by: a small toggle on the map itself (Daniel, 2026-11-14) ----------------------
   // Day/night is the sunlight at the clock's moment; the others are finder layers (map-layers.js). Each step
-  // keeps its own choice: the Regions step opens on the landing sites, the Drive step on day and night.
+  // keeps its own choice: the Regions step opens on the landing sites, the Drive step on the one map.
+  // "All" is the one map (map-layers.js ALL_LAYER): sunlight at the clock's moment, steep ground and landing
+  // ground together. The other three show one of them alone.
   const MAP_VIEWS = [
+    ['all', 'All'],
     ['time', 'Day/night'],
     ['slope', 'Slope'],
     ['result', 'Landing sites'],
   ];
-  const mapViewFor = { 2: 'result', 3: 'time' };
+  const showsTime = (id) => id === 'time' || id === 'all';
+  const mapViewFor = { 2: 'result', 3: 'all' };
   const mapViewButtons = MAP_VIEWS.map(([id, label]) => h('button', { type: 'button', onClick: () => setMapView(id) }, label));
   $('mapViews').append(...mapViewButtons);
   function setMapView(id) {
@@ -766,15 +770,15 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function applyMapView() {
     const id = mapViewFor[step] ?? 'result';
     pressMapView(id);
-    clock.showTime = id === 'time';
-    if (id !== 'time') finder.chooseLayer(id);
+    finder.chooseLayer(id);
+    clock.showTime = showsTime(id);
     showMoment();
   }
   // The "why no drive works" box can show another layer (Darkness, Reach…): the toggle follows it.
   finder.listenLayer((id) => {
     if (step !== 2 && step !== 3) return;
     mapViewFor[step] = id;
-    clock.showTime = false;
+    clock.showTime = showsTime(id);
     pressMapView(id);
   });
   $('surfaceCanvas').addEventListener('pointerdown', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SLOPE_BANDS } from '../src/finder/slope-bands.js';
 import { FAIL } from '../src/finder/score.js';
-import { MAP_LAYERS, describeCell, hillshade, layerLegend, layerPixel } from '../src/finder/map-layers.js';
+import { ALL_LAYER, ALL_SCALE, MAP_LAYERS, allPictures, allPixel, composeAll, describeCell, hillshade, layerLegend, layerPixel } from '../src/finder/map-layers.js';
 import { SLOPE_MAX_DEG } from '../src/surface/lenses.js';
 
 const n = 8;
@@ -200,5 +200,119 @@ describe('reach layer', () => {
     expect(describeCell(r, 3, 3, { reach })).toContain(' · 1.2 km drive from the start');
     expect(describeCell(r, 3, 4, { reach })).toContain(' · not reachable from the start');
     expect(describeCell(r, 3, 3)).not.toContain('start');
+  });
+});
+
+describe('the one map (All)', () => {
+  const brightness = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  it('leaves ground under 10 degrees a plain grey, lighter in sunlight than in shadow', () => {
+    for (const shade of [0, 120, 255]) {
+      const lit = allPixel(1, shade, 5, false);
+      const dark = allPixel(0, shade, 5, false);
+      expect(lit[0]).toBe(lit[1]);
+      expect(dark[0]).toBe(dark[1]);
+      expect(brightness(lit)).toBeGreaterThan(brightness(dark) + 50);
+    }
+  });
+
+  it('colours steeper ground with its slope band, in sunlight and in shadow', () => {
+    for (const band of SLOPE_BANDS.slice(1)) {
+      const deg = band.maxDeg === Infinity ? 40 : band.maxDeg - 1;
+      const rgb = [1, 3, 5].map((i) => parseInt(band.hex.slice(i, i + 2), 16));
+      for (const light of [0, 1]) {
+        const got = allPixel(light, 255, deg, false);
+        // The same hue as the band: the channels keep the band's proportions (to rounding).
+        const k = got[0] / rgb[0];
+        expect(Math.abs(got[1] - rgb[1] * k)).toBeLessThanOrEqual(1);
+        expect(Math.abs(got[2] - rgb[2] * k)).toBeLessThanOrEqual(1);
+      }
+      expect(allPixel(1, 255, deg, false)).toEqual(rgb); // full strength on the brightest relief
+    }
+  });
+
+  it('keeps every piece of shadowed ground darker than every piece of sunlit ground', () => {
+    let darkestLit = Infinity;
+    let lightestDark = 0;
+    for (const deg of [0, 9.9, 12, 17, 30]) {
+      for (const shade of [0, 128, 255]) {
+        for (const landing of [false, true]) {
+          if (landing && deg >= 10) continue; // landing ground is never that steep
+          darkestLit = Math.min(darkestLit, brightness(allPixel(1, shade, deg, landing)));
+          lightestDark = Math.max(lightestDark, brightness(allPixel(0, shade, deg, landing)));
+        }
+      }
+    }
+    expect(darkestLit).toBeGreaterThan(lightestDark);
+  });
+
+  it('washes landing ground blue', () => {
+    const plain = allPixel(1, 150, 3, false);
+    const landing = allPixel(1, 150, 3, true);
+    expect(landing[2] - landing[0]).toBeGreaterThan(plain[2] - plain[0] + 40);
+  });
+
+  it('treats a slope with no value as plain ground', () => {
+    expect(allPixel(1, 150, NaN, false)).toEqual(allPixel(1, 150, 0, false));
+  });
+
+  function resultWithOneLandingCell() {
+    const r = fakeResult();
+    r.fail.fill(FAIL.SLOPE);
+    r.fail[3 * n + 3] = 0;
+    r.elevation[0] = NaN;
+    r.maskStride = Math.ceil((n * n) / 8);
+    r.steps = 2;
+    r.sunMask = new Uint8Array(2 * r.maskStride);
+    r.sunMask[r.maskStride] = 0b00000100; // at step 1 only cell 2 is sunlit
+    return r;
+  }
+  const pixel = (picture, size, x, y) => [...picture.slice((y * size + x) * 4, (y * size + x) * 4 + 4)];
+
+  it('builds a sunlit and a shadowed picture, finer than the cells, with the background where there is no data', () => {
+    const r = resultWithOneLandingCell();
+    const { size, scale, lit, dark } = allPictures(r, hillshade(r.elevation, n, r.cellM));
+    expect(scale).toBe(ALL_SCALE);
+    expect(size).toBe(n * ALL_SCALE);
+    expect(lit.length).toBe(size * size * 4);
+    expect(pixel(lit, size, 0, 0)).toEqual([6, 8, 12, 255]);
+    expect(pixel(dark, size, 0, 0)).toEqual([6, 8, 12, 255]);
+    const far = pixel(lit, size, size - 2, size - 2);
+    expect(far[0]).toBe(far[1]); // slope 5 degrees: plain grey
+    expect(far[0]).toBeGreaterThan(pixel(dark, size, size - 2, size - 2)[0] + 50);
+  });
+
+  it('outlines landing ground the same way in both pictures: bright inside the edge, dark just outside', () => {
+    const r = resultWithOneLandingCell();
+    const { size, lit, dark } = allPictures(r, hillshade(r.elevation, n, r.cellM));
+    const x = 3 * ALL_SCALE;
+    const y = 3 * ALL_SCALE;
+    expect(pixel(lit, size, x, y)).toEqual([150, 215, 255, 255]);
+    expect(pixel(dark, size, x, y)).toEqual([150, 215, 255, 255]);
+    expect(pixel(lit, size, x - 1, y)).toEqual([6, 12, 30, 255]);
+    expect(pixel(dark, size, x - 1, y)).toEqual([6, 12, 30, 255]);
+    expect(pixel(lit, size, x - 2, y)[0]).toBeGreaterThan(90); // beyond the outline: ordinary ground again
+  });
+
+  it('composes a moment from the two pictures: sunlit cells from one, the rest from the other', () => {
+    const r = resultWithOneLandingCell();
+    const pictures = allPictures(r, hillshade(r.elevation, n, r.cellM));
+    const { size } = pictures;
+    const out = new Uint8ClampedArray(size * size * 4);
+    composeAll(pictures, r, 1, out);
+    const inCell = (cell) => [(cell % n) * ALL_SCALE + 1, Math.floor(cell / n) * ALL_SCALE + 1];
+    expect(pixel(out, size, ...inCell(2))).toEqual(pixel(pictures.lit, size, ...inCell(2)));
+    expect(pixel(out, size, ...inCell(5))).toEqual(pixel(pictures.dark, size, ...inCell(5)));
+    composeAll(pictures, r, 0, out); // at step 0 nothing is sunlit
+    expect(out).toEqual(pictures.dark);
+    composeAll(pictures, { ...r, sunMask: undefined }, 0, out); // a result without sunlight maps is drawn in shadow
+    expect(out).toEqual(pictures.dark);
+  });
+
+  it('has a legend naming sunlight, shadow, the three steeper slope bands and landing ground', () => {
+    const legend = layerLegend(ALL_LAYER, fakeResult());
+    expect(legend.swatches.map((s) => s.label)).toEqual(['in sunlight', 'in shadow', 'slope 10–15°', 'slope 15–20°', 'slope over 20°', 'landing ground']);
+    for (const s of legend.swatches) expect(s.hex).toMatch(/^#[0-9a-f]{6}$/);
+    expect(legend.note).toMatch(/smoothed/);
   });
 });
