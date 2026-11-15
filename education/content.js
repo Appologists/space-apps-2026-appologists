@@ -102,7 +102,7 @@ export const BADGES = [
     {id: 'earth', name: 'Earth gazer', how: 'Load today\'s EPIC photo of Earth'},
     {id: 'sun', name: 'Sun watcher', how: 'View all 4 SDO channels'},
     {id: 'horizons', name: 'Fact checker', how: 'Check the Moon\'s phase against JPL Horizons'},
-    {id: 'reader', name: 'Well read', how: 'Read 10 facts'},
+    {id: 'reader', name: 'Well read', how: 'See all 5 facts in 3D'},
     {id: 'quiz', name: 'Quiz ace', how: 'Score 2,000 or more in the quiz'},
     {id: 'thermo', name: 'Thermal analyst', how: 'Score 600 or more in the temperature estimate'},
     {id: 'board', name: 'On the board', how: 'Post a score to the leaderboard'},
