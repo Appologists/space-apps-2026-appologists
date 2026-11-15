@@ -4,45 +4,41 @@
 //   Site        flow step 3: the region's map full size, map layers and the rover's drive
 //   Street view the street view (public/Street-view/) at the landing spot, inside the app
 //   Learn       the education pages (education/)
-// The survey sets the same values the old "Mission" step did (data/missions.json profiles, finder values).
+// The mission questions are the old "Mission" step's own (data/missions.json profiles, finder values).
 import missions from '../../data/missions.json';
-import { formatDuration } from '../mission.js';
+import { DURATION_MARKS, formatDuration } from '../mission.js';
 import { clear, h } from './dom.js';
 
 const $ = (id) => document.getElementById(id);
 
-// Survey answers -> finder values. Every option is one of the choices the old Mission step offered.
-const LANDERS = [
-  { id: 'nasa', title: 'Ice-hunting rover', sub: "like NASA's VIPER · slow and careful, steered from Earth" },
-  { id: 'custom', title: 'Faster rover', sub: 'drives on its own, without Earth in view' },
+// The mission questions are the old "Mission" step's, word for word (flow.js GROUPS, data/missions.json):
+// choose the Pre-set mission or a Custom one; a custom mission then asks about the mission, the lander and the rover.
+const GROUPS = [
+  {
+    title: 'Mission',
+    date: true,
+    choices: [],
+  },
+  {
+    title: 'Lander',
+    choices: [
+      { key: 'ellipseRadiusM', label: 'Landing accuracy', hint: 'How far from its target it may come down', options: [[50, '50 m'], [100, '100 m'], [500, '500 m']] },
+      { key: 'maxLandingSlopeDeg', label: 'Steepest ground it lands on', options: [[5, '5°'], [10, '10°'], [15, '15°']] },
+      { key: 'needEarthAtLanding', label: 'Earth in view at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
+      { key: 'needSunAtLanding', label: 'Sunlight at touchdown', options: [[true, 'Needed'], [false, 'Not needed']] },
+    ],
+  },
+  {
+    title: 'Rover',
+    choices: [
+      { key: 'maxDarknessHours', label: 'Max darkness', options: [[24, '24 h'], [50, '50 h'], [100, '100 h']] },
+      { key: 'roverMaxSlopeDeg', label: 'Max ground slope', options: [[10, '10°'], [15, '15°'], [20, '20°']] },
+      { key: 'roverSpeedMPerHour', label: 'Average speed', options: [[36, '36 m/hr'], [200, '200 m/hr'], [720, '720 m/hr']] },
+      { key: 'roverNeedsEarthToDrive', label: 'Earth in view to drive', options: [[true, 'Needed'], [false, 'Not needed']] },
+    ],
+  },
 ];
-const LENGTHS = [
-  [168, '7 days'],
-  [336, '14 days'],
-  [708, 'One lunar day', '29.5 days'],
-];
-const MUSTS = [
-  { key: 'needSunAtLanding', title: 'Sunlight at touchdown', sub: 'power from the moment it lands' },
-  { key: 'needEarthAtLanding', title: 'Earth in view at touchdown', sub: 'talk to mission control straight away' },
-];
-const CARE = [
-  { id: 'cautious', title: 'Cautious', sub: 'slopes under 5° · rover survives 24 h of dark', v: { maxLandingSlopeDeg: 5, maxDarknessHours: 24 } },
-  { id: 'balanced', title: 'Balanced', sub: 'slopes under 10° · 50 h of dark', v: { maxLandingSlopeDeg: 10, maxDarknessHours: 50 } },
-  { id: 'bold', title: 'Bold', sub: 'slopes under 15° · 100 h of dark', v: { maxLandingSlopeDeg: 15, maxDarknessHours: 100 } },
-];
-// "More options": the exact choices, same lists as the old step's buttons (flow.js GROUPS)
-const MORE = {
-  lander: [
-    ['ellipseRadiusM', 'Lands within', [[50, '50 m'], [100, '100 m'], [500, '500 m']]],
-    ['roverMaxSlopeDeg', 'Rover climbs slopes up to', [[10, '10°'], [15, '15°'], [20, '20°']]],
-    ['roverSpeedMPerHour', 'Rover average speed', [[36, '36 m/h'], [200, '200 m/h'], [720, '720 m/h']]],
-    ['roverNeedsEarthToDrive', 'Rover needs Earth in view to drive', [[true, 'Yes'], [false, 'No']]],
-  ],
-  care: [
-    ['maxLandingSlopeDeg', 'Lands on slopes under', [[5, '5°'], [10, '10°'], [15, '15°']]],
-    ['maxDarknessHours', 'Rover survives darkness for', [[24, '24 h'], [50, '50 h'], [100, '100 h']]],
-  ],
-};
+const picture = (src) => (/^https?:/.test(src) ? src : `${import.meta.env.BASE_URL}${src}`);
 
 export function createShell({ app, flow, finder, globe, getMission, setMission }) {
   const regions = missions.regions;
@@ -93,11 +89,12 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   function drawSummary() {
     const m = getMission();
     const v = finder.values;
-    const lander = LANDERS.find((l) => (l.id === 'nasa' ? v.roverSpeedMPerHour === 36 : v.roverSpeedMPerHour !== 36)) ?? LANDERS[0];
+    const saved = /profile=(\w+)/.exec(location.hash)?.[1];
+    const profile = missions.profiles.find((p) => p.id === (saved ?? answer.profile)) ?? missions.profiles[0];
     const day = m.start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
     clear($('missionLine')).append(
       h('div', { class: 'eyebrow' }, 'Your mission'),
-      h('div', { class: 'mission-name' }, lander.title),
+      h('div', { class: 'mission-name' }, profile.id === 'custom' ? 'Custom mission' : profile.blurb),
       h('div', { class: 'mission-sub' }, `lands ${day} · ${formatDuration(m.durationHours)} · slopes under ${v.maxLandingSlopeDeg}°`),
       h('button', { type: 'button', class: 'primary change', onClick: () => openSurvey() }, 'Change mission'),
       h(
@@ -124,89 +121,87 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     );
   }
 
-  // ---- survey ---------------------------------------------------------------------------------------------
+  // ---- mission questions (the old Mission step, as a short series of cards) -------------------------------------
   let q = 0;
-  const answer = { lander: 'nasa', start: null, hours: 336, musts: new Set(['needSunAtLanding', 'needEarthAtLanding']), care: 'balanced', exact: {} };
+  const answer = { profile: 'nasa', start: null, hours: 336, values: {} };
   function openSurvey() {
     const m = getMission();
-    const v = finder.values;
-    // before the first search, start from the ready-made mission's own date (data/missions.json), not the app's default "now"
+    // before the first search, start from the Pre-set mission's own date (data/missions.json), not the app's default
     const preset = missions.profiles.find((p) => p.id === 'nasa');
-    answer.start = flow.getStep() >= 2 ? new Date(m.start) : new Date(preset.mission.start);
-    answer.hours = m.durationHours;
-    answer.lander = v.roverSpeedMPerHour === 36 && v.roverNeedsEarthToDrive ? 'nasa' : flow.getStep() >= 2 ? 'custom' : 'nasa';
-    answer.musts = new Set(MUSTS.filter((x) => v[x.key]).map((x) => x.key));
-    answer.care = CARE.find((c) => c.v.maxLandingSlopeDeg === v.maxLandingSlopeDeg && c.v.maxDarknessHours === v.maxDarknessHours)?.id ?? 'balanced';
-    answer.exact = {};
+    const first = flow.getStep() < 2;
+    answer.start = first ? new Date(preset.mission.start) : new Date(m.start);
+    answer.hours = first ? preset.mission.durationHours : m.durationHours;
+    answer.values = first ? { ...preset.finder } : { ...finder.values };
     q = 0;
     $('survey').hidden = false;
     drawSurvey();
   }
-  const opt = (on, title, sub, onClick) => h('button', { type: 'button', class: 'opt', 'aria-pressed': String(on), onClick }, h('b', {}, title), sub ? h('span', {}, sub) : null);
-  const exactRows = (list) =>
+  const choose = (id) => {
+    const profile = missions.profiles.find((p) => p.id === id);
+    answer.profile = id;
+    answer.values = { ...profile.finder };
+    if (id === 'nasa') { answer.start = new Date(profile.mission.start); answer.hours = profile.mission.durationHours; }
+    drawSurvey();
+  };
+  const row = (label, hint, options, current, set) =>
     h(
-      'details',
-      { class: 'more' },
-      h('summary', {}, 'More options'),
-      ...list.map(([key, label, options]) => {
-        const current = key in answer.exact ? answer.exact[key] : finder.values[key];
-        return h(
-          'div',
-          { class: 'exact' },
-          h('span', {}, label),
-          h('div', { class: 'exact-opts' }, options.map(([value, text]) => h('button', { type: 'button', 'aria-pressed': String(current === value), onClick: () => { answer.exact[key] = value; drawSurvey(true); } }, text))),
-        );
-      }),
+      'div',
+      { class: 'exact' },
+      h('span', {}, label, hint ? h('small', {}, hint) : null),
+      h('div', { class: 'exact-opts' }, options.map(([value, text]) => h('button', { type: 'button', 'aria-pressed': String(current === value), onClick: () => { set(value); drawSurvey(); } }, text))),
     );
-  function drawSurvey(keepOpen = false) {
-    const wasOpen = keepOpen && $('surveyBody').querySelector('details')?.open;
+  function missionCard(profile) {
+    return h(
+      'button',
+      { type: 'button', class: 'profile-card', 'aria-pressed': String(answer.profile === profile.id), onClick: () => choose(profile.id) },
+      profile.pictures?.length
+        ? h('span', { class: 'pics' }, profile.pictures.map((pic) => h('img', { src: picture(pic.src), alt: pic.alt, title: pic.credit, style: `flex: ${pic.width ?? 100} 1 0; object-position: ${pic.position ?? '50% 50%'}` })))
+        : null,
+      h('strong', {}, profile.name),
+      h('span', {}, profile.blurb),
+    );
+  }
+  function drawSurvey() {
+    const preset = answer.profile !== 'custom';
     const pages = [
       () => [
-        h('h3', {}, "What's landing?"),
-        h('p', {}, 'Pick the closest. You can fine-tune it below.'),
-        h('div', { class: 'opts' }, LANDERS.map((l) => opt(answer.lander === l.id, l.title, l.sub, () => { answer.lander = l.id; answer.exact = {}; drawSurvey(); }))),
-        exactRows(MORE.lander),
-      ],
-      () => [
-        h('h3', {}, 'When, and for how long?'),
-        h('p', {}, 'The Sun and Earth move, so the date changes the answer. Times are UTC.'),
-        h(
-          'label',
-          { class: 'date' },
-          'Landing',
-          h('input', { type: 'datetime-local', step: '3600', value: answer.start.toISOString().slice(0, 16), onChange: (e) => { const d = new Date(`${e.target.value}Z`); if (!Number.isNaN(d.getTime())) answer.start = d; } }),
-        ),
-        h('div', { class: 'opts row' }, LENGTHS.map(([hrs, t, sub]) => opt(answer.hours === hrs, t, sub, () => { answer.hours = hrs; drawSurvey(); }))),
-      ],
-      () => [
-        h('h3', {}, 'What must be true at touchdown?'),
-        h('p', {}, 'Pick any. Each one rules out ground that fails it.'),
-        h('div', { class: 'opts grid' }, MUSTS.map((m) => opt(answer.musts.has(m.key), m.title, m.sub, () => { answer.musts.has(m.key) ? answer.musts.delete(m.key) : answer.musts.add(m.key); drawSurvey(); }))),
-      ],
-      () => [
-        h('h3', {}, 'How careful should we be?'),
-        h('p', {}, 'Sets the steepest ground it may land on and how long the rover must survive in the dark.'),
-        h('div', { class: 'opts row' }, CARE.map((c) => opt(answer.care === c.id, c.title, c.sub, () => { answer.care = c.id; for (const k of Object.keys(c.v)) delete answer.exact[k]; drawSurvey(); }))),
-        exactRows(MORE.care),
+        h('h3', {}, 'Plan a mission'),
+        h('div', { class: 'profile-cards' }, missions.profiles.map(missionCard)),
+        preset
+          ? h('ul', { class: 'facts' }, missions.profiles.find((p) => p.id === answer.profile).facts.map((f) => h('li', { title: missions.sources[f.source]?.title ?? '' }, f.text)))
+          : h('p', {}, 'Next: the mission, the lander and the rover.'),
       ],
     ];
+    if (!preset) {
+      for (const group of GROUPS) {
+        pages.push(() => [
+          h('h3', {}, group.title),
+          group.date
+            ? [
+                h('label', { class: 'date' }, 'Landing datetime (UTC)', h('input', { type: 'datetime-local', step: '3600', value: answer.start.toISOString().slice(0, 16), onChange: (e) => { const d = new Date(`${e.target.value}Z`); if (!Number.isNaN(d.getTime())) answer.start = d; } })),
+                row('Duration', null, DURATION_MARKS.map((mark) => [mark.hours, mark.label]), answer.hours, (v) => (answer.hours = v)),
+              ]
+            : null,
+          ...group.choices.map((c) => row(c.label, c.hint, c.options, answer.values[c.key], (v) => (answer.values[c.key] = v))),
+        ]);
+      }
+    }
+    q = Math.min(q, pages.length - 1);
     clear($('surveyDots')).append(...pages.map((_, i) => h('i', { class: i <= q ? 'on' : '' })));
-    $('surveyCount').textContent = `Question ${q + 1} of ${pages.length}`;
-    clear($('surveyBody')).append(...pages[q]());
-    if (wasOpen) $('surveyBody').querySelector('details').open = true;
+    $('surveyCount').textContent = pages.length > 1 ? `Step ${q + 1} of ${pages.length}` : 'Your mission';
+    clear($('surveyBody')).append(...pages[q]().flat().filter(Boolean));
     $('surveyBack').style.visibility = q ? 'visible' : 'hidden';
-    $('surveyNext').textContent = q === pages.length - 1 ? 'Find landing regions →' : 'Next';
+    $('surveyNext').textContent = q === pages.length - 1 ? 'Find regions that fit →' : 'Next';
     $('surveyNext').onclick = () => (q < pages.length - 1 ? (q++, drawSurvey()) : finishSurvey());
     $('surveyBack').onclick = () => q > 0 && (q--, drawSurvey());
   }
   $('surveyClose').onclick = () => {
     if (flow.getStep() >= 2) $('survey').hidden = true;
-    else finishSurvey(); // first visit: closing it runs the ready-made mission as it stands
+    else finishSurvey(); // first visit: closing it runs the Pre-set mission
   };
   async function finishSurvey() {
-    flow.debug.useProfile(answer.lander);
-    const care = CARE.find((c) => c.id === answer.care).v;
-    Object.assign(finder.values, care, Object.fromEntries(MUSTS.map((m) => [m.key, answer.musts.has(m.key)])), answer.exact);
+    flow.debug.useProfile(answer.profile);
+    Object.assign(finder.values, answer.values);
     finder.drawForm();
     setMission({ start: answer.start, durationHours: answer.hours });
     $('survey').hidden = true;
