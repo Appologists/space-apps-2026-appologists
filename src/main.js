@@ -4,7 +4,6 @@
 //
 // Changing the mission re-evaluates every site. Changing a weight only re-ranks. Moving the time
 // slider only moves the Sun on the globe and updates the selected site's card.
-import './styles.css';
 import sitesData from '../data/sites.json';
 import { criteria, defaultWeights, plannedCriteria, readyCriteria } from './criteria/index.js';
 import { formatUTC } from './format.js';
