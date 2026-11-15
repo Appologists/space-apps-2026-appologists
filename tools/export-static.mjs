@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { defaultWeights } from '../src/criteria/index.js';
 import { searchQuestion, staticKey } from '../src/finder/client.js';
 import { decodeRasters } from '../src/finder/wire.js';
+import { missionRegions } from '../src/finder/regions.js';
 import { defaultFinder } from '../src/finder/score.js';
 import { defaultMission } from '../src/mission.js';
 
@@ -24,7 +25,7 @@ mkdirSync(new URL('landing/', out), { recursive: true });
 mkdirSync(new URL('streetview/', out), { recursive: true });
 const SITES_PER_REGION = 3; // the street view opens at the drive's start: the region's first site, unless moved
 
-const regions = missions.regions.map((region) => (region.site ? { ...sites.sites.find((s) => s.id === region.site), id: region.id } : region));
+const regions = missionRegions(missions, sites); // the app's own regions, so the questions are the app's
 let bytes = 0;
 const spots = new Map();
 for (const profile of missions.profiles) {

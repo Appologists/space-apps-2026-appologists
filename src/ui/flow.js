@@ -14,6 +14,7 @@ import missions from '../../data/missions.json';
 import sitesData from '../../data/sites.json';
 import { searchLanding } from '../finder/client.js';
 import { createTrack } from '../finder/playback.js';
+import { missionRegions } from '../finder/regions.js';
 import { STATE_STORY, milestoneLabel } from '../finder/plan-text.js';
 import { formatHours, formatUTC } from '../format.js';
 import { clear, h } from './dom.js';
@@ -31,13 +32,7 @@ const STEPS = [
 ];
 
 /** The regions every mission is checked against, with their coordinates and sources resolved. */
-const REGIONS = missions.regions.map((region) => {
-  const site = region.site ? sitesData.sites.find((s) => s.id === region.site) : region;
-  const sources = region.site ? sitesData.sources : missions.sources;
-  // A named crater stands for its middle (a reference point, not a vetted landing site); missions.json says so.
-  // searchRadiusKm: the crater regions are searched 20 km round their centres, to reach the rims (our choice).
-  return { id: region.id, name: site.name, lat: site.lat, lon: site.lon, searchRadiusKm: region.searchRadiusKm, source: sources[site.source] };
-});
+const REGIONS = missionRegions(missions, sitesData);
 
 // Region markers on the globe, coloured like the verdicts in the list (styles.css, .region .verdict).
 const REGION_COLOURS = { pass: '#5fe0c0', fail: '#8d96a6', waiting: '#3a4250' };
