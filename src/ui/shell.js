@@ -216,6 +216,25 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
   // ---- the close-up that pops out of the globe (Moon tab) ---------------------------------------------------
   $('popOpen').onclick = () => show('site');
   $('popStand').onclick = () => show('street');
+  const suggested = { result: null, since: 0, done: false };
+  /** The pop-out is small: zoom its map in on the drive (the full map is one click away under "Open site"). */
+  const MAP_MARGIN = 12; // src/finder/map-view.js MARGIN
+  function zoomPopToRoute(result) {
+    const canvas = $('finderCanvas');
+    const path = finder.getRoute()?.plan?.path;
+    if (!result || !path?.length) return void (canvas.style.transform = '');
+    const n = result.n;
+    let r0 = n, r1 = 0, c0 = n, c1 = 0;
+    for (const i of path) { const r = Math.floor(i / n), c = i % n; r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c); }
+    const W = canvas.clientWidth, H = canvas.clientHeight, size = Math.min(W, H) - 2 * MAP_MARGIN, bx = (W - size) / 2, by = (H - size) / 2;
+    const px = (c) => bx + ((c + 0.5) / n) * size, py = (r) => by + ((r + 0.5) / n) * size;
+    const span = Math.max(px(c1) - px(c0), py(r1) - py(r0), 1);
+    const s = Math.min(2.6, Math.max(1, (0.6 * Math.min(W, H)) / span));
+    const cx = (px(c0) + px(c1)) / 2, cy = (py(r0) + py(r1)) / 2;
+    const tx = Math.min(0, Math.max(W - s * W, W / 2 - s * cx)), ty = Math.min(0, Math.max(H - s * H, H / 2 - s * cy));
+    canvas.style.transformOrigin = '0 0';
+    canvas.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${s.toFixed(3)})`;
+  }
   function drawLead() {
     requestAnimationFrame(drawLead);
     // keep the tabs in step with what is on screen (a reload or a saved address can land on either view)
@@ -226,7 +245,18 @@ export function createShell({ app, flow, finder, globe, getMission, setMission }
     }
     const svg = $('leadLine');
     const region = flow.getRegion?.();
-    if (tab !== 'moon' || flow.getStep() !== 2 || !region || $('finder').hidden) return void (svg.innerHTML = '');
+    if (tab !== 'moon' || flow.getStep() !== 2 || !region || $('finder').hidden) {
+      $('finderCanvas').style.transform = '';
+      return void (svg.innerHTML = '');
+    }
+    // The pop-out shows the rover's drive too: plan one (the finder's own "Suggest a drive") when a region opens.
+    const result = finder.getResult?.();
+    if (result && result !== suggested.result) { suggested.result = result; suggested.since = Date.now(); suggested.done = false; }
+    // keep trying for a while: the drive can only be planned once the region and the rover's reach are ready
+    if (result && Date.now() - suggested.since < 15000 && !finder.getRoute()?.targets?.length) {
+      if (finder.suggestDrive()) suggested.done = true;
+    }
+    zoomPopToRoute(result);
     const p = globe.debug.screenOf(region.lat, region.lon);
     const card = $('finder').getBoundingClientRect();
     const stage = $('stage').getBoundingClientRect();

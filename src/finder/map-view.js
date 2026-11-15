@@ -74,7 +74,9 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     if (!result) return;
     const size = Math.max(0, Math.min(w, hgt) - 2 * MARGIN);
     box = { x: (w - size) / 2, y: (hgt - size) / 2, size };
-    ctx.imageSmoothingEnabled = false;
+    // Smoothed: the 80 m cells read as terrain, not as squares, when the map is shown large or in the app's pop-out.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(raster, box.x, box.y, size, size);
 
     const centre = { x: box.x + size / 2, y: box.y + size / 2 };
@@ -128,12 +130,14 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       }
       if (path && path.length > 1) {
         trace(path);
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
         ctx.strokeStyle = '#06080c';
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 9; // thick enough to read when the map is small (the app's pop-out)
         ctx.stroke();
         if (bySlope) {
           // Each hop coloured by the steeper of its two cells.
-          ctx.lineWidth = 3.5;
+          ctx.lineWidth = 5;
           for (let k = 1; k < path.length; k++) {
             const a = cellCentre(Math.floor(path[k - 1] / result.n), path[k - 1] % result.n);
             const b = cellCentre(Math.floor(path[k] / result.n), path[k] % result.n);

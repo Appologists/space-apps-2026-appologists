@@ -167,3 +167,6 @@ details.more[open] summary::before { content: '▾ '; }
 .survey .facts { margin: 4px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; }
 .exact span small { display: block; color: var(--dim); font-size: 11.5px; }
 .exact-opts { flex-wrap: wrap; justify-content: flex-end; }
+/* the pop-out is a preview: its map is zoomed onto the drive (ui/shell.js) and not clickable; "Open site" is */
+.app[data-step='2'] #finderCanvas { pointer-events: none; }
+.app[data-step='2'] .finder-map { overflow: hidden; }
