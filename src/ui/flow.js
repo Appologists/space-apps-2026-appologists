@@ -800,11 +800,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function updateClockText() {
     if (!clockParts || !track) return;
     const now = track.at(clock.hours);
-    const when = new Date(api.getMission().start.getTime() + clock.hours * 3_600_000);
     const km = (m) => (m / 1000).toFixed(1);
-    clockParts.text.textContent =
-      `${formatHours(clock.hours)} after landing · ${formatUTC(when)} · ${km(now.distanceM)} of ${km(track.lengthM)} km` +
-      (clock.playing ? ` · one second shows ${formatHours(clock.rate)}` : '');
+    // The date and time are on the time bar under the map; this line keeps the day and the distance.
+    clockParts.text.textContent = `Day ${(clock.hours / 24).toFixed(1)} · ${km(now.distanceM)} of ${km(track.lengthM)} km driven`;
     const story = STATE_STORY[now.state] ?? '';
     if (clockParts.story.textContent !== story) clockParts.story.textContent = story;
     const max = route?.rover?.maxDarknessHours;
