@@ -151,6 +151,7 @@ export function terrainApi({ root = process.cwd() } = {}) {
         if (found.dem.detailVaries) result.header.sourceNote = 'Mountains beyond the search area, which can block a low Sun, are read from coarser data (500 m cells).';
         const bytes = encodeRasters(result.header, result.rasters);
         keep(key, bytes);
+        res.setHeader('x-landing-search', 'new'); // searched just now, and kept for next time
         return binary(res, bytes);
       }
       return next();

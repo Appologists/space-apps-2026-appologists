@@ -22,6 +22,8 @@ const url = `http://localhost:${port}/api/terrain/landing-search`;
 
 const regions = missions.regions.map((region) => (region.site ? { ...sites.sites.find((s) => s.id === region.site), id: region.id } : region));
 let failed = 0;
+let notKept = 0;
+console.log(`Asking the app on port ${port} (${url})`);
 for (const profile of missions.profiles) {
   console.log(`\n${profile.name}`);
   const mission = { ...defaultMission(), start: new Date(profile.mission.start), durationHours: profile.mission.durationHours };
@@ -37,7 +39,10 @@ for (const profile of missions.profiles) {
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? `HTTP ${response.status}`);
       const bytes = (await response.arrayBuffer()).byteLength;
       const seconds = ((performance.now() - started) / 1000).toFixed(1);
-      const kept = response.headers.get('x-landing-search') === 'kept' ? 'already kept' : 'searched and kept';
+      // The app says what it did. An app without that word is an older copy that keeps nothing.
+      const said = response.headers.get('x-landing-search');
+      const kept = said === 'kept' ? 'already kept' : said === 'new' ? 'searched and kept' : 'searched, NOT kept';
+      if (!said) notKept++;
       console.log(`  ${region.name.padEnd(24)} ${kept.padEnd(18)} ${seconds.padStart(5)} s  ${(bytes / 1e6).toFixed(1)} MB`);
     } catch (error) {
       failed++;
@@ -45,4 +50,10 @@ for (const profile of missions.profiles) {
     }
   }
 }
-process.exit(failed ? 1 : 0);
+if (notKept) {
+  console.log(
+    `\nThe app on port ${port} searched but does not keep answers: it is an older copy without the mission steps.\n` +
+      'Nothing was warmed. Point this at the app that has them: npm run demo:warm -- --port <its port>',
+  );
+}
+process.exit(failed || notKept ? 1 : 0);
