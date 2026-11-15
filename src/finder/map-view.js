@@ -75,7 +75,6 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     const size = Math.max(0, Math.min(w, hgt) - 2 * MARGIN);
     box = { x: (w - size) / 2, y: (hgt - size) / 2, size };
     ctx.imageSmoothingEnabled = false;
-    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(raster, box.x, box.y, size, size);
 
     const centre = { x: box.x + size / 2, y: box.y + size / 2 };
