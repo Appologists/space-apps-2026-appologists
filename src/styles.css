@@ -1432,3 +1432,95 @@ input.big {
     height: 52vh;
   }
 }
+
+/* ---- Step 1 (the landing page): the panel gets half the screen ---------------------------------------------
+   During the demo the panel is what people tap, so on the first step it is as wide as the Moon, with large text
+   and large buttons. The later steps give the map and the surface view the room instead. */
+@media (min-width: 901px) {
+  .app[data-step='1'] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .app[data-step='1'] .flow-head,
+  .app[data-step='1'] .flow-body,
+  .app[data-step='1'] .flow-nav {
+    padding-inline: clamp(20px, 3vw, 40px);
+  }
+  .app[data-step='1'] h1 {
+    font-size: 28px;
+  }
+  .app[data-step='1'] .steps button {
+    min-height: 58px;
+    font-size: 16px;
+  }
+  .app[data-step='1'] .steps .n {
+    font-size: 18px;
+  }
+  .app[data-step='1'] .step-title {
+    font-size: 32px;
+  }
+  .app[data-step='1'] .profiles {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+  }
+  .app[data-step='1'] .profile {
+    min-height: 110px;
+    padding: 18px 20px;
+    align-content: start;
+  }
+  .app[data-step='1'] .profile strong {
+    font-size: 26px;
+  }
+  .app[data-step='1'] .profile span {
+    font-size: 18px;
+  }
+  /* The custom choices sit two to a row, so the whole mission fits on about one screen. */
+  .app[data-step='1'] .setup {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px 24px;
+    align-items: start;
+  }
+  .app[data-step='1'] .setup > .eyebrow,
+  .app[data-step='1'] .setup > .facts,
+  .app[data-step='1'] .setup > button {
+    grid-column: 1 / -1;
+  }
+  .app[data-step='1'] .setup .eyebrow {
+    font-size: 14px;
+    margin-top: 6px;
+  }
+  .app[data-step='1'] .choice {
+    gap: 8px;
+  }
+  .app[data-step='1'] .choice-label {
+    font-size: 20px;
+  }
+  .app[data-step='1'] .choice-label small {
+    font-size: 16px;
+  }
+  .app[data-step='1'] .choice-options {
+    gap: 10px;
+  }
+  .app[data-step='1'] .choice-options button {
+    min-height: 64px;
+    font-size: 21px;
+  }
+  .app[data-step='1'] input.big {
+    min-height: 60px;
+    font-size: 20px;
+  }
+  .app[data-step='1'] .facts {
+    gap: 10px;
+    font-size: 19px;
+  }
+  .app[data-step='1'] .setup > button {
+    min-height: 56px;
+    font-size: 18px;
+  }
+  .app[data-step='1'] .flow-nav button {
+    min-height: 64px;
+    font-size: 21px;
+  }
+  .app[data-step='1'] .flow-hint {
+    font-size: 17px;
+  }
+}

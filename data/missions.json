@@ -29,8 +29,8 @@
   "profiles": [
     {
       "id": "nasa",
-      "name": "Off the shelf: NASA's numbers",
-      "blurb": "A lander held to NASA's Artemis lander limits, carrying a rover with the limits of NASA's VIPER.",
+      "name": "Pre-set",
+      "blurb": "Artemis lander carrying VIPER rover",
       "mission": { "start": "2026-11-21T00:00:00Z", "durationHours": 336 },
       "finder": {
         "ellipseRadiusM": 100,
