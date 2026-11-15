@@ -146,13 +146,17 @@ export function createDateScan({ el, onUse }) {
   const remember = (which) => (e) => { open[which] = e.currentTarget.open; };
 
   /** One stat: a big number and a few words under it. */
-  const stat = (cls, value, label) => h('div', { class: `when-stat ${cls}` }, h('b', {}, value), h('span', {}, label));
+  const stat = (cls, value, label, note = '') => h('div', { class: `when-stat ${cls}` }, h('b', {}, value), h('span', {}, label), note ? h('small', {}, note) : '');
 
-  /** A few words under the power number: does the panel run the steady load, and with how much battery? */
-  function powerLabel(stay) {
-    if (!(panel.loadW > 0)) return 'solar at landing';
-    if (!stay.coversLoad) return `solar · too little for ${watts(panel.loadW)}`;
-    return stay.batteryWh > 0 ? `solar · ${wattHours(stay.batteryWh)} battery` : `solar · runs ${watts(panel.loadW)}`;
+  /** Words under the power number: it is an estimate, for whose panel, and whether that panel runs the steady load. */
+  function powerLabel() {
+    const isExample = ['areaM2', 'efficiency', 'mount', 'otherLosses', 'loadW'].every((k) => panel[k] === EXAMPLE_PANEL[k]);
+    return `at landing, estimated for ${isExample ? 'an example' : 'your'} panel`;
+  }
+  function loadNote(stay) {
+    if (!(panel.loadW > 0)) return '';
+    if (!stay.coversLoad) return `too little for a steady ${watts(panel.loadW)}`;
+    return stay.batteryWh > 0 ? `${watts(panel.loadW)} load: ${wattHours(stay.batteryWh)} battery` : `runs a steady ${watts(panel.loadW)}`;
   }
 
   function answer(row, start) {
@@ -166,8 +170,8 @@ export function createDateScan({ el, onUse }) {
       h('div', { class: 'when-stats' },
         stat('sun', formatHours(start.longestLitH), 'of sun in a row'),
         stat('earth', pct(start.earthFraction), 'Earth in view'),
-        power ? stat('power', `~${watts(power.atLanding)}`, powerLabel(power.stay)) : '',
-        stat('dark', start.longestDarkH > 0 ? formatHours(start.longestDarkH) : 'None', start.longestDarkH > 0 ? 'longest dark' : 'dark hours')),
+        power ? stat('power', `~${watts(power.atLanding)}`, powerLabel(), loadNote(power.stay)) : '',
+        stat('dark', start.longestDarkH > 0 ? formatHours(start.longestDarkH) : 'Never', start.longestDarkH > 0 ? 'longest time in the dark' : 'dark during the stay')),
       h('details', { class: 'when-more', open: open.more, onToggle: remember('more') },
         h('summary', {}, 'Details'),
         h('ul', { class: 'when-facts' },
@@ -268,7 +272,7 @@ export function createDateScan({ el, onUse }) {
       el.append(h('p', { class: 'when-lede' }, picked.row === ranked[0].row && picked.start === ranked[0].win.best ? `Best landing time from ${range}:` : 'Chosen landing time:'), answer(row, start));
       const others = ranked.filter((r) => r.row.spot.region !== row.spot.region).slice(0, 2);
       if (others.length) {
-        el.append(h('div', { class: 'when-others' }, 'Also good: ',
+        el.append(h('div', { class: 'when-others' }, 'Also passes: ',
           ...others.flatMap((o, i) => [i ? ' · ' : '', h('button', { type: 'button', class: 'linklike', onClick: () => { picked = { row: o.row, start: o.win.best }; draw(); } },
             `${dayLabel(dateOf(o.win.best))} at ${o.row.spot.name}`)])));
       }
