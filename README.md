@@ -25,6 +25,22 @@ drivable **route** to a destination.
 **What does not work yet:** the ranking itself still assumes a smooth Moon, so no ridge or crater rim casts
 a shadow in the scores. Near the poles that decides the real answer. See [docs/plan.md](docs/plan.md).
 
+## The website (no server)
+
+The hosted site is the same app reading saved answers instead of the server: the ready-made missions'
+searches and the street view terrain at their landing spots. With the app running (`npm run dev`):
+
+```bash
+npm run export:static
+npm run build:site
+```
+
+Then upload the `dist` folder to Netlify (drag it onto the site's Deploys page). Missions with other settings
+say they are not saved on the website; they work when the app runs on a computer.
+
+To try VR on a Meta Quest without hosting: `npm run dev:quest`, then open the address it prints in the
+Quest's Browser (same Wi-Fi; tap "Advanced" > "Proceed" on the certificate warning).
+
 ## Start
 
 You need [Node.js](https://nodejs.org/) 22.12 or newer (`node --version` to check).
@@ -51,6 +67,14 @@ Then choose a south-pole site and press "Look around from here", or double-click
 
 **Showing the demo to anyone?** Follow [docs/demo-runbook.md](docs/demo-runbook.md): it adds the stored
 sunlight maps (`npm run data:light`) that make each region's search take about a second, and the warm-up.
+
+For the sharpest street view (5 m ground at the four regions the finder favours: Connecting ridge, Shackleton rim,
+Peak near Shackleton, Malapert), also get NASA Goddard's 5 m maps (387 MB). Without them the street view uses
+the 80 m data and says so.
+
+```bash
+npm run data:fetch -- pgda-lola-5mpp
+```
 
 | Command | What it does |
 | --- | --- |

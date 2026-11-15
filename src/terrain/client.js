@@ -5,8 +5,10 @@ let infoPromise = null;
 
 /** Which terrain datasets exist and which are downloaded on this machine. Asked once and remembered. */
 export function terrainInfo() {
+  // The hosted website has no server: it reads what the searches used from a saved copy (tools/export-static.mjs).
+  const saved = () => fetch('/static/terrain-info.json').then((r) => (r.ok ? r.json() : { available: false, sources: [], hint: null }));
   infoPromise ??= fetch('/api/terrain/info')
-    .then((r) => (r.ok ? r.json() : { available: false, sources: [], hint: null }))
+    .then((r) => (r.ok && r.headers.get('content-type')?.includes('json') ? r.json() : saved()))
     .catch(() => ({ available: false, sources: [], hint: null }));
   return infoPromise;
 }

@@ -15,6 +15,7 @@ import { coverageText, terrainCovers, terrainInfo } from './terrain/client.js';
 import { renderDetail } from './ui/detail.js';
 import { createFinderMode } from './ui/finder-mode.js';
 import { createFlow } from './ui/flow.js';
+import { createShell } from './ui/shell.js';
 import { createSurfaceMode } from './ui/surface-mode.js';
 import { renderTerrainPicker } from './ui/terrain-picker.js';
 import { renderMission, renderRanking, renderWeights } from './ui/panel.js';
@@ -318,6 +319,21 @@ flow = createFlow({
     setStatus,
   },
 });
+// The app around the steps: top tabs, the mission survey, the pop-out close-up and the street view (ui/shell.js).
+const shell = createShell({
+  app: document.querySelector('.app'),
+  flow,
+  finder,
+  globe,
+  getMission: () => state.mission,
+  setMission: (patch) => {
+    Object.assign(state.mission, patch);
+    if (patch.durationHours) state.mission.stepMinutes = stepMinutesFor(patch.durationHours);
+    state.viewIndex = 0;
+    evaluate();
+    drawMission();
+  },
+});
 // The older tools (ranked list of known sites, weights, terrain data, exact-number form, and the site card
 // that goes with the list) are kept off the page for the demo. Add ?tools to the address to get them back
 // under "More tools" on the first step.
@@ -328,4 +344,4 @@ $('moreTools').addEventListener('toggle', (e) => {
 });
 
 // Handy in the browser console while developing.
-window.__app = { state, globe, surface, finder, lookAround, get flow() { return flow; }, get ctx() { return ctx; }, get ranking() { return ranking; } };
+window.__app = { state, globe, surface, finder, lookAround, shell, get flow() { return flow; }, get ctx() { return ctx; }, get ranking() { return ranking; } };

@@ -280,6 +280,48 @@
           "bytes": 5184
         }
       ]
+    },
+    {
+      "id": "pgda-lola-5mpp",
+      "title": "South-pole landing sites at 5 m: Connecting ridge, Shackleton rim, Peak near Shackleton, Malapert massif",
+      "description": "NASA Goddard's re-processed LOLA elevation at 5 m per pixel for four candidate landing regions (PGDA Sites 01, 04, 07, 23), with each map's height-uncertainty map. The street view uses them for the ground within 1 km of you wherever they cover the spot; elsewhere it uses the best LOLA data you have. About 390 MB.",
+      "format": "GeoTIFF, 32-bit float, uncompressed; height in metres relative to the 1737.4 km sphere; south polar stereographic X/Y in metres (MOON_ME frame, DE421); 5 m pixels. *_toterr.tif: total height uncertainty (RMS) in metres.",
+      "sourcePage": "https://pgda.gsfc.nasa.gov/products/78",
+      "license": "Public (NASA GSFC Planetary Geology, Geophysics and Geochemistry Lab). Cite Barker et al. (2021), High-Resolution LOLA Topography for Lunar South Pole Sites.",
+      "files": [
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Site01_final_adj_5mpp_surf.tif",
+          "bytes": 40980810
+        },
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Site01_final_adj_5mpp_toterr.tif",
+          "bytes": 40980810
+        },
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_surf.tif",
+          "bytes": 40980806
+        },
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_toterr.tif",
+          "bytes": 40980808
+        },
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Site07_final_adj_5mpp_surf.tif",
+          "bytes": 40980808
+        },
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Site07_final_adj_5mpp_toterr.tif",
+          "bytes": 40980810
+        },
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Site23_final_adj_5mpp_surf.tif",
+          "bytes": 70586804
+        },
+        {
+          "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Site23_final_adj_5mpp_toterr.tif",
+          "bytes": 70586811
+        }
+      ]
     }
   ]
 }
