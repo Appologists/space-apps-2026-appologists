@@ -47,6 +47,12 @@
     border-radius:2px;border:1px solid rgba(239,233,221,.55);background:rgba(14,13,12,.9);color:var(--text);font:500 12.5px var(--mono)}
   #homeBtn:hover{border-color:#fff;background:rgba(239,233,221,.12)}
   #homeBtn svg{width:16px;height:16px}
+  /* Enter VR (top right, left of Home): filled, the eye-catching one */
+  #vrBtn{position:fixed;top:16px;right:112px;z-index:4;display:flex;align-items:center;gap:8px;cursor:pointer;height:40px;padding:0 16px;
+    border-radius:2px;border:0;background:var(--accent);color:#140c08;font:600 12.5px var(--mono);box-shadow:0 4px 18px rgba(255,106,61,.35)}
+  #vrBtn:hover{filter:brightness(1.1)}
+  #vrBtn svg{width:20px;height:20px}
+  #vrBtn.off{background:rgba(14,13,12,.9);color:var(--muted);border:1px dashed rgba(239,233,221,.35);box-shadow:none;cursor:help}
   #site h1{margin:6px 0 2px;font-size:20px;font-weight:700;letter-spacing:-.01em}
   #site .coords{font-size:12px;color:var(--muted)}
   .seg{display:flex;gap:4px;background:rgba(255,255,255,.05);padding:3px;border-radius:10px;margin-top:10px}
@@ -119,7 +125,7 @@
     padding:5px 10px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid var(--line);white-space:nowrap}
 
   body.globe #readout, body.globe #stats, body.globe #timebar, body.globe #compassWrap, body.globe #mapPanel,
-  body.globe #cross, body.globe #badge, body.globe #help, body.globe #site, body.globe #backGlobe, body.globe #homeBtn{display:none}
+  body.globe #cross, body.globe #badge, body.globe #help, body.globe #site, body.globe #backGlobe, body.globe #homeBtn, body.globe #vrBtn{display:none}
   #globePanel{top:16px;left:16px;width:320px;padding:16px;display:none}
   body.globe #globePanel{display:block}
   #globePanel h1{margin:6px 0 4px;font-size:22px;letter-spacing:-.01em}
@@ -204,6 +210,14 @@
   @media (max-width:1000px){ #compassWrap,#badge{display:none} }
   @media (max-width:820px){ #stats,#mapPanel,#compassWrap,#badge{display:none} #timebar{right:16px} #readout{width:220px} #site{width:240px} }
 </style>
+<script type="module">
+// ?vr-test : load Meta's Immersive Web Emulation Runtime so VR can be tried on a laptop with no headset
+// (the free "Immersive Web Emulator" Chrome extension does the same with a control panel)
+if(new URLSearchParams(location.search).has('vr-test')){
+  try{ const m=await import('https://cdn.jsdelivr.net/npm/iwer@2.7.0/build/iwer.module.js');
+    const d=new m.XRDevice(m.metaQuest3); d.installRuntime({forceInstall:true}); window.__xrDevice=d; }catch(e){ console.warn('vr-test',e); } }
+window.dispatchEvent(new Event('vrtest-ready'));
+</script>
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -251,6 +265,7 @@
   </div>
 </div>
 <button id="backGlobe" title="Back to the whole Moon"><span class="mini"></span><span class="txt"><small>← back to</small><b>Whole Moon</b></span></button>
+<button id="vrBtn" class="off" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-4.2l-1.6-2.4a1.4 1.4 0 0 0-2.4 0L9.2 16.5H5a2 2 0 0 1-2-2z"/><circle cx="8" cy="11.5" r="1.6"/><circle cx="16" cy="11.5" r="1.6"/></svg><span>VR: open on a Quest</span></button>
 <button id="homeBtn" title="Back to the start page"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7.5 8 2l6 5.5M3.8 6.2V14h3V10h2.4v4h3V6.2"/></svg>Home</button>
 
 <!-- Summary box. For now it shows this week's sunlight here; part one (site filters) will fill it through
@@ -514,9 +529,9 @@ const patchU={value:new THREE.Vector3(0,0,-1)};
 const floatLinear=!!renderer.extensions.get('OES_texture_float_linear');
 function heightTex(arr,n){ const t=new THREE.DataTexture(arr,n,n,THREE.RedFormat,THREE.FloatType); t.minFilter=t.magFilter=floatLinear?THREE.LinearFilter:THREE.NearestFilter; t.needsUpdate=true; return t; }
 const TU={ uNearH:{value:heightTex(new Float32Array(N*N),N)}, uFarH:{value:heightTex(new Float32Array(NF*NF).fill(-1e5),NF)}, uSunDir:{value:new THREE.Vector3(0,1,0)},
-  uExag:{value:1}, uDistant:{value:1}, uHasFar:{value:0} };
+  uExag:{value:1}, uDistant:{value:1}, uHasFar:{value:0}, uNearMax:{value:110}, uFarMax:{value:150} };
 const SUNVIS_GLSL=`
-uniform sampler2D uNearH; uniform sampler2D uFarH; uniform vec3 uSunDir; uniform float uExag; uniform float uDistant; uniform float uHasFar;
+uniform sampler2D uNearH; uniform sampler2D uFarH; uniform vec3 uSunDir; uniform float uExag; uniform float uDistant; uniform float uHasFar; uniform float uNearMax; uniform float uFarMax;
 varying float vSunVis;
 float hN(vec2 p){ vec2 g=(p+${S}.)/${2*S}.*${N-1}.; return texture2D(uNearH,(g+0.5)/${N}.).r; }
 float hF(vec2 p){ vec2 g=(p+${SF}.)/${2*SF}.*${NF-1}.; return texture2D(uFarH,(g+0.5)/${NF}.).r; }
@@ -527,10 +542,10 @@ float sunVis(vec3 p){
   // start from the real surface and skip the first 20 m: close-up shading comes from the surface normal (like the
   // original look); this march adds the shadows other real terrain casts onto you
   if(inNear){ p.y=hN(p.xz)*uExag+1.0; t=20.0; st=3.0;
-    for(int i=0;i<110;i++){ vec3 q=p+d*t; if(abs(q.x)>=${S}.||abs(q.z)>=${S}.) break; m=min(m,(q.y-hN(q.xz)*uExag)/t); t+=st; st=min(st*1.045,25.0); } }
+    for(int i=0;i<110;i++){ if(float(i)>=uNearMax) break; vec3 q=p+d*t; if(abs(q.x)>=${S}.||abs(q.z)>=${S}.) break; m=min(m,(q.y-hN(q.xz)*uExag)/t); t+=st; st=min(st*1.045,25.0); } }
   else { p.y+=4.0; t=180.0; }
   if(uHasFar>0.5){ float s2=max(st,120.0);
-    for(int i=0;i<150;i++){ vec3 q=p+d*t; if(abs(q.x)>=${SF}.||abs(q.z)>=${SF}.||t>85000.0) break;
+    for(int i=0;i<150;i++){ if(float(i)>=uFarMax) break; vec3 q=p+d*t; if(abs(q.x)>=${SF}.||abs(q.z)>=${SF}.||t>85000.0) break;
       if(abs(q.x)>=${S}.||abs(q.z)>=${S}.) m=min(m,(q.y-hF(q.xz)*uExag)/t); t+=s2; s2=min(s2*1.03,600.0); } }
   float h=clamp(atan(m)/${(0.45*Math.PI/180).toFixed(6)},-1.0,1.0);  // slightly soft edge for looks; the numbers use the true 0.267°
   float v=(1.5707963+asin(h)+h*sqrt(1.0-h*h))/3.1415927;
@@ -962,14 +977,116 @@ function globeFrame(now){
     el.style.left=((sp.x+1)/2*innerWidth)+'px'; el.style.top=((1-sp.y)/2*innerHeight)+'px'; }
   renderer.render(gScene,gCam);
 }
+/* ---------- VR (WebXR): works in the Meta Quest browser; test on a laptop with Meta's Immersive Web Emulator ----------
+   Controls in the headset:
+     left stick   walk (hold left grip to go faster)      right stick  turn in 30° steps
+     right trigger  point at the ground, let go to teleport there
+     A  play / pause time     B  +6 hours     X  −6 hours     Y  leave VR
+   The wrist panel on your left hand shows the same live readouts as the desktop panels. */
+renderer.xr.enabled=true;
+renderer.xr.setReferenceSpaceType('local-floor');
+const rig=new THREE.Group(); rig.add(camera); scene.add(rig);          // the player: moved by walking/teleporting/turning
+let vrYaw=0, inVR=false;
+const vrHands={left:null,right:null};                                    // {ray, grip, src}
+const vrPrev={};                                                         // button edge detection
+let snapArmed=true, aimHit=null;
+const _v=new THREE.Vector3(), _v2=new THREE.Vector3(), _q2=new THREE.Quaternion(), eye=new THREE.Vector3(), lookDir=new THREE.Vector3();
+
+// pointer line + teleport marker
+const rayGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-1)]);
+const marker=new THREE.Mesh(new THREE.RingGeometry(0.35,0.5,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xff6a3d,transparent:true,opacity:0.9,depthTest:false}));
+marker.visible=false; marker.renderOrder=10; scene.add(marker);
+function makeHand(i){
+  const ray=renderer.xr.getController(i), grip=renderer.xr.getControllerGrip(i);
+  const line=new THREE.Line(rayGeo,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.6})); line.scale.z=6; line.visible=false; ray.add(line); ray.userData.line=line;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.025,0.11),new THREE.MeshStandardMaterial({color:0x222222,roughness:0.6})); body.position.z=0.02; grip.add(body);
+  rig.add(ray); rig.add(grip);
+  ray.addEventListener('connected',e=>{ const h=e.data.handedness; if(h==='left'||h==='right'){ vrHands[h]={ray,grip,src:e.data}; if(h==='left') grip.add(wrist); if(h==='right') line.visible=true; } });
+  ray.addEventListener('disconnected',()=>{ for(const k in vrHands) if(vrHands[k]&&vrHands[k].ray===ray) vrHands[k]=null; });
+}
+
+// wrist panel: a small canvas on the left hand, redrawn a few times a second
+const wcv=document.createElement('canvas'); wcv.width=640; wcv.height=400; const wctx=wcv.getContext('2d');
+const wtex=new THREE.CanvasTexture(wcv); wtex.encoding=THREE.sRGBEncoding;
+const wrist=new THREE.Mesh(new THREE.PlaneGeometry(0.2,0.125),new THREE.MeshBasicMaterial({map:wtex,transparent:true,toneMapped:false,side:THREE.DoubleSide}));
+wrist.position.set(0,0.07,0.03); wrist.rotation.x=-0.9;
+let wristAt=0;
+function drawWrist(){ const g=wctx, W=640, Hh=400, txt=id=>document.getElementById(id).textContent;
+  g.clearRect(0,0,W,Hh); g.fillStyle='rgba(14,13,12,.92)'; g.fillRect(0,0,W,Hh); g.strokeStyle='#ff6a3d'; g.lineWidth=4; g.strokeRect(2,2,W-4,Hh-4);
+  g.fillStyle='#ff6a3d'; g.font='500 20px IBM Plex Mono, monospace'; g.fillText('YOU ARE STANDING AT',24,40);
+  g.fillStyle='#efe9dd'; g.font='34px Instrument Serif, Georgia, serif'; g.fillText((site.meta&&site.meta.name)||'',24,80);
+  const ft=fmtTime(t); g.font='22px IBM Plex Mono, monospace'; g.fillStyle='#a39d91'; g.fillText(`${ft.day} · ${ft.clock}${playing?'  ▶':''}`,24,114);
+  const rows=[['Sun',txt('rSun'),'#f5b942'],['Earth',txt('rEarth'),'#7fb2ff'],['In sun?',txt('rLit')],['Call home?',txt('rComm')],['Height',txt('rElev')],['Slope',txt('rSlope')]];
+  rows.forEach((r,k)=>{ const y=156+k*34; g.fillStyle=r[2]||'#a39d91'; g.font='22px IBM Plex Mono, monospace'; g.fillText(r[0],24,y); g.fillStyle='#efe9dd'; g.fillText(r[1],200,y); });
+  g.fillStyle='#a39d91'; g.font='17px IBM Plex Mono, monospace'; g.fillText('L stick walk · R stick turn · R trigger teleport',24,Hh-46); g.fillText('A play/pause · B +6 h · X −6 h · Y leave VR',24,Hh-20);
+  wtex.needsUpdate=true; }
+
+function pressed(src,i){ const gp=src&&src.gamepad; return !!(gp&&gp.buttons[i]&&gp.buttons[i].pressed); }
+function edge(key,now){ const was=vrPrev[key]; vrPrev[key]=now; return now&&!was; }
+function headLocalXZ(){ return {x:camera.position.x, z:camera.position.z}; }   // head offset inside the rig (room-scale)
+function rotXZ(p,a){ const c=Math.cos(a), s=Math.sin(a); return {x:p.x*c+p.z*s, z:-p.x*s+p.z*c}; } // matches rotation.y=a
+
+function vrStep(dt,now){
+  // head in the world (camera is updated by the headset)
+  camera.getWorldPosition(eye); camera.getWorldDirection(lookDir);
+  const L=vrHands.left&&vrHands.left.src, R=vrHands.right&&vrHands.right.src;
+  const ax=src=>{ const a=src&&src.gamepad&&src.gamepad.axes; return a&&a.length>=4?{x:a[2],y:a[3]}:{x:0,y:0}; };
+  // walk with the left stick, in the direction you are looking
+  const ls=ax(L); if(Math.hypot(ls.x,ls.y)>0.15){ const sp=(pressed(L,1)?15:3)*dt; const fx=lookDir.x, fz=lookDir.z, n=Math.hypot(fx,fz)||1;
+    const f={x:fx/n,z:fz/n}, r={x:-f.z,z:f.x}; cam.x+=(f.x*-ls.y+r.x*ls.x)*sp; cam.z+=(f.z*-ls.y+r.z*ls.x)*sp; lastMoveAt=now; analysisDirty=true; }
+  // snap turn with the right stick, turning around your head (not the rig's corner)
+  const rs=ax(R); if(snapArmed&&Math.abs(rs.x)>0.6){ const d=(rs.x>0?-1:1)*30*DEG; const hl=headLocalXZ(), before=rotXZ(hl,vrYaw), after=rotXZ(hl,vrYaw+d);
+      cam.x+=before.x-after.x; cam.z+=before.z-after.z; vrYaw+=d; snapArmed=false; } else if(Math.abs(rs.x)<0.3) snapArmed=true;
+  // teleport: aim with the right trigger held, go on release
+  const trig=pressed(R,0);
+  if(trig&&vrHands.right){ const ray=vrHands.right.ray; ray.getWorldPosition(_v); ray.getWorldQuaternion(_q2); _v2.set(0,0,-1).applyQuaternion(_q2);
+    const hit=marchHit(_v,_v2,exag); aimHit=hit&&hit.t<900?hit:null;
+    if(aimHit){ marker.visible=true; marker.position.set(aimHit.x,nearH(aimHit.x,aimHit.z)+0.05,aimHit.z); ray.userData.line.scale.z=aimHit.t; } else { marker.visible=false; ray.userData.line.scale.z=30; } }
+  else { if(vrPrev.trig&&aimHit){ const off=rotXZ(headLocalXZ(),vrYaw); cam.x=aimHit.x-off.x; cam.z=aimHit.z-off.z; lastMoveAt=now; analysisDirty=true; }
+    marker.visible=false; aimHit=null; if(vrHands.right) vrHands.right.ray.userData.line.scale.z=6; }
+  vrPrev.trig=trig;
+  // buttons
+  if(edge('A',pressed(R,4))) togglePlay();
+  if(edge('B',pressed(R,5))){ t=Math.min(168,t+6); scrub.value=t; }
+  if(edge('X',pressed(L,4))){ t=Math.max(0,t-6); scrub.value=t; }
+  if(edge('Y',pressed(L,5))){ const s=renderer.xr.getSession(); if(s) s.end(); }
+  cam.x=Math.max(-S+5,Math.min(S-5,cam.x)); cam.z=Math.max(-S+5,Math.min(S-5,cam.z));
+  // stand on the ground under your head
+  const off=rotXZ(headLocalXZ(),vrYaw), hx=cam.x+off.x, hz=cam.z+off.z;
+  rig.position.set(cam.x,nearH(hx,hz),cam.z); rig.rotation.y=vrYaw;
+  if(now-wristAt>250){ wristAt=now; drawWrist(); }
+  return {x:hx,z:hz,heading:((Math.atan2(lookDir.x,-lookDir.z)/DEG)+360)%360};
+}
+
+// lighter settings while in the headset (Quest draws every frame twice on a phone-class chip)
+function vrQuality(on){
+  TU.uNearMax.value=on?50:110; TU.uFarMax.value=on?70:150;
+  sunLight.shadow.mapSize.set(on?2048:4096,on?2048:4096); if(sunLight.shadow.map){ sunLight.shadow.map.dispose(); sunLight.shadow.map=null; }
+  if(renderer.xr.setFoveation) renderer.xr.setFoveation(on?1:0);
+}
+const vrBtn=document.getElementById('vrBtn');
+async function checkVR(){ let ok=false; try{ ok=!!(navigator.xr&&await navigator.xr.isSessionSupported('immersive-vr')); }catch(e){}
+  vrBtn.disabled=!ok; vrBtn.classList.toggle('off',!ok); vrBtn.querySelector('span').textContent=ok?'Enter VR':'VR: open on a Quest';
+  vrBtn.title=ok?'Stand here in VR':'Open this page in the Meta Quest browser (or Chrome with Meta’s Immersive Web Emulator)'; }
+checkVR(); addEventListener('vrtest-ready',checkVR);
+vrBtn.addEventListener('click',async()=>{ if(vrBtn.disabled||inVR) return;
+  try{ const s=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor','bounded-floor']}); await renderer.xr.setSession(s);
+    inVR=true; vrYaw=cam.yaw; vrQuality(true); camera.near=0.05; camera.updateProjectionMatrix();   // hands and the wrist panel are closer than 30 cm hoverEl.style.display='none'; document.body.classList.add('vr');
+    s.addEventListener('end',()=>{ inVR=false; vrQuality(false); camera.near=0.3; camera.updateProjectionMatrix();
+      if(document.body.firstElementChild!==canvas) document.body.prepend(canvas);   // emulators can move the canvas on top of the panels rig.position.set(0,0,0); rig.rotation.set(0,0,0); marker.visible=false; document.body.classList.remove('vr');
+      cam.yaw=vrYaw; setTimeout(resize,0); }); }
+  catch(e){ console.warn('VR',e); alert('Could not start VR: '+e.message); } });
+makeHand(0); makeHand(1);
+if(location.search.includes('vr-test')) window.__svVR={vrHands,wrist,rig,camera,renderer,get inVR(){return inVR;}};   // test mode only
+
 /* ---------- loop ---------- */
 const $=id=>document.getElementById(id);
 let last=performance.now();
-function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;
-  if(view==='globe'){ globeFrame(now); requestAnimationFrame(frame); return; }
+function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;   // run by renderer.setAnimationLoop (needed for VR)
+  if(view==='globe'){ globeFrame(now); return; }
   if(playing){ t+=dt*speed; if(t>168) t=0; scrub.value=t; }
   // movement
-  const heading=((-cam.yaw/DEG)%360+360)%360, fwd={x:Math.sin(heading*DEG),z:-Math.cos(heading*DEG)}, right={x:-fwd.z,z:fwd.x};
+  const heading0=((-cam.yaw/DEG)%360+360)%360, fwd={x:Math.sin(heading0*DEG),z:-Math.cos(heading0*DEG)}, right={x:-fwd.z,z:fwd.x};
   const sp=(keys['shift']?40:9)*dt; let mx=0,mz=0;
   if(keys['w']||keys['arrowup']){mx+=fwd.x;mz+=fwd.z;} if(keys['s']||keys['arrowdown']){mx-=fwd.x;mz-=fwd.z;}
   if(keys['d']||keys['arrowright']){mx+=right.x;mz+=right.z;} if(keys['a']||keys['arrowleft']){mx-=right.x;mz-=right.z;}
@@ -977,39 +1094,42 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;
   if(cam.target){ const dx=cam.target.x-cam.x, dz=cam.target.z-cam.z, d=Math.hypot(dx,dz); const step=Math.min(d,Math.max(6,d*2.2)*dt);
     if(d<0.3){ cam.target=null; } else { cam.x+=dx/d*step; cam.z+=dz/d*step; } lastMoveAt=now; analysisDirty=true; }
   cam.x=Math.max(-S+5,Math.min(S-5,cam.x)); cam.z=Math.max(-S+5,Math.min(S-5,cam.z));
-  if(patchC && Math.max(Math.abs(cam.x-patchC.x),Math.abs(cam.z-patchC.z))>18) buildPatch();
-  const gH=nearH(cam.x,cam.z)/exag;
-  camera.position.set(cam.x,gH*exag+2,cam.z); camera.rotation.set(cam.pitch,cam.yaw,0);
+  let gH, heading=heading0, P=cam;
+  if(inVR){ const v=vrStep(dt,now); P={x:v.x,z:v.z}; heading=v.heading; gH=nearH(P.x,P.z)/exag; }
+  else { gH=nearH(cam.x,cam.z)/exag; camera.position.set(cam.x,gH*exag+2,cam.z); camera.rotation.set(cam.pitch,cam.yaw,0); }
+  if(patchC && Math.max(Math.abs(P.x-patchC.x),Math.abs(P.z-patchC.z))>18) buildPatch();
+  camera.getWorldPosition(eye);
 
   // sky
   const sun=SUN(t), ep=EARTH(t); const sd=dirAzEl(sun.az,sun.el), ed=dirAzEl(ep.az,ep.el);
   TU.uSunDir.value.copy(sd);
   if(site.distant){ const D=site.distant, f=sun.az/0.5, i=Math.floor(f)%720, u=f-Math.floor(f), hz=D[i]*(1-u)+D[(i+1)%720]*u, hh=Math.max(-1,Math.min(1,(sun.el-hz)/0.267));
     TU.uDistant.value=(Math.PI/2+Math.asin(hh)+hh*Math.sqrt(1-hh*hh))/Math.PI; } else TU.uDistant.value=1;
-  sunCore.position.copy(camera.position).addScaledVector(sd,SKY_R); sunGlow.position.copy(sunCore.position);
-  earth.position.copy(camera.position).addScaledVector(ed,EARTH_D); earthHalo.position.copy(earth.position); earth.rotation.y=t*0.26;
-  stars.position.copy(camera.position);
-  const fx2=cam.x+Math.sin(heading*DEG)*150, fz2=cam.z-Math.cos(heading*DEG)*150;
+  sunCore.position.copy(eye).addScaledVector(sd,SKY_R); sunGlow.position.copy(sunCore.position);
+  earth.position.copy(eye).addScaledVector(ed,EARTH_D); earthHalo.position.copy(earth.position); earth.rotation.y=t*0.26;
+  stars.position.copy(eye);
+  const fx2=P.x+Math.sin(heading*DEG)*150, fz2=P.z-Math.cos(heading*DEG)*150;
   sunLight.target.position.set(fx2,gH*exag,fz2); sunLight.position.set(fx2,gH*exag,fz2).addScaledVector(sd,2500);
-  sunLight.intensity = sun.el>-6?5.2:0; // the terrain decides; a high peak sees below the flat horizon earthshine.position.copy(ed).multiplyScalar(100);
+  sunLight.intensity = sun.el>-6?5.2:0; // the terrain decides; a high peak sees below the flat horizon
+  earthshine.position.copy(ed).multiplyScalar(100);
   stars.material.opacity = 0.85;
 
   // readouts
-  const frac=sunFraction(cam.x,cam.z,sun), ev=earthVisible(cam.x,cam.z,ep);
+  const frac=sunFraction(P.x,P.z,sun), ev=earthVisible(P.x,P.z,ep);
   $('rSun').textContent=`az ${sun.az.toFixed(1)}° · el ${sun.el.toFixed(2)}°`;
   $('rEarth').textContent=`az ${ep.az.toFixed(1)}° · el ${ep.el.toFixed(2)}°`;
   const rl=$('rLit'); if(frac>=0.99){rl.className='pill lit'; rl.textContent='full sun';} else if(frac>0){rl.className='pill part'; rl.textContent=`partly · ${Math.round(frac*100)}%`;} else {rl.className='pill dark'; rl.textContent='in shadow';}
   const rc=$('rComm'); if(ev){rc.className='pill earth'; rc.textContent='yes, clear line';} else {rc.className='pill dark'; rc.textContent= ep.el<-6?'earth has set':'below the skyline';}
-  if(site.illustrative){ $('rElev').textContent='illustrative'; $('rSlope').textContent=`${slopeAt(cam.x,cam.z).toFixed(1)}° (illustrative)`; }
-  else { const er=errAt(cam.x,cam.z); $('rElev').textContent=`${(sampleR(cam.x,cam.z)+site.meta.heightM).toFixed(1)} m${er!=null?' ± '+er.toFixed(1):''}`; $('rSlope').textContent=`${slopeReal(cam.x,cam.z).toFixed(1)}°`; }
+  if(site.illustrative){ $('rElev').textContent='illustrative'; $('rSlope').textContent=`${slopeAt(P.x,P.z).toFixed(1)}° (illustrative)`; }
+  else { const er=errAt(P.x,P.z); $('rElev').textContent=`${(sampleR(P.x,P.z)+site.meta.heightM).toFixed(1)} m${er!=null?' ± '+er.toFixed(1):''}`; $('rSlope').textContent=`${slopeReal(P.x,P.z).toFixed(1)}°`; }
   const ft=fmtTime(t); $('when').innerHTML=`${ft.day}<span class="mono">${ft.clock}</span>`;
   $('cursorLine').style.left=`calc(${t/168*100}% - 1px)`;
   if(analysisDirty && now-lastMoveAt>220) runAnalysis();
-  drawCompass(heading,sun,ep); drawMinimap(heading,sun);
-  renderer.render(scene,camera); requestAnimationFrame(frame);
+  if(!inVR){ drawCompass(heading,sun,ep); drawMinimap(heading,sun); }   // nobody sees them in the headset
+  renderer.render(scene,camera);
 }
 
-resize(); document.body.classList.add('hero'); setView('globe'); requestAnimationFrame(frame);
+resize(); document.body.classList.add('hero'); setView('globe'); renderer.setAnimationLoop(frame);
 Promise.all(Object.keys(SITE_LL).map(k=>fetch(`data/${k}/meta.json`).then(r=>r.json()).then(m=>{ SITE_LL[k]=[m.lat,m.lon];
   gMarkers[k].position.copy(llToVec(m.lat,m.lon,1.012)); const sb=document.getElementById('sb_'+k); if(sb) sb.textContent=fmtLL(m)+(m.near?` · ${Math.round(m.heightM)} m`:''); })))
   .catch(e=>console.warn('site list',e))

@@ -54,3 +54,30 @@ StreetView.setSummary({            // fill the bottom-left box with whatever par
 })
 StreetView.clearSummary()          // back to this week's sunlight numbers
 ```
+
+## VR (Meta Quest)
+
+The street view has an **Enter VR** button (top right). It uses WebXR, so it runs in the Meta Quest's built-in
+browser: open the page's https link (Netlify), go to a site, press Enter VR.
+
+| In the headset | Does |
+|---|---|
+| Left stick | Walk where you are looking (hold left grip to go faster) |
+| Right stick | Turn in 30° steps |
+| Right trigger | Point at the ground, let go to teleport there |
+| A | Play / pause time |
+| B / X | Time +6 h / −6 h |
+| Y | Leave VR |
+| Left wrist | Panel with the live readouts (Sun, Earth, in sun?, call home?, height, slope) |
+
+In VR the page uses lighter settings (fewer shadow steps, smaller shadow map) so the Quest can keep up.
+It has only been tested in an emulator so far; check speed and comfort on a real headset.
+
+**Trying it without a headset**
+- Install Meta's free **Immersive Web Emulator** extension in Chrome, open the page, pick a site, press Enter VR.
+  The extension's panel moves the virtual headset and controllers.
+- Or add `?vr-test` to the address (e.g. `index.html?vr-test`): the page loads the same emulator by itself, no
+  install. Don't use `?vr-test` together with the extension.
+- WebXR needs https or localhost. On a Quest without deploying: enable developer mode, connect USB, run
+  `adb reverse tcp:8000 tcp:8000`, start a local server on port 8000 and open `localhost:8000` in the Quest browser.
+
