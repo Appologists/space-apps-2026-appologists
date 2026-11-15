@@ -6,6 +6,11 @@ Team Appologists' project for the NASA Space Apps Challenge 2026,
 A web app that runs on your own computer. You choose a landing date, how long the mission lasts and what
 matters most; it ranks landing sites and shows where the Sun and Earth are in each site's sky.
 
+**Start here:** the left panel is five steps. Choose a mission, see which regions near the south pole can
+take it, plan the rover's drive and play it back, stand at the landing spot, then ride along the route.
+The older tools (ranked list of 23 sites, weights, terrain data) are off the page for the demo: add `?tools`
+to the address (`http://localhost:5173/?tools`) and they appear under "More tools" on the first step.
+
 **What works today:** a 3D Moon with 23 sites, ranking by uninterrupted sunlight and Earth visibility, a
 time slider, your own points by click or coordinates, and a one-click check against NASA JPL Horizons.
 Within 10° of the south pole you can also **stand on the surface and look around**: real terrain from NASA's
@@ -50,6 +55,7 @@ Then choose a south-pole site and press "Look around from here", or double-click
 | `npm test` | Runs the tests (about 2 seconds) |
 | `npm run check:horizons` | Compares our Sun/Earth maths with JPL Horizons over the next 28 days |
 | `npm run check:landing` | Compares the landing-site finder with the slower point-by-point method at 16 places |
+| `npm run demo:warm` | With the app running: asks every search the ready-made missions need, so the steps open at once |
 | `npm run data:list` | Lists the large datasets we know about and which ones you have |
 | `npm run data:fetch -- <id>` | Downloads one into `data/raw/` (never committed) |
 | `npm run build` | Builds a static copy into `dist/` |
@@ -67,7 +73,8 @@ Then choose a south-pole site and press "Look around from here", or double-click
 | `src/terrain/` | Terrain around a point: the real horizon, and the format terrain travels in |
 | `server/` | Runs inside the dev server: reads the big terrain files and serves the piece the app asks for |
 | `src/finder/` | The landing-site finder: its rules, the map of results, and the format results travel in |
-| `src/ui/` | The panel, ranked list and site card |
+| `src/ui/` | The mission steps (`flow.js`), the panel, ranked list and site card |
+| `data/missions.json` | Ready-made missions and the regions they are checked against, each with its source |
 | `data/sites.json` | The curated sites, each with its source |
 | `data/catalog.json` | Large datasets: where they come from and how big they are |
 | `tools/` | Command-line helpers: dataset download, Horizons check |

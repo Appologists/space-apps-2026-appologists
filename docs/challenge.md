@@ -17,12 +17,12 @@ compare sites and dates fast.
 | Suggested | Status here |
 | --- | --- |
 | Choose from notable sites (Apollo, CLPS targets, commercial, other countries) and enter your own coordinates | Started: 23 sites, click or type your own. No CLPS or Artemis targets yet. |
-| Compare several sites side by side | Ranked list only. Side-by-side view not built. |
+| Compare several sites side by side | The Regions step lists seven south-pole regions for one mission, with the ground that passes or the reason none does. A side-by-side view of two sites is not built. |
 | Choose landing date and time; explore lunar days and seasons | Date, time and five mission lengths. No date-versus-date comparison yet. |
 | Show Sun and Earth relative to the horizon; time left before sunset or Earthset | Done on the site card, for a smooth-Moon horizon. |
 | Power and communication numbers: Sun elevation, hours of sunlight, Earth visibility windows | Done for a smooth-Moon horizon. No power estimate yet. |
-| 2D maps, 3D views or other pictures | 3D globe, a timeline strip, and a view from the surface with the Sun and Earth's paths (80° S to the pole). No 2D map. |
-| Animations or timelines over a lunar day | Time slider and Play. |
+| 2D maps, 3D views or other pictures | 3D globe, a timeline strip, and a view from the surface with the Sun and Earth's paths (80° S to the pole). A 2D map of each searched region, with layers. |
+| Animations or timelines over a lunar day | Time slider and Play. The Drive step plays the rover's trip while the map shows which ground is sunlit hour by hour; the Ride step does it from the surface. |
 | Useful to planners and understandable to the public | Not yet tested on anyone. |
 | Real terrain for horizons (LOLA); steep slopes and deep craters at the south pole | Done in the surface view (80 m LOLA, real horizon, cast shadows). **Not yet in the ranking: biggest gap.** |
 | Earth's libration and the Moon's orbit | Included: the ephemeris has both. |

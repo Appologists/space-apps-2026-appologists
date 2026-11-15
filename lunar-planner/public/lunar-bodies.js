@@ -16,7 +16,7 @@ function showEnablePrompt() {
     box.innerHTML = `
         <div class="enable">
             <h3>Turn on Google Street View</h3>
-            <p>Google refused the map key. To see Earth at street level:</p>
+            <p>To walk around Earth at street level, the app needs a Google Maps key:</p>
             <ol>
                 <li>Open the <a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener">Maps JavaScript API page</a> and click <b>Enable</b>.</li>
                 <li>In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Credentials</a>, open the key. Under API restrictions, allow <b>Maps JavaScript API</b>. Under website restrictions, allow <b>http://127.0.0.1:8002/*</b>.</li>
@@ -46,38 +46,82 @@ function loadGoogle(key) {
     return googleReady;
 }
 
-/** Open Street View at the panorama nearest to lat/lng (within 100 km). */
+// Search wider and wider for a panorama; if there is none (ocean, desert, poles), show the place
+// from above in satellite view instead. The visitor never sees a "not found" message.
+let satMap = null;
+
+async function findPano(google, lat, lng) {
+    const service = new google.maps.StreetViewService();
+    const S = google.maps.StreetViewSource;
+    const tries = [
+        {radius: 1000, source: S.OUTDOOR},
+        {radius: 20000, source: S.OUTDOOR},
+        {radius: 20000, source: S.DEFAULT},
+        {radius: 100000, source: S.DEFAULT},
+        {radius: 500000, source: S.DEFAULT},
+    ];
+    for (const t of tries) {
+        try {
+            const {data} = await service.getPanorama({
+                location: {lat, lng}, radius: t.radius, source: t.source,
+                preference: google.maps.StreetViewPreference.NEAREST,
+            });
+            if (data?.location?.pano) {
+                return data;
+            }
+        } catch (e) {
+            // try the next, wider search
+        }
+    }
+    return null;
+}
+
+function showSatellite(google, lat, lng, label) {
+    const box = $('gsv');
+    if (panorama) {
+        panorama.setVisible(false);
+    }
+    if (!satMap) {
+        box.innerHTML = '';
+        panorama = null;
+        satMap = new google.maps.Map(box, {center: {lat, lng}, zoom: 15, mapTypeId: 'satellite', tilt: 45, streetViewControl: true, fullscreenControl: false});
+    } else {
+        satMap.setCenter({lat, lng});
+        satMap.setZoom(15);
+    }
+    $('earth-where').textContent = `Satellite view \u00b7 ${label}`;
+}
+
+/** Open Street View near lat/lng, or a satellite view of the place when no panorama exists. */
 export async function showStreetView(key, lat, lng, label, onStatus) {
     const where = $('earth-where');
-    where.textContent = `Looking for Street View near ${label}...`;
+    if (!key || window.__gmapsAuthFailed) {
+        showEnablePrompt();
+        return false;
+    }
+    where.textContent = `Looking around ${label}...`;
     try {
         const google = await loadGoogle(key);
+        const data = await findPano(google, lat, lng);
+        if (!data) {
+            showSatellite(google, lat, lng, label);
+            return true;
+        }
         if (!panorama) {
-            panorama = new google.maps.StreetViewPanorama($('gsv'), {
-                addressControl: true,
-                fullscreenControl: false,
-                motionTracking: false,
-                zoomControl: true,
+            const box = $('gsv');
+            box.innerHTML = '';
+            satMap = null;
+            panorama = new google.maps.StreetViewPanorama(box, {
+                addressControl: true, fullscreenControl: false, motionTracking: false, zoomControl: true,
             });
         }
-        const service = new google.maps.StreetViewService();
-        const {data} = await service.getPanorama({
-            location: {lat, lng},
-            radius: 100000,
-            preference: google.maps.StreetViewPreference.NEAREST,
-            source: google.maps.StreetViewSource.OUTDOOR,
-        });
         panorama.setPano(data.location.pano);
         panorama.setPov({heading: 0, pitch: 0});
         panorama.setVisible(true);
-        where.textContent = `Street View near ${label} \u00b7 ${data.location.description || ''}`;
+        where.textContent = `Street View \u00b7 ${data.location.description || label}`;
         return true;
     } catch (e) {
-        if (window.__gmapsAuthFailed || /key|load/i.test(e.message)) {
-            showEnablePrompt();
-        } else {
-            where.textContent = `No Street View within 100 km of ${label}. Try a NASA center.`;
-        }
+        showEnablePrompt();
         return false;
     }
 }
@@ -96,7 +140,8 @@ export async function loadEpic() {
         $('epic-cap').textContent = `Earth from NASA's EPIC camera on DSCOVR, 1.5 million km away \u00b7 ${j.date_utc} UTC`;
         epicLoaded = true;
     } catch (e) {
-        $('epic-cap').textContent = 'NASA EPIC image not available right now.';
+        $('epic-img').removeAttribute('src');
+        $('epic-cap').textContent = 'The newest NASA EPIC photo could not be reached. Check the internet connection.';
     }
 }
 

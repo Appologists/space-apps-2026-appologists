@@ -8,7 +8,7 @@
 //  - Shortest: the shortest drivable path (no thought for sunlight), driven as soon as the rules allow.
 //              It can get the rover lost in the dark, which is why the planner exists; the panel says so.
 //
-// The slope bands and the darkness margin are our estimate (see docs/decisions.md, decision P).
+// The slope bands and the darkness margin are our estimate (see docs/decisions.md, decision R).
 import { planMission } from './planner.js';
 import { pathTo, reachFrom } from './route.js';
 import { STATE, simulatePlan } from './schedule.js';
