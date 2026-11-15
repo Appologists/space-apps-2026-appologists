@@ -66,8 +66,9 @@ describe('the label on the street view picture', () => {
     expect(page).toContain('groundLabel(site,true).forEach');
   });
 
-  it('is not hidden in a narrow window', () => {
-    expect(page).not.toMatch(/@media[^\n]*#badge\s*\{\s*display:\s*none/);
-    expect(page).toMatch(/@media \(max-width:1000px\)\{[^\n]*#badge, body\.in-app #badge\{top:auto;/);
+  it('is off the picture and offered as the hover text of the site card (decision 10)', () => {
+    const show = between('function showGroundLabel(', '\n');
+    expect(show).toContain("getElementById('badge').style.display='none'");
+    expect(show).toContain("getElementById('site').title=groundLabel(site).join(");
   });
 });

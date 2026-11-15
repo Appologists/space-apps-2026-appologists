@@ -326,6 +326,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       legend.swatches?.length ? h('ul', { class: 'legend-swatches' }, legend.swatches.map((s) => h('li', {}, h('i', { style: `background:${s.hex}` }), s.label))) : null,
       h('p', { class: 'legend-note' }, legend.note),
     ];
+    legendEl.dataset.layer = shown(); // lets a page style one layer's key (shell.css trims the Moon tab's)
     legendEl.replaceChildren(...parts.filter(Boolean)); // a null here would be written out as the word "null"
     legendEl.hidden = false;
   }
