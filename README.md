@@ -1,6 +1,6 @@
 # Lunar Landing Site Navigator
 
-Team Appologists' project for the NASA Space Apps Challenge 2026,
+Team Apollogists' project for the NASA Space Apps Challenge 2026,
 [Lunar Landing Site Navigator](https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/).
 
 A web app that runs on your own computer. You choose a landing date, how long the mission lasts and what

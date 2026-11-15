@@ -121,6 +121,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
       app.classList.add('flying'); // keeps the finder's map invisible until the surface has gone
       await surface.close({ outro: true });
     }
+    // Going to the Ride tab while the time bar is playing the whole mission: stop that first, so the bar's button
+    // can run the ride (while this is not yet step 5 the click still reaches main.js).
+    if (next === 5 && step !== 5 && !barIsRide && $('play').getAttribute('aria-pressed') === 'true') $('play').click();
     step = next;
     furthest = Math.max(furthest, step);
     app.dataset.step = String(step);
@@ -691,7 +694,35 @@ export function createFlow({ app, globe, finder, surface, api }) {
   let clockParts = null;
   const dayText = (hours) => `Day ${(hours / 24).toFixed(1)}`;
 
+  // On the Ride tab the time bar's Play button runs the ride, and the panel has no play button of its own (Daniel,
+  // 2026-11-15): one play control, and more room for the credits. Elsewhere the bar's button is main.js's, which
+  // plays the whole mission in about 20 seconds; this listener runs first and leaves it alone off the Ride tab.
+  const barPlay = $('play');
+  let barIsRide = false; // the bar's button is showing the ride's state
+  barPlay.addEventListener(
+    'click',
+    (e) => {
+      if (step !== 5 || !track) return;
+      e.stopImmediatePropagation();
+      if (clock.playing) pause();
+      else play();
+    },
+    true,
+  );
+  function syncBarPlay() {
+    if (step === 5 && track) {
+      barPlay.textContent = clock.playing ? 'Pause' : 'Play';
+      barPlay.setAttribute('aria-pressed', String(clock.playing));
+      barIsRide = true;
+    } else if (barIsRide) {
+      barPlay.textContent = 'Play';
+      barPlay.setAttribute('aria-pressed', 'false');
+      barIsRide = false;
+    }
+  }
+
   function drawClock() {
+    syncBarPlay();
     const el = clear(step === 5 ? $('driveNow') : $('playback'));
     clear(step === 5 ? $('playback') : $('driveNow'));
     const column = clear($('driveTimeline'));
@@ -717,14 +748,17 @@ export function createFlow({ app, globe, finder, surface, api }) {
       h('div', { class: 'dark-bar', title: 'Unbroken time in the dark so far. Full means the rover is lost.' }, clockParts.fill),
       clockParts.dark,
     );
-    el.append(
-      h(
-        'div',
-        { class: 'play-row' },
-        h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : step === 5 ? 'Ride the drive' : 'Play the drive'),
-        step === 3 ? clockParts.next : null, // the Ride step has Play alone (Daniel, 2026-11-15)
-      ),
-    );
+    // The Site tab has its own play button; the Ride tab uses the time bar's (see syncBarPlay above).
+    if (step === 3) {
+      el.append(
+        h(
+          'div',
+          { class: 'play-row' },
+          h('button', { type: 'button', class: 'primary play', 'aria-pressed': String(clock.playing), onClick: () => (clock.playing ? pause() : play()) }, clock.playing ? 'Pause' : 'Play the drive'),
+          clockParts.next,
+        ),
+      );
+    }
     if (step === 3) {
       // The timeline: touchdown at the top, then one row for every time the sentence changes. A tap on a row
       // moves the clock there.

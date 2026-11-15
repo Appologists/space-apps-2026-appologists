@@ -1,6 +1,6 @@
 {
   "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed. `sections` lists only data and tools the app really uses (package.json, data/catalog.json, data/missions.json, data/sites.json, index.html).",
-  "teamName": "Team Appologists",
+  "teamName": "Team Apollogists",
   "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
   "team": [
     {
