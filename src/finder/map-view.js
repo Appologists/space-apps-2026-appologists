@@ -74,8 +74,7 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     if (!result) return;
     const size = Math.max(0, Math.min(w, hgt) - 2 * MARGIN);
     box = { x: (w - size) / 2, y: (hgt - size) / 2, size };
-    // Smoothed: the 80 m cells read as terrain, not as squares, when the map is shown large or in the app's pop-out.
-    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingEnabled = false;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(raster, box.x, box.y, size, size);
 
