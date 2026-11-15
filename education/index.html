@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Learn · Lunar Landing Site Navigator</title>
+    <link rel="icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/learn/learn.css">
+    <script type="importmap">{"imports":{"three":"/vendor/team/three.module.js","three/addons/":"/vendor/three/examples/jsm/","astronomy-engine":"/vendor/team/astronomy.js"}}</script>
+</head>
+<body>
+
+<header class="top">
+    <a class="brand" href="#hero"><span class="px">LUNAR NAVIGATOR</span><span class="brand-sub mono">/ learn</span></a>
+    <nav>
+        <a href="#lab">3D lab</a>
+        <a href="#facts">Facts</a>
+        <a href="#play">Play</a>
+        <a href="#board">Leaderboard</a>
+    </nav>
+    <div class="me">
+        <span class="lvl px" id="lvl">LV 1</span>
+        <span class="xpbar"><i id="xpfill"></i></span>
+        <span class="mono quiet" id="xptext">0 XP</span>
+        <a class="back" href="/">Planner &rarr;</a>
+    </div>
+</header>
+
+<main>
+    <!-- ================= Hero ================= -->
+    <section id="hero" class="hero">
+        <div class="grid-bg" aria-hidden="true"></div>
+        <p class="kicker mono">NASA SPACE APPS 2026 · EDUCATION</p>
+        <h1 class="px morph" id="hero-title" aria-label="Learn the Moon">LEARN THE MOON</h1>
+        <p class="lead">Explore the Moon, Earth and Sun with live NASA data in 3D, then test what you have learned. Every value on this page comes from a named source, and every fact links to it.</p>
+        <div class="cta">
+            <a class="btn primary" href="#lab">Open the 3D lab</a>
+            <a class="btn" href="#play">Test yourself</a>
+        </div>
+        <div class="shapes" role="group" aria-label="Pixel shape of the headline font">
+            <span class="mono quiet">Geist Pixel shape</span>
+            <button data-elsh="1" class="on">Square</button>
+            <button data-elsh="40">Grid</button>
+            <button data-elsh="20">Circle</button>
+            <button data-elsh="60">Triangle</button>
+            <button data-elsh="80">Line</button>
+        </div>
+        <dl class="stats">
+            <div><dt class="px" id="stat-sites">23</dt><dd>landing sites</dd></div>
+            <div><dt class="px">5</dt><dd>NASA datasets</dd></div>
+            <div><dt class="px" id="stat-q">18</dt><dd>questions</dd></div>
+            <div><dt class="px" id="stat-players">0</dt><dd>participants</dd></div>
+        </dl>
+    </section>
+
+    <!-- ================= 3D lab ================= -->
+    <section id="lab" class="section">
+        <div class="head">
+            <p class="kicker mono">01 · 3D LAB</p>
+            <h2 class="px">INTERACTIVE 3D</h2>
+            <p class="quiet">Drag to rotate, scroll to zoom. The Earth and Sun images are the latest from NASA's EPIC and SDO; the Moon uses LRO maps and LOLA heights.</p>
+        </div>
+        <div class="tabs" role="tablist">
+            <button role="tab" data-world="moon" class="on">Moon</button>
+            <button role="tab" data-world="earth">Earth</button>
+            <button role="tab" data-world="sun">Sun</button>
+            <button role="tab" data-world="system">Sun · Earth · Moon</button>
+        </div>
+        <div class="lab">
+            <div class="stage" id="stage">
+                <canvas id="gl"></canvas>
+                <div class="pins" id="pins"></div>
+                <div class="stage-note mono" id="stage-note"></div>
+                <div class="loading mono" id="loading" hidden>Loading NASA data&hellip;</div>
+            </div>
+            <aside class="info" id="info" aria-live="polite"></aside>
+        </div>
+    </section>
+
+    <!-- ================= Facts ================= -->
+    <section id="facts" class="section">
+        <div class="head">
+            <p class="kicker mono">02 · FACT DECK</p>
+            <h2 class="px">FACTS</h2>
+            <p class="quiet">Select a card to read it. Each card cites its NASA source.</p>
+        </div>
+        <div class="filters" role="group" aria-label="Show facts about">
+            <button data-filter="all" class="on">All</button>
+            <button data-filter="moon">Moon</button>
+            <button data-filter="earth">Earth</button>
+            <button data-filter="sun">Sun</button>
+        </div>
+        <div class="deck" id="deck"></div>
+    </section>
+
+    <!-- ================= Play ================= -->
+    <section id="play" class="section">
+        <div class="head">
+            <p class="kicker mono">03 · ASSESSMENT</p>
+            <h2 class="px">TEST YOURSELF</h2>
+            <p class="quiet">Two short exercises. Scores are recorded on the leaderboard below.</p>
+        </div>
+        <div class="games" id="games">
+            <article class="game-card">
+                <p class="kicker mono">GAME 1</p>
+                <h3 class="px">MISSION QUIZ</h3>
+                <p>10 questions, 20 seconds each. Faster correct answers score more; three correct in a row add a 1.5&times; streak bonus.</p>
+                <button class="btn primary" data-start="quiz">Start quiz</button>
+            </article>
+            <article class="game-card">
+                <p class="kicker mono">GAME 2</p>
+                <h3 class="px">TEMPERATURE ESTIMATE</h3>
+                <p>Five rounds. For a real landing site and local time, estimate the surface temperature, then compare with the value measured by LRO Diviner.</p>
+                <button class="btn primary" data-start="hotcold">Start estimation</button>
+            </article>
+        </div>
+        <div class="arena" id="arena" hidden></div>
+    </section>
+
+    <!-- ================= Leaderboard ================= -->
+    <section id="board" class="section">
+        <div class="head">
+            <p class="kicker mono">04 · LEADERBOARD</p>
+            <h2 class="px">LEADERBOARD</h2>
+            <p class="quiet">Stored on this computer, so everyone using this station shares one board.</p>
+        </div>
+        <div class="board-wrap">
+            <div class="board">
+                <div class="filters" role="tablist">
+                    <button data-board="quiz" class="on">Mission quiz</button>
+                    <button data-board="hotcold">Temperature estimate</button>
+                </div>
+                <ol class="ranks" id="ranks"></ol>
+            </div>
+            <div class="badges">
+                <p class="kicker mono">YOUR PROGRESS</p>
+                <ul id="badges"></ul>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="foot">
+    <p>Data: <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">NASA/JPL Horizons</a> ·
+        <a href="https://lola.gsfc.nasa.gov/" target="_blank" rel="noopener">LRO LOLA</a> ·
+        <a href="https://www.diviner.ucla.edu/" target="_blank" rel="noopener">LRO Diviner</a> ·
+        <a href="https://svs.gsfc.nasa.gov/4720/" target="_blank" rel="noopener">LROC Moon map (NASA SVS)</a> ·
+        <a href="https://epic.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA EPIC</a> ·
+        <a href="https://sdo.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA SDO</a> ·
+        Moon phase: <a href="https://github.com/cosinekitty/astronomy" target="_blank" rel="noopener">Astronomy Engine</a>, checked against Horizons.</p>
+    <p class="quiet">Type: <a href="https://vercel.com/font" target="_blank" rel="noopener">Geist Pixel and Geist Mono</a> (Vercel) and
+        <a href="https://fonts.google.com/specimen/Wix+Madefor+Text" target="_blank" rel="noopener">Wix Madefor Text</a> (the type of base44), all under the SIL Open Font License.</p>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script type="module" src="/learn/learn.js"></script>
+</body>
+</html>
