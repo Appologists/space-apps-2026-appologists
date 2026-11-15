@@ -164,7 +164,7 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
 
   const roverNow = () => ({
     maxSlopeDeg: values.roverMaxSlopeDeg,
-    rangeM: values.roverRangeKm * 1000,
+    rangeM: values.roverRangeKm > 0 ? values.roverRangeKm * 1000 : Infinity, // 0: no limit on the total drive
     speedMPerHour: values.roverSpeedMPerHour,
     maxDarknessHours: values.maxDarknessHours,
     needEarthToDrive: values.roverNeedsEarthToDrive,
@@ -209,7 +209,7 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
       routeText = 'Click the map to choose where the rover starts.';
       map.setRoute(null);
     } else if (!targets.length) {
-      const limits = `within ${values.roverRangeKm} km on slopes up to ${values.roverMaxSlopeDeg}°`;
+      const limits = `${values.roverRangeKm > 0 ? `within ${values.roverRangeKm} km ` : ''}on slopes up to ${values.roverMaxSlopeDeg}°`;
       let cells = 0;
       for (let i = 0; i < reach.dist.length; i++) if (Number.isFinite(reach.dist[i])) cells++;
       const area = (cells * result.cellM * result.cellM) / 1e6;

@@ -97,7 +97,7 @@ export function layerPixel(layerId, result, index, shade, extra) {
     case 'reach': {
       const reach = extra?.reach;
       const d = reach ? reach.dist[index] : Infinity;
-      if (Number.isFinite(d)) return at(BLUE, 1 - d / reach.rangeM);
+      if (Number.isFinite(d)) return at(BLUE, 1 - d / reachScaleM(reach));
       const v = Math.round(28 + shade * 0.42);
       return [v, v, v];
     }
@@ -115,6 +115,9 @@ export function layerPixel(layerId, result, index, shade, extra) {
 }
 
 const pct = (v) => `${Math.round(v * 100)}%`;
+
+/** The distance the Reach layer's colours run up to: the rover's range, or with no range limit the farthest spot it reaches. */
+export const reachScaleM = (reach) => (Number.isFinite(reach.rangeM) ? reach.rangeM : Math.max(reach.farthestM ?? 0, 1));
 
 /** What the legend shows for a layer, in the shape the surface view's legend uses, plus optional `swatches`. */
 export function layerLegend(layerId, result, extra) {
@@ -158,8 +161,8 @@ export function layerLegend(layerId, result, extra) {
         note: reach
           ? `How far the rover must drive from the start to get there, on slopes up to ${reach.maxSlopeDeg}°.`
           : 'Pick a start point to see how far the rover can drive. No reach data yet.',
-        stops: withLabels(blue, reach ? km(reach.rangeM) : 'range', '0 km'),
-        swatches: [{ hex: FAIL_GREY_HEX, label: 'too steep or out of range' }],
+        stops: withLabels(blue, reach ? km(reachScaleM(reach)) : 'range', '0 km'),
+        swatches: [{ hex: FAIL_GREY_HEX, label: reach && !Number.isFinite(reach.rangeM) ? 'too steep, or cut off by steep ground' : 'too steep or out of range' }],
       };
     }
     case TIME_LAYER:

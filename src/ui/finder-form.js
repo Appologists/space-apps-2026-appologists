@@ -75,7 +75,7 @@ export function renderFinderForm(el, { values, centre, busy, hint, onChange, onS
       'div',
       { class: 'fields' },
       number('roverSlope', 'Steepest slope it drives (°)', 'roverMaxSlopeDeg', { min: '0', max: '45' }),
-      number('roverRange', 'Range (km)', 'roverRangeKm', { min: '0' }),
+      number('roverRange', 'Longest total drive (km, 0 = no limit)', 'roverRangeKm', { min: '0' }),
       number('roverSpeed', 'Average speed (m per hour)', 'roverSpeedMPerHour', { min: '1', title: 'Including stops' }),
     ),
     check('roverEarth', 'Needs Earth in view to drive', 'roverNeedsEarthToDrive'),

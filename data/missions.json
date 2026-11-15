@@ -58,7 +58,7 @@
         "maxDarknessHours": 50,
         "roverMaxSlopeDeg": 15,
         "roverSpeedMPerHour": 36,
-        "roverRangeKm": 20,
+        "roverRangeKm": 0,
         "roverNeedsEarthToDrive": true
       },
       "facts": [
@@ -68,7 +68,7 @@
         { "text": "Rover survives 50 hours of darkness", "source": "viper-ops" },
         { "text": "Rover averages 36 m an hour, because it waits about nine tenths of the time", "source": "viper-planning" },
         { "text": "Rover needs Earth in view to drive: it is steered from the ground", "source": "viper-ops" },
-        { "text": "Lands 21 November 2026, 00:00 UTC, for 14 days, in sunlight with Earth in view; rover range 20 km", "source": "our-choice" }
+        { "text": "Lands 21 November 2026, 00:00 UTC, for 14 days, in sunlight with Earth in view", "source": "our-choice" }
       ]
     },
     {
@@ -93,7 +93,7 @@
         "maxDarknessHours": 50,
         "roverMaxSlopeDeg": 15,
         "roverSpeedMPerHour": 200,
-        "roverRangeKm": 20,
+        "roverRangeKm": 0,
         "roverNeedsEarthToDrive": false
       },
       "facts": []
