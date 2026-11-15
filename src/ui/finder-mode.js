@@ -15,7 +15,6 @@ import { clear, debounce, h } from './dom.js';
 import { renderFinderForm } from './finder-form.js';
 import { renderSchedule } from './finder-schedule.js';
 import { renderRouteOptions } from './route-options-panel.js';
-import { createSimulation } from './simulation-panel.js';
 
 const $ = (id) => document.getElementById(id);
 const percent = (fraction) => `${Math.round(fraction * 100)}%`;
@@ -45,7 +44,6 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
   let departHours = 0; // "leave no earlier than", hours after landing
   let options = null; // the three route choices (route-options.js), or null when there are no destinations
   let why = null; // why the planner found no drive (why-not.js), or null
-  const simulation = createSimulation({ el: $('finderSim'), getMap: () => map });
   let routeChoice = 'safest'; // which choice the map and the plan show: 'safest' | 'fastest' | 'shortest'
 
   const CLICK_MODES = [
@@ -271,10 +269,9 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
     $('finderRoute').textContent = routeText;
     const shownChoice = options ? [routeChoice, 'fastest', 'safest', 'shortest'].find((id) => options[id]?.plan?.path) ?? routeChoice : routeChoice;
     renderRouteOptions($('finderRouteOptions'), { options, choice: shownChoice, rover, result, plan, why, onLayer: chooseLayer, onChoose: (id) => { routeChoice = id; updateRoute(); } });
-    simulation.setPlan(result, plan, rover);
     drawDests();
     drawSchedule(text);
-    onRoute?.({ result, start, targets, plan });
+    onRoute?.({ result, start, targets, plan, rover });
   }
 
   function drawSchedule(text) {
@@ -343,7 +340,6 @@ export function createFinderMode({ app, getState, setStatus, onPick, onRoute }) 
   }
 
   function close() {
-    simulation.stop();
     app.classList.remove('finder-open');
     $('finder').hidden = true;
   }

@@ -114,7 +114,9 @@ function routeDetail(result, plan) {
   const canvas = h('canvas', { class: 'route-profile', 'aria-label': 'Height along the route, coloured by slope' });
   const steps = directions(result, plan);
   const icon = { depart: '▶', drive: '↗', creep: '⋯', wait: '⏸', arrive: '◆', lost: '✕' };
-  const box = h('div', { class: 'route-detail' },
+  // Folded, so the Drive step stays short enough for "Play the drive" to be seen without scrolling.
+  const box = h('details', { class: 'explain route-detail' },
+    h('summary', {}, 'Height along the route, and directions'),
     h('div', { class: 'route-sub' }, 'Height along the route (elevation above the Moon\'s reference sphere)'),
     canvas,
     h('div', { class: 'route-sub' }, 'Directions'),
@@ -124,7 +126,9 @@ function routeDetail(result, plan) {
         h('span', { class: 'step-text' }, step.text),
         h('span', { class: 'step-time' }, step.atHours == null || Number.isNaN(step.atHours) ? '' : `${formatHours(step.atHours)}`)))),
     h('p', { class: 'caveats' }, 'Headings use the map: up is north. Times are hours after landing. Directions merge small zigzags of the 80 m grid into longer legs.'));
-  requestAnimationFrame(() => drawProfile(canvas, result, plan));
+  box.addEventListener('toggle', () => {
+    if (box.open) drawProfile(canvas, result, plan);
+  });
   return box;
 }
 

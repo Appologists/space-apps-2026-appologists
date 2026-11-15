@@ -24,30 +24,6 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   let timeStep = null; // while a drive plays back: the time step whose sunlight the map shows instead of the layer
   let rover = null; // { east, north, headingDeg, lit }: metres from the middle of the search area
   let box = { x: 0, y: 0, size: 0 }; // raster rectangle in CSS pixels
-  let sim = null; // simulation frame (simulation.js frameAt) or null
-  const shadowCanvas = document.createElement('canvas');
-  let shadowStep = -1;
-
-  /** Shade the ground that is dark at time step `step` (from the finder's Sun mask). */
-  function paintShadow(step) {
-    if (!result?.sunMask || step === shadowStep) return;
-    const { n, maskStride, sunMask } = result;
-    shadowCanvas.width = n;
-    shadowCanvas.height = n;
-    const sctx = shadowCanvas.getContext('2d');
-    const img = sctx.createImageData(n, n);
-    const base = step * maskStride;
-    for (let i = 0; i < n * n; i++) {
-      const lit = (sunMask[base + (i >> 3)] >> (i & 7)) & 1;
-      if (lit) continue;
-      img.data[i * 4] = 8;
-      img.data[i * 4 + 1] = 14;
-      img.data[i * 4 + 2] = 40;
-      img.data[i * 4 + 3] = 175;
-    }
-    sctx.putImageData(img, 0, 0);
-    shadowStep = step;
-  }
   let down = null;
 
   function paintRaster() {
@@ -100,10 +76,6 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     box = { x: (w - size) / 2, y: (hgt - size) / 2, size };
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(raster, box.x, box.y, size, size);
-    if (sim) {
-      paintShadow(sim.step);
-      ctx.drawImage(shadowCanvas, box.x, box.y, size, size);
-    }
 
     const centre = { x: box.x + size / 2, y: box.y + size / 2 };
     ctx.lineWidth = 1;
@@ -266,47 +238,6 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
       ctx.fillText(String(site.rank), p.x, p.y + 0.5);
     }
 
-    // The simulated rover: the way it has driven so far, then the rover coloured by what it is doing.
-    if (sim && route?.path?.length) {
-      const { path } = route;
-      ctx.beginPath();
-      for (let k = 0; k <= Math.min(sim.pathIndex, path.length - 1); k++) {
-        const q = cellCentre(Math.floor(path[k] / result.n), path[k] % result.n);
-        if (k === 0) ctx.moveTo(q.x, q.y);
-        else ctx.lineTo(q.x, q.y);
-      }
-      const here = { x: box.x + ((sim.col + 0.5) / result.n) * box.size, y: box.y + ((sim.row + 0.5) / result.n) * box.size };
-      ctx.lineTo(here.x, here.y);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      if (!sim.lit) {
-        ctx.beginPath();
-        ctx.arc(here.x, here.y, 16, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(143,168,255,0.25)';
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.arc(here.x, here.y, 16, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,211,107,0.25)';
-        ctx.fill();
-      }
-      ctx.beginPath();
-      ctx.arc(here.x, here.y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = sim.colour;
-      ctx.fill();
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = '#06080c';
-      ctx.stroke();
-      if (sim.state === 5) {
-        ctx.font = 'bold 12px "IBM Plex Mono", monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#06080c';
-        ctx.fillText('✕', here.x, here.y + 0.5);
-      }
-    }
-
     if (selected) {
       const p = toScreen(selected);
       if (p) {
@@ -442,8 +373,6 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
   return {
     setResult(next) {
       result = next;
-      sim = null;
-      shadowStep = -1;
       selected = null;
       reach = null;
       route = null;
@@ -471,11 +400,6 @@ export function createFinderMap({ container, canvas, legendEl, tipEl, onPick }) 
     },
     setRoute(next) {
       route = next || null;
-      draw();
-    },
-    /** Show a simulation frame (simulation.js), or null to stop showing it. */
-    setSim(frame) {
-      sim = frame || null;
       draw();
     },
     /** Show the sunlight of one time step instead of the chosen layer; null goes back to the layer. */
