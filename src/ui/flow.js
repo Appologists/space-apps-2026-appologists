@@ -832,10 +832,9 @@ export function createFlow({ app, globe, finder, surface, api }) {
         ]),
       ),
     );
-    // The site's address as a QR code under the credits, when data/credits.json gives one (`site.url`).
+    // The site's address as a QR code over the right of the ride view, when data/credits.json gives one (`site.url`).
     const site = credits.site?.url ? credits.site : null;
     $('siteQr').hidden = !site;
-    $('rideSection').classList.toggle('with-qr', !!site);
     if (site) {
       $('siteQr').href = site.url;
       $('siteQrLabel').textContent = site.label ?? 'Try it yourself';

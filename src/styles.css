@@ -1542,16 +1542,23 @@ input.big {
   text-align: center;
   animation: credits-roll 34s linear infinite;
 }
-/* The site's QR code under the credits: big enough to scan from the back of a room, on white as scanners need. */
-.with-qr .credits {
-  --credits-h: clamp(160px, calc(100vh - 560px), 700px);
+/* The site's QR code, over the right side of the ride view: big enough to scan from the back of a room, on white
+   as scanners need, and clear of the heading chip above and the time bar below. */
+.site-qr-wrap {
+  position: fixed;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
 }
 .site-qr {
   display: grid;
   justify-items: center;
   gap: 8px;
-  margin-top: 14px;
-  color: inherit;
+  padding: 12px 12px 10px;
+  border-radius: 8px;
+  background: rgba(14, 13, 12, 0.82);
+  color: var(--text, #efe9dd);
   text-decoration: none;
 }
 .site-qr[hidden] {
