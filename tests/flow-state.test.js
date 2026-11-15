@@ -33,6 +33,12 @@ describe('the mission steps in the address', () => {
     expect(decodeFlow(`#${encodeFlow(state)}`).step).toBe(3);
   });
 
+  it('still reads an old address with a landing accuracy that is no longer a choice (50 m)', () => {
+    const old = decodeFlow('#step=2&profile=custom&t=2026-11-21T00%3A00&d=336&f=10%2C50%2C10%2C50%2C1%2C1%2C15%2C200%2C0%2C0&region=peak-near-shackleton');
+    expect(old.step).toBe(2);
+    expect(old.values.ellipseRadiusM).toBe(50);
+  });
+
   it('writes no drive when there is none', () => {
     const text = encodeFlow({ ...state, region: null, startAt: null, targets: [] });
     expect(text).not.toMatch(/region|from|to=/);
