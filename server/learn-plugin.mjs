@@ -8,11 +8,14 @@
 //   /api/epic, /api/learn/epic.jpg, /api/learn/sdo/<ch>.jpg   NASA EPIC and SDO images, relayed (they send no CORS)
 //   /api/learn/leaderboard, /api/learn/score                  the leaderboard, lunar-planner/data/leaderboard.json
 //   /api/health                the git commit, so an open /learn page reloads after a pull
-// It also adds "Education" and "Explorer" links to the main page. /classic (the explorer) is the Python app in
+// With ?tools in the address it also adds "Education" and "Explorer" links to the main page (the demo page
+// stays clean without it). /classic (the explorer) is the Python app in
 // lunar-planner/: when that runs, /classic goes there; when not, it says how to start it.
 //
-// Live sync: on branch main, the dev server pulls origin/main every minute (fast-forward only, so it never
-// merges or overwrites local work) and Vite reloads open pages. LUNAR_SYNC=0 turns it off.
+// Live sync is off unless you ask for it. Start the dev server with LUNAR_SYNC=1 and, on branch main, it pulls
+// origin/main every minute (fast-forward only, so it never merges or overwrites local work) and Vite reloads
+// open pages. Leave it off while presenting: a teammate's push would reload the page in front of the audience,
+// and it runs whatever was pushed without anyone looking first.
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync, renameSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, normalize, sep } from 'node:path';
@@ -286,8 +289,11 @@ bash start.sh                                            (Mac / Linux)</pre>
 <p><a href="/learn" style="color:#f5c96b">&larr; Back to Education</a> &nbsp; <a href="/" style="color:#a1a1a1">Main site</a></p></div></body>`;
 
 // ---------- Live sync ----------
+/** Live sync runs only when asked for (LUNAR_SYNC=1), and never in CI. */
+export const syncWanted = (env) => env.LUNAR_SYNC === '1' && !env.CI;
+
 function startSync(log) {
-  if (process.env.LUNAR_SYNC === '0' || process.env.CI) return;
+  if (!syncWanted(process.env)) return;
   const git = (args) => new Promise((resolve) => execFile('git', args, { cwd: ROOT, timeout: 50_000 }, (err, out) => resolve(err ? null : out.trim())));
   const pull = async () => {
     if ((await git(['rev-parse', '--abbrev-ref', 'HEAD'])) !== 'main') return;
@@ -296,9 +302,19 @@ function startSync(log) {
     const after = await git(['rev-parse', 'HEAD']);
     if (after && after !== before) log(`Live sync: updated to ${after.slice(0, 7)} from GitHub. Open pages reload.`);
   };
-  log('Live sync is on: on branch main, the newest origin/main is pulled every minute (LUNAR_SYNC=0 turns it off).');
+  log('Live sync is on (LUNAR_SYNC=1): on branch main, the newest origin/main is pulled every minute.');
   setInterval(pull, 60_000).unref();
   pull();
+}
+
+/** The main page gets the links only on the dev server (the built copy has no /learn) and only with ?tools. */
+export function wantsTools(ctx) {
+  if (!ctx?.server) return false;
+  try {
+    return new URL(ctx.originalUrl ?? '', 'http://x').searchParams.has('tools');
+  } catch {
+    return false;
+  }
 }
 
 // ---------- The plugin ----------
@@ -308,8 +324,16 @@ export function learnPages() {
     configureServer(server) {
       startSync((text) => server.config.logger.info(`\n  ${text}`));
       server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url, 'http://x');
-        const path = decodeURIComponent(url.pathname);
+        // An address that cannot be read (a broken %-escape, say) is not ours: pass it on. Throwing here would
+        // be an unhandled rejection, which stops the dev server.
+        let url;
+        let path;
+        try {
+          url = new URL(req.url, 'http://x');
+          path = decodeURIComponent(url.pathname);
+        } catch {
+          return next();
+        }
         const q = url.searchParams;
         try {
           // Education page and its files (served as they are: they use their own import map, not Vite's).
@@ -426,13 +450,14 @@ export function learnPages() {
         }
       });
     },
-    // Links from the main page to Education and the Explorer (index.html itself is not changed).
+    // Links from the main page to Education and the Explorer (index.html itself is not changed). Like the main
+    // page's other extras they show only with ?tools in the address, so the demo page stays clean.
     transformIndexHtml: {
       order: 'post',
       handler(html, ctx) {
-        if (ctx.path !== '/index.html') return html;
+        if (ctx.path !== '/index.html' || !wantsTools(ctx)) return html;
         const style = 'color:#c9c4bb;text-decoration:none;padding:5px 10px;border-radius:7px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12)';
-        const nav = `<nav aria-label="Other pages" style="position:fixed;right:12px;bottom:10px;z-index:50;display:flex;gap:6px;font:12px system-ui,sans-serif">`
+        const nav = `<nav aria-label="Other pages" style="position:fixed;right:12px;top:48px;z-index:50;display:flex;gap:6px;font:12px system-ui,sans-serif">`
           + `<a href="/learn" style="${style}">Education</a><a href="/classic" style="${style}">Explorer &rarr;</a></nav>`;
         return html.replace('</body>', `${nav}\n</body>`);
       },

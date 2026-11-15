@@ -30,23 +30,26 @@ function direction(azimuthDeg, elevationDeg) {
   return { x: Math.cos(el) * Math.sin(az), y: Math.sin(el), z: -Math.cos(el) * Math.cos(az) };
 }
 
+/** Bump when lightMaps() changes what it computes: maps stored by tools/precompute-light.mjs are then ignored. */
+export const LIGHT_VERSION = 1;
+
+const withDefaults = (params) => ({ stepMinutes: 60, panelHeightM: 2, antennaHeightM: 2, weights: { sunlight: 1, earthComms: 0.7 }, ...defaultFinder(), ...params });
+
 /**
- * @param {{label: object, data: Int16Array, id?: string}} dem  from openLolaPolar()
- * @param {import('../src/finder/types.js').FinderParams} params
- * @returns {{header: object, rasters: Object<string, Float32Array|Uint8Array>}|null} null if the centre has no terrain data
+ * The expensive part of a search: for every time step of `series`, which cells see the Sun (from panel height)
+ * and which see Earth (from antenna height), one bit per cell. Depends only on the place, the grid, the two
+ * heights, the terrain and the times; not on any landing limit. tools/precompute-light.mjs stores these for the
+ * mission regions over a stretch of dates, so a search there need not compute them again.
+ * @returns {{sunMask: Uint8Array, earthMask: Uint8Array, maskStride: number, steps: number}|null}
  */
-export function searchLanding(dem, params) {
-  const started = performance.now();
-  const p = { stepMinutes: 60, panelHeightM: 2, antennaHeightM: 2, weights: { sunlight: 1, earthComms: 0.7 }, ...defaultFinder(), ...params };
+export function lightMaps(dem, params, series) {
+  const p = withDefaults(params);
   const { center } = p;
   const groundHeightM = heightAt(dem, center.lat, center.lon);
   if (Number.isNaN(groundHeightM)) return null;
-
   const grid = searchGrid(p.radiusKm);
   const { n, cellM, halfSizeM } = grid;
   const count = n * n;
-
-  // ---- Terrain on the two grids -------------------------------------------------------------------------
   const sceneHeight = (wantM) => (x, z) => {
     const d = Math.hypot(x, z);
     const at = offsetToLatLon(center, x, -z);
@@ -58,16 +61,86 @@ export function searchLanding(dem, params) {
   const coarse = buildShadowGrid(coarseHalf, COARSE_CELL_M, sceneHeight(COARSE_CELL_M));
   const beyondFine = (x, z) => sampleGrid(coarse, coarse.M, x, z);
 
-  // ---- What does not change with time: height, slope, and each cell's own "up" ----------------------------
-  const elevation = new Float32Array(count).fill(NaN);
-  const slope = new Float32Array(count).fill(NaN);
-  const valid = new Uint8Array(count); // has terrain data
-  const inside = new Uint8Array(count); // within the search circle
+  // Each cell's own "up", for one extra test: is the body above a smooth Moon's horizon here at all? (The sweep
+  // covers real terrain; this catches night caused by the Moon's bulk beyond the coarse grid.)
+  const valid = new Uint8Array(count);
   const upX = new Float32Array(count);
   const upY = new Float32Array(count);
   const upZ = new Float32Array(count);
   const sinDipPanel = new Float32Array(count);
   const sinDipAntenna = new Float32Array(count);
+  const cell = [0, 0];
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) {
+      const c = row * n + col;
+      const { east, north } = cellOffset(grid, row, col);
+      const at = offsetToLatLon(center, east, north);
+      const h = sampleAt(dem, at.lat, at.lon, cell, cellM)[0];
+      if (Number.isNaN(h)) continue;
+      valid[c] = 1;
+      const y = fine.Y[c] + R + groundHeightM;
+      const length = Math.hypot(east, y, north);
+      upX[c] = east / length;
+      upY[c] = y / length;
+      upZ[c] = -north / length;
+      const above = Math.max(h, 0);
+      sinDipPanel[c] = Math.sin(Math.acos(R / (R + above + p.panelHeightM)));
+      sinDipAntenna[c] = Math.sin(Math.acos(R / (R + above + p.antennaHeightM)));
+    }
+  }
+
+  const steps = series.samples.length;
+  const site = { lat: center.lat, lon: center.lon, elevationM: groundHeightM };
+  const maskStride = Math.ceil(count / 8);
+  const sunMask = new Uint8Array(steps * maskStride);
+  const earthMask = new Uint8Array(steps * maskStride);
+  for (let i = 0; i < steps; i++) {
+    const sample = series.samples[i];
+    const sun = altAz(site, sample.sunKm);
+    const s = direction(sun.azimuth, sun.elevation);
+    sweepShadows(coarse, s);
+    sweepShadows(fine, s, beyondFine);
+    for (let c = 0; c < count; c++) {
+      if (valid[c] && fine.Y[c] + p.panelHeightM > fine.S[c] && upX[c] * s.x + upY[c] * s.y + upZ[c] * s.z > -sinDipPanel[c]) {
+        sunMask[i * maskStride + (c >> 3)] |= 1 << (c & 7);
+      }
+    }
+    const earth = altAz(site, sample.earthKm);
+    const e = direction(earth.azimuth, earth.elevation);
+    sweepShadows(coarse, e);
+    sweepShadows(fine, e, beyondFine);
+    for (let c = 0; c < count; c++) {
+      if (valid[c] && fine.Y[c] + p.antennaHeightM > fine.S[c] && upX[c] * e.x + upY[c] * e.y + upZ[c] * e.z > -sinDipAntenna[c]) {
+        earthMask[i * maskStride + (c >> 3)] |= 1 << (c & 7);
+      }
+    }
+  }
+  return { sunMask, earthMask, maskStride, steps };
+}
+
+/**
+ * @param {{label: object, data: Int16Array, id?: string}} dem  from openLolaPolar()
+ * @param {import('../src/finder/types.js').FinderParams} params
+ * @param {{storedLight?: (p: object, series: object) => ({sunMask: Uint8Array, earthMask: Uint8Array}|null)}} [options]
+ *        storedLight: maps computed in advance for exactly these times (light-store.mjs); null means compute them
+ * @returns {{header: object, rasters: Object<string, Float32Array|Uint8Array>}|null} null if the centre has no terrain data
+ */
+export function searchLanding(dem, params, { storedLight = null } = {}) {
+  const started = performance.now();
+  const p = withDefaults(params);
+  const { center } = p;
+  const groundHeightM = heightAt(dem, center.lat, center.lon);
+  if (Number.isNaN(groundHeightM)) return null;
+
+  const grid = searchGrid(p.radiusKm);
+  const { n, cellM, halfSizeM } = grid;
+  const count = n * n;
+
+  // ---- What does not change with time: height and slope ------------------------------------------------------
+  const elevation = new Float32Array(count).fill(NaN);
+  const slope = new Float32Array(count).fill(NaN);
+  const valid = new Uint8Array(count); // has terrain data
+  const inside = new Uint8Array(count); // within the search circle
   const radiusM = p.radiusKm * 1000;
   const cell = [0, 0]; // reused: [height, slope] of the current cell
   for (let row = 0; row < n; row++) {
@@ -81,24 +154,16 @@ export function searchLanding(dem, params) {
       inside[c] = Math.hypot(east, north) <= radiusM ? 1 : 0;
       elevation[c] = h;
       slope[c] = cell[1];
-      // The cell's own vertical, for one extra test: is the body above a smooth Moon's horizon here at all?
-      // (The sweep covers real terrain; this catches night caused by the Moon's bulk beyond the coarse grid.)
-      const y = fine.Y[c] + R + groundHeightM;
-      const length = Math.hypot(east, y, north);
-      upX[c] = east / length;
-      upY[c] = y / length;
-      upZ[c] = -north / length;
-      const above = Math.max(h, 0);
-      sinDipPanel[c] = Math.sin(Math.acos(R / (R + above + p.panelHeightM)));
-      sinDipAntenna[c] = Math.sin(Math.acos(R / (R + above + p.antennaHeightM)));
     }
   }
 
-  // ---- Step through the mission ---------------------------------------------------------------------------
+  // ---- Step through the mission: the sunlight and Earth maps, stored in advance or computed now ------------------
   const series = ephemerisSeries(new Date(p.start), p.durationHours, p.stepMinutes);
-  const steps = series.samples.length;
   const { stepHours } = series;
-  const site = { lat: center.lat, lon: center.lon, elevationM: groundHeightM };
+  const stored = storedLight?.(p, series) ?? null;
+  const { sunMask, earthMask } = stored ?? lightMaps(dem, p, series);
+  const steps = series.samples.length;
+  const maskStride = Math.ceil(count / 8);
   const sunCount = new Uint16Array(count);
   const earthCount = new Uint16Array(count);
   const litRun = new Uint16Array(count);
@@ -107,45 +172,25 @@ export function searchLanding(dem, params) {
   const maxDark = new Uint16Array(count);
   const sunAtStart = new Uint8Array(count);
   const earthAtStart = new Uint8Array(count);
-  // One bit per cell per time step, for the timed drive: is the panel sunlit, is Earth in view?
-  const maskStride = Math.ceil(count / 8);
-  const sunMask = new Uint8Array(steps * maskStride);
-  const earthMask = new Uint8Array(steps * maskStride);
-
   for (let i = 0; i < steps; i++) {
-    const sample = series.samples[i];
-
-    const sun = altAz(site, sample.sunKm);
-    const s = direction(sun.azimuth, sun.elevation);
-    sweepShadows(coarse, s);
-    sweepShadows(fine, s, beyondFine);
+    const base = i * maskStride;
     for (let c = 0; c < count; c++) {
       if (!valid[c]) continue;
-      const lit = fine.Y[c] + p.panelHeightM > fine.S[c] && upX[c] * s.x + upY[c] * s.y + upZ[c] * s.z > -sinDipPanel[c];
+      const lit = (sunMask[base + (c >> 3)] >> (c & 7)) & 1;
       if (lit) {
         sunCount[c]++;
-        sunMask[i * maskStride + (c >> 3)] |= 1 << (c & 7);
         darkRun[c] = 0;
         if (++litRun[c] > maxLit[c]) maxLit[c] = litRun[c];
       } else {
         litRun[c] = 0;
         if (++darkRun[c] > maxDark[c]) maxDark[c] = darkRun[c];
       }
-      if (i === 0) sunAtStart[c] = lit ? 1 : 0;
-    }
-
-    const earth = altAz(site, sample.earthKm);
-    const e = direction(earth.azimuth, earth.elevation);
-    sweepShadows(coarse, e);
-    sweepShadows(fine, e, beyondFine);
-    for (let c = 0; c < count; c++) {
-      if (!valid[c]) continue;
-      const inView = fine.Y[c] + p.antennaHeightM > fine.S[c] && upX[c] * e.x + upY[c] * e.y + upZ[c] * e.z > -sinDipAntenna[c];
-      if (inView) {
-        earthCount[c]++;
-        earthMask[i * maskStride + (c >> 3)] |= 1 << (c & 7);
+      const inView = (earthMask[base + (c >> 3)] >> (c & 7)) & 1;
+      if (inView) earthCount[c]++;
+      if (i === 0) {
+        sunAtStart[c] = lit;
+        earthAtStart[c] = inView;
       }
-      if (i === 0) earthAtStart[c] = inView ? 1 : 0;
     }
   }
 
@@ -258,6 +303,7 @@ export function searchLanding(dem, params) {
       sites,
       counts,
       computeMs: Math.round(performance.now() - started),
+      lightStored: !!stored, // the sunlight and Earth maps came from tools/precompute-light.mjs
       dataset: dem.id ?? 'lola',
       terrainPixelM: dem.pixelM ?? dem.label?.scaleM ?? null,
     },

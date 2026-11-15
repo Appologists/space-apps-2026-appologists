@@ -81,10 +81,22 @@ describe('simulateDrive', () => {
     expect(d.timeline[40]).toBe(STATE.LOST);
   });
 
-  it('arrives but freezes afterwards', () => {
+  it('stops counting darkness once it arrives (decision U)', () => {
     const r = fake();
     for (let s = 8; s < 48; s++) setBit(r.sunMask, r.maskStride, s, 55, 0);
     const d = simulateDrive(r, row5, { ...opts, maxDarknessHours: 5 });
+    expect(d.arrived).toBe(true);
+    expect(d.arrivalHours).toBe(5);
+    expect(d.survived).toBe(true);
+    expect(d.lostAtHours).toBeNull();
+    expect(d.longestDarkH).toBe(0);
+    expect(d.timeline[30]).toBe(STATE.ARRIVED);
+  });
+
+  it('with the old rule, arrives but freezes afterwards', () => {
+    const r = fake();
+    for (let s = 8; s < 48; s++) setBit(r.sunMask, r.maskStride, s, 55, 0);
+    const d = simulateDrive(r, row5, { ...opts, maxDarknessHours: 5, surviveAfterArrival: true });
     expect(d.arrived).toBe(true);
     expect(d.arrivalHours).toBe(5);
     expect(d.survived).toBe(false);

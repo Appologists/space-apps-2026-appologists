@@ -5,9 +5,17 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
 
 ## Commands
 
+**Setting up a machine to show the demo:** follow [`docs/demo-runbook.md`](docs/demo-runbook.md) step by step
+(terrain, `npm run data:light`, `npm run demo:warm`). Tell the person if a step has not been done.
+
 - `npm run dev` runs the app. `npm test` must pass before you say a change is done.
 - `npm run check:horizons` compares our Sun/Earth maths with NASA JPL Horizons. Run it after touching
   `src/astro/`.
+- `npm run data:light` (once, after downloading terrain; about 5 minutes) stores which ground sees the Sun and
+  Earth, hour by hour, for the seven mission regions from 14 Nov 2026 to 15 Jan 2027 (`data/raw/light/`, not in
+  git). A search there then answers in about a second, for any landing limits and any whole-hour landing time
+  in that stretch. Rerun it after changing the code listed in `server/light-store.mjs`; `npm run check:light`
+  checks that stored and computed answers are the same.
 - `npm run demo:warm` (with the app running) asks every search the ready-made missions need, so they are kept
   and the steps open at once. Run it before showing the app to anyone.
 - `npm run check:landing` after changing the landing search; `npm run check:tiles` after changing how the
@@ -34,8 +42,9 @@ what it is, `docs/plan.md` for what to build next and `docs/architecture.md` for
   runs the playback clock; it computes nothing. A new ready-made mission or region: `data/missions.json`, each
   number with a source. What the address keeps: `src/ui/flow-state.js`. Credits: `data/credits.json`.
 - The education page (`/learn`): `education/`. `npm run dev` serves it with its data through
-  `server/learn-plugin.mjs` (no Python); the Python app in `lunar-planner/` serves it too. The plugin also
-  pulls origin/main every minute on branch `main` (live sync; `LUNAR_SYNC=0` turns it off).
+  `server/learn-plugin.mjs` (no Python); the Python app in `lunar-planner/` serves it too. Started with
+  `LUNAR_SYNC=1`, the plugin also pulls origin/main every minute on branch `main` (live sync: off by default,
+  and leave it off while presenting). The main page links to `/learn` only with `?tools` in the address.
 - A new lens (a way to colour the ground in the surface view): one entry in `src/surface/lenses.js`, which
   also states the colour rules every lens follows. The switch and legend appear by themselves.
 

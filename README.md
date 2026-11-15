@@ -49,12 +49,17 @@ npm run data:fetch -- lola-south-80s-80m
 
 Then choose a south-pole site and press "Look around from here", or double-click the Moon near the south pole.
 
+**Showing the demo to anyone?** Follow [docs/demo-runbook.md](docs/demo-runbook.md): it adds the stored
+sunlight maps (`npm run data:light`) that make each region's search take about a second, and the warm-up.
+
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Runs the app with live reload |
 | `npm test` | Runs the tests (about 2 seconds) |
 | `npm run check:horizons` | Compares our Sun/Earth maths with JPL Horizons over the next 28 days |
 | `npm run check:landing` | Compares the landing-site finder with the slower point-by-point method at 16 places |
+| `npm run data:light` | Stores the seven mission regions' sunlight and Earth maps (5 min, 344 MB in `data/raw/light/`), so their searches take about a second |
+| `npm run check:light` | Checks that a search using the stored maps gives exactly the computed answer |
 | `npm run demo:warm` | With the app running: asks every search the ready-made missions need, so the steps open at once |
 | `npm run data:list` | Lists the large datasets we know about and which ones you have |
 | `npm run data:fetch -- <id>` | Downloads one into `data/raw/` (never committed) |

@@ -26,7 +26,7 @@ export async function searchLanding(params) {
  * app and tools/warm-demo.mjs ask in exactly the same words (the server keeps answers by question).
  * The rover's numbers are left out: they do not change which ground can take a landing.
  * @param {Object} q
- * @param {{lat: number, lon: number}} q.center
+ * @param {{lat: number, lon: number, searchRadiusKm?: number}} q.center  a region may bring its own search radius
  * @param {Object} q.values     the finder's values (score.js defaultFinder)
  * @param {{start: Date, durationHours: number, panelHeightM: number, antennaHeightM: number}} q.mission
  * @param {Object<string, number>} q.weights
@@ -37,6 +37,7 @@ export function searchQuestion({ center, values, mission, weights, source = 'aut
   const landing = Object.fromEntries(Object.entries(values).filter(([key]) => !key.startsWith('rover')));
   return {
     ...landing,
+    radiusKm: center.searchRadiusKm ?? landing.radiusKm, // the crater regions search wider, to reach their rims
     source,
     center: { lat: center.lat, lon: center.lon },
     start: mission.start.toISOString(),

@@ -14,11 +14,13 @@ import path from 'node:path';
 import { encodeRasters } from '../src/finder/wire.js';
 import { encodePatch } from '../src/terrain/polar-grid.js';
 import { searchLanding } from './landing-search.mjs';
+import { createLightStore, lightCodeKey, lightDir, terrainDataKey } from './light-store.mjs';
 import { samplePolarPatch } from './lola-polar.mjs';
 import { createTerrainStore } from './terrain-sources.mjs';
 
 export function terrainApi({ root = process.cwd() } = {}) {
   const store = createTerrainStore(root);
+  const lightStore = createLightStore(lightDir(root)); // maps from tools/precompute-light.mjs, when there are any
 
   // ---- Kept answers ---------------------------------------------------------------------------------------
   // A search takes 10 to 20 seconds and the same question comes back whenever someone steps back or reloads,
@@ -28,7 +30,6 @@ export function terrainApi({ root = process.cwd() } = {}) {
   const kept = new Map(); // key -> bytes, newest last
   const KEEP_IN_MEMORY = 16;
   const SEARCH_CODE = ['server/landing-search.mjs', 'server/lola-polar.mjs', 'server/composite.mjs', 'src/finder/score.js', 'src/finder/grid.js', 'src/surface/shadows.js'];
-  const FAR_MARGIN_KM = 150; // how far beyond its area a search reads terrain (FAR_MARGIN_M in landing-search.mjs)
   /** The same value with every object's keys sorted, so the same question always reads the same. */
   const inOrder = (value) =>
     value && typeof value === 'object' && !Array.isArray(value)
@@ -42,20 +43,8 @@ export function terrainApi({ root = process.cwd() } = {}) {
         return 0;
       }
     });
-    // Which downloads can change the answer? A search wholly inside a regional grid (its far ground too) reads
-    // nothing else. One whose own area is inside it reads other data only for far ground, at 500 m: that comes
-    // from a complete whole-Moon map when one is there, so a tile of finer data arriving changes nothing.
-    // Anything else may read whatever is downloaded, tile by tile.
-    const { center, radiusKm = 10 } = params;
-    const edge = found.source.southOfLat;
-    const sources = store.list();
-    const inside = (km) => edge != null && center.lat <= edge - (km / 30.3 + 0.2);
-    const wholeMoonFar = sources.some((s) => s.installed && !s.incomplete && s.southOfLat == null && s.pixelM <= 500);
-    const data = inside(radiusKm + FAR_MARGIN_KM)
-      ? found.source.id
-      : inside(radiusKm) && wholeMoonFar
-        ? sources.map((s) => `${s.id}:${s.installed && !s.incomplete}`)
-        : sources.map((s) => `${s.id}:${s.installed}:${s.coverage}`);
+    // Which downloads can change the answer (light-store.mjs).
+    const data = terrainDataKey(store, params, found);
     return createHash('sha1').update(JSON.stringify([inOrder(params), data, code])).digest('hex');
   }
   function readKept(key) {
@@ -145,13 +134,16 @@ export function terrainApi({ root = process.cwd() } = {}) {
           res.setHeader('x-landing-search', 'kept'); // the browser says so beside the result
           return binary(res, earlier);
         }
-        const result = searchLanding(found.dem, params);
+        // Stored sunlight and Earth maps (tools/precompute-light.mjs) stand in for the slow part when they match.
+        const keys = { dataKey: terrainDataKey(store, params, found), codeKey: lightCodeKey(root) };
+        const result = searchLanding(found.dem, params, { storedLight: (p, series) => lightStore.find(p, keys, series) });
         if (!result) return json(res, 404, { error: `No terrain data at the centre of the search: "${found.source.label}" covers ${found.source.coverage}.` });
         result.header.sourceLabel = found.source.label;
         if (found.dem.detailVaries) result.header.sourceNote = 'Mountains beyond the search area, which can block a low Sun, are read from coarser data (500 m cells).';
         const bytes = encodeRasters(result.header, result.rasters);
         keep(key, bytes);
         res.setHeader('x-landing-search', 'new'); // searched just now, and kept for next time
+        res.setHeader('x-landing-light', result.header.lightStored ? 'stored' : 'computed');
         return binary(res, bytes);
       }
       return next();

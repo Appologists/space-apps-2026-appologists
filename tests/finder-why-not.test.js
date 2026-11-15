@@ -56,10 +56,16 @@ describe('whyNot', () => {
     expect(why.marks[0].kind).toBe('far');
   });
 
-  it('says when the rover gets there but the spot stays dark too long', () => {
+  it('has nothing to say when the destination goes dark after the rover gets there (decision U)', () => {
     const r = fake();
     r.dark(3, 6, 20, 71);
-    const why = ask(r, at(3, 0), [at(3, 6)]);
+    expect(ask(r, at(3, 0), [at(3, 6)])).toBe(null);
+  });
+
+  it('with the old rule, says when the rover gets there but the spot stays dark too long', () => {
+    const r = fake();
+    r.dark(3, 6, 20, 71);
+    const why = ask(r, at(3, 0), [at(3, 6)], { ...rover, surviveAfterArrival: true });
     expect(why.title).toContain('does not survive');
     expect(why.marks.some((m) => m.kind === 'dark' && m.row === 3 && m.col === 6)).toBe(true);
   });
