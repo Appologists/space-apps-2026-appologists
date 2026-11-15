@@ -33,7 +33,7 @@
       "blurb": "Artemis lander carrying VIPER rover",
       "pictures": [
         {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/HLS_Starship_rendering.jpg/500px-HLS_Starship_rendering.jpg",
+          "src": "images/starship-hls.jpg",
           "alt": "Artist's concept of SpaceX's Starship lander for Artemis on the Moon",
           "credit": "NASA, artist's concept (Wikimedia Commons, public domain)",
           "url": "https://commons.wikimedia.org/wiki/File:HLS_Starship_rendering.jpg",
@@ -41,7 +41,7 @@
           "position": "50% 30%"
         },
         {
-          "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Viper-ACD20-0047.jpg/960px-Viper-ACD20-0047.jpg",
+          "src": "images/viper.jpg",
           "alt": "Artist's concept of NASA's VIPER rover on the Moon",
           "credit": "NASA Ames / Daniel Rutter, artist's concept (Wikimedia Commons, public domain)",
           "url": "https://commons.wikimedia.org/wiki/File:Viper-ACD20-0047.jpg",

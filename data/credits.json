@@ -4,9 +4,25 @@
   "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
   "team": [],
   "thanks": [
-    { "what": "Terrain", "who": "NASA Lunar Reconnaissance Orbiter, LOLA instrument" },
-    { "what": "Sun and Earth positions", "who": "Astronomy Engine by Don Cross, checked against NASA JPL Horizons" },
-    { "what": "Moon colour map", "who": "NASA Scientific Visualization Studio, CGI Moon Kit" },
-    { "what": "Drawn with", "who": "three.js, Vite and Vitest" }
+    {
+      "what": "Terrain",
+      "who": "NASA Lunar Reconnaissance Orbiter, LOLA instrument"
+    },
+    {
+      "what": "Sun and Earth positions",
+      "who": "Astronomy Engine by Don Cross, checked against NASA JPL Horizons"
+    },
+    {
+      "what": "Moon colour map",
+      "who": "NASA Scientific Visualization Studio, CGI Moon Kit"
+    },
+    {
+      "what": "Drawn with",
+      "who": "three.js, Vite and Vitest"
+    },
+    {
+      "what": "Pictures",
+      "who": "NASA artist's concepts of the Starship lander and of VIPER (NASA Ames, Daniel Rutter), via Wikimedia Commons"
+    }
   ]
 }
