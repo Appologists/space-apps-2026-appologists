@@ -1,0 +1,69 @@
+{
+  "about": "What the last mission step shows while the rover drives. `team` is filled in by the team: names are never guessed. `sections` lists only data and tools the app really uses (package.json, data/catalog.json, data/missions.json, data/sites.json, index.html).",
+  "teamName": "Team Appologists",
+  "event": "NASA Space Apps Challenge 2026 · Lunar Landing Site Navigator",
+  "team": [
+    {
+      "name": "Khiem Hoang Tran"
+    },
+    {
+      "name": "Lucas Nguyen"
+    },
+    {
+      "name": "Thanh Minh Nguyen"
+    },
+    {
+      "name": "Rishi Jasuja"
+    },
+    {
+      "name": "Karley Browning"
+    },
+    {
+      "name": "Daniel Blackburn"
+    }
+  ],
+  "sections": [
+    {
+      "title": "Data sources",
+      "items": [
+        {
+          "what": "Terrain heights",
+          "who": "NASA Lunar Reconnaissance Orbiter, LOLA laser altimeter (NASA Planetary Data System, Geosciences Node)"
+        },
+        {
+          "what": "Moon colour map",
+          "who": "NASA Scientific Visualization Studio, CGI Moon Kit"
+        },
+        {
+          "what": "Sun and Earth positions checked against",
+          "who": "NASA JPL Horizons"
+        },
+        {
+          "what": "Candidate landing regions",
+          "who": "NASA, Artemis III candidate regions (2022)"
+        },
+        {
+          "what": "Proposed landing sites",
+          "who": "Gracy and Lee, Lunar and Planetary Science Conference 2024"
+        }
+      ]
+    },
+    {
+      "title": "Tools and technologies",
+      "items": [
+        {
+          "what": "Sun and Earth positions",
+          "who": "Astronomy Engine by Don Cross"
+        },
+        {
+          "what": "Web app and terrain server",
+          "who": "Vite and Node.js"
+        },
+        {
+          "what": "Written in",
+          "who": "JavaScript, HTML and CSS"
+        }
+      ]
+    }
+  ]
+}

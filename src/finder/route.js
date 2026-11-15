@@ -7,7 +7,8 @@ const NEIGHBOURS = [
   [-1, -1], [-1, 1], [1, -1], [1, 1],
 ];
 
-function drivableMask(result, maxSlopeDeg) {
+/** 1 for every cell the rover may stand on: has terrain data, inside the search area, slope within the limit. */
+export function drivableMask(result, maxSlopeDeg) {
   const size = result.n * result.n;
   const ok = new Uint8Array(size);
   for (let i = 0; i < size; i++) {
@@ -17,7 +18,7 @@ function drivableMask(result, maxSlopeDeg) {
 }
 
 /** Binary min-heap of (key, value) pairs on typed arrays; grows as needed. */
-function createHeap(capacity = 4096) {
+export function createHeap(capacity = 4096) {
   let keys = new Float64Array(capacity);
   let vals = new Int32Array(capacity);
   let size = 0;
@@ -70,7 +71,10 @@ function createHeap(capacity = 4096) {
   };
 }
 
-/** @returns {{ n, cellM, start: number, rangeM, maxSlopeDeg, dist: Float32Array, prev: Int32Array }} */
+/**
+ * @returns {{ n, cellM, start: number, rangeM, maxSlopeDeg, dist: Float32Array, prev: Int32Array, farthestM: number }}
+ *   rangeM may be Infinity (no limit); farthestM is the longest drive to any reachable cell.
+ */
 export function reachFrom(result, start, { maxSlopeDeg, rangeM }) {
   const { n, cellM, elevation } = result;
   const size = n * n;
@@ -111,7 +115,9 @@ export function reachFrom(result, start, { maxSlopeDeg, rangeM }) {
       }
     }
   }
-  return { n, cellM, start: s, rangeM, maxSlopeDeg, dist: Float32Array.from(d), prev };
+  let farthestM = 0;
+  for (let i = 0; i < size; i++) if (d[i] < Infinity && d[i] > farthestM) farthestM = d[i];
+  return { n, cellM, start: s, rangeM, maxSlopeDeg, dist: Float32Array.from(d), prev, farthestM };
 }
 
 /** @returns {number[]|null} cell indices from the start to the target inclusive, or null if not reachable */

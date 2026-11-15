@@ -89,7 +89,7 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     app.classList.add('surface-open');
     $('surface').hidden = false;
     $('surfaceTip').hidden = true;
-    if (innerWidth <= 900) $('hudDetails').open = false; // on a phone the panel would cover the view
+    if (innerWidth <= 900 && $('hudDetails')) $('hudDetails').open = false; // on a phone the panel would cover the view
     if (!view) {
       view = createSurfaceView({
         canvas: $('surfaceCanvas'),
@@ -174,7 +174,7 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     );
     const edge = patch.coverage < 0.995 && patch.dataEdgeM ? ` The data ends ${Math.round(patch.dataEdgeM / 1000)} km away in some directions; ground beyond is drawn flat and blue-grey.` : '';
     $('hudNotes').textContent =
-      `Terrain: ${patch.sourceLabel ?? 'NASA LOLA'} data, about ${Math.round(patch.pixelM)} m per pixel, so no rocks or small craters. The fine grain on the ground is decoration, not data. Shadows are computed from the terrain; ground in shadow is brightened a little so you can see its shape.${edge}`;
+      `Terrain: ${patch.sourceLabel ?? 'NASA LOLA'} data, about ${Math.round(patch.pixelM)} m per pixel, so no rocks or small craters.${patch.sourceNote ? ` ${patch.sourceNote}` : ''} The fine grain on the ground is decoration, not data. Shadows are computed from the terrain; ground in shadow is brightened a little so you can see its shape.${edge}`;
   }
 
   /** The time slider moved: move the Sun and Earth and say what is visible now. */
@@ -232,7 +232,22 @@ export function createSurfaceMode({ app, getState, setStatus }) {
     current.profiles.eye = horizonProfile(current.patch, value);
     timeChanged();
   });
-  $('surfaceBack').addEventListener('click', close);
+  $('surfaceBack')?.addEventListener('click', close);
 
-  return { open, close, isOpen: () => !!current, missionChanged, timeChanged, getView: () => view };
+  return {
+    open,
+    close,
+    isOpen: () => !!current,
+    missionChanged,
+    timeChanged,
+    getView: () => view,
+    /** Where the open view is centred, or null. */
+    getSite: () => current?.site ?? null,
+    /** Drive the viewpoint over the open terrain: metres east and north of where the view was opened. */
+    setPosition: (eastM, northM, look) => {
+      if (!current) return;
+      view.setPosition(eastM, northM);
+      if (look) view.setLook(look);
+    },
+  };
 }

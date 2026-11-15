@@ -14,7 +14,9 @@
     "data:check": "node tools/fetch-data.mjs --check",
     "data:fetch": "node tools/fetch-data.mjs",
     "check:horizons": "node tools/check-horizons.mjs",
-    "check:landing": "node tools/check-landing-search.mjs"
+    "check:landing": "node tools/check-landing-search.mjs",
+    "check:tiles": "node tools/check-tiles.mjs",
+    "demo:warm": "node tools/warm-demo.mjs"
   },
   "engines": {
     "node": ">=22.12"

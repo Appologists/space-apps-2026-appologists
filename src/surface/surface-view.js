@@ -186,6 +186,8 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegen
       coarse: buildShadowGrid(COARSE.halfSizeM, COARSE.cellM, heightAt),
       fine: buildShadowGrid(FINE.halfSizeM, FINE.cellM, heightAt),
     };
+    stand.x = 0;
+    stand.z = 0;
     setLens(lens.id); // repaint for this terrain (also shades the ground)
     placeCamera();
   }
@@ -284,13 +286,17 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegen
   // Earth is a sphere lit from the Sun's direction, so its phase comes out right.
   const earthBall = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.MeshLambertMaterial({ color: 0x5b93e6 }));
   const sunLight = new THREE.DirectionalLight(0xffffff, 3.2);
-  scene.add(sunDisc, sunHalo, earthBall, sunLight, new THREE.AmbientLight(0xffffff, 0.06));
+  // The sky moves with the camera, so the Sun and Earth keep their directions when the viewpoint drives away
+  // from the middle of the terrain (see setPosition).
+  const skyGroup = new THREE.Group();
+  skyGroup.add(sunDisc, sunHalo, earthBall);
+  scene.add(skyGroup, sunLight, new THREE.AmbientLight(0xffffff, 0.06));
 
   const pathMaterial = (color) => new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 });
   const sunPath = new THREE.Line(new THREE.BufferGeometry(), pathMaterial(0xffd36b));
   const earthPath = new THREE.Line(new THREE.BufferGeometry(), pathMaterial(0x5aa8ff));
   sunPath.frustumCulled = earthPath.frustumCulled = false;
-  scene.add(sunPath, earthPath);
+  skyGroup.add(sunPath, earthPath);
 
   const sky = { sunDir: new THREE.Vector3(0, 1, 0), earthDir: new THREE.Vector3(0, 1, 0), sunText: 'Sun', earthText: 'Earth' };
 
@@ -338,11 +344,23 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegen
 
   // ---- Camera and controls ---------------------------------------------------------------------------
   const lookDir = new THREE.Vector3();
+  const stand = { x: 0, z: 0 }; // where the viewer stands, metres east and south of the middle of the terrain
+  /** Height of the ground under the viewer. Off the middle, the highest of a few nearby samples, so the eye never sinks into a rise between them. */
+  function groundUnderViewer() {
+    if (!ground || (stand.x === 0 && stand.z === 0)) return 0;
+    let top = -Infinity;
+    for (const [dx, dz] of [[0, 0], [25, 0], [-25, 0], [0, 25], [0, -25]]) {
+      const y = ground.sample.height(stand.x + dx, stand.z + dz);
+      if (!Number.isNaN(y)) top = Math.max(top, y);
+    }
+    return Number.isFinite(top) ? top : 0;
+  }
   function placeCamera() {
     look.pitch = THREE.MathUtils.clamp(look.pitch, -89, 89);
     look.yaw = ((look.yaw % 360) + 360) % 360;
     look.fov = THREE.MathUtils.clamp(look.fov, 8, 100);
-    camera.position.set(0, eyeHeightM, 0);
+    camera.position.set(stand.x, groundUnderViewer() + eyeHeightM, stand.z);
+    skyGroup.position.copy(camera.position);
     camera.fov = look.fov;
     camera.lookAt(skyDirection(look.yaw, look.pitch, lookDir).add(camera.position));
     camera.updateProjectionMatrix();
@@ -351,6 +369,15 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegen
   }
   function setLook(next) {
     Object.assign(look, next);
+    placeCamera();
+  }
+  /**
+   * Move the viewer over the same terrain, for driving along a route: metres east and north of its middle.
+   * The Sun and Earth stay where they are in the sky; over a few kilometres they move by under 0.2°.
+   */
+  function setPosition(eastM, northM) {
+    stand.x = eastM;
+    stand.z = -northM;
     placeCamera();
   }
   function setEyeHeight(heightM) {
@@ -411,8 +438,8 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegen
         const x = o.x + d.x * after;
         const z = o.z + d.z * after;
         return {
-          distanceM: Math.hypot(x, z),
-          bearingDeg: ((Math.atan2(x, -z) / DEG) + 360) % 360,
+          distanceM: Math.hypot(x - stand.x, z - stand.z),
+          bearingDeg: ((Math.atan2(x - stand.x, -(z - stand.z)) / DEG) + 360) % 360,
           elevationM: ground.sample.elevation(x, z),
           slopeDeg: ground.sample.slope(x, z),
         };
@@ -503,5 +530,5 @@ export function createSurfaceView({ canvas, container, labelsEl, onLook, onLegen
   }
 
   placeCamera();
-  return { setTerrain, setSky, setPaths, setLook, setEyeHeight, setLens, getLens: () => lens.id, probe, getLook: () => ({ ...look }), resize, requestRender };
+  return { setTerrain, setSky, setPaths, setLook, setPosition, setEyeHeight, setLens, getLens: () => lens.id, probe, getLook: () => ({ ...look }), resize, requestRender };
 }

@@ -5,7 +5,7 @@ import { clear, h } from './dom.js';
 /**
  * @param {HTMLElement} el
  * @param {Object} options
- * @param {{available: boolean, sources: {id: string, label: string, coverage: string, sizeText: string, fetch: string, note?: string, installed: boolean}[]}|null} options.info
+ * @param {{available: boolean, sources: {id: string, label: string, coverage: string, sizeText: string, fetch: string, note?: string, installed: boolean, incomplete?: boolean}[]}|null} options.info
  * @param {string} options.selected   a dataset id, or 'auto'
  * @param {(id: string) => void} options.onSelect
  */
@@ -27,12 +27,17 @@ export function renderTerrainPicker(el, { info, selected, onSelect }) {
     option(
       'auto',
       'Best available',
-      info.available ? 'The finest downloaded data that covers the spot; coarser data fills in beyond its edges.' : 'No terrain data is downloaded yet.',
+      info.available ? 'The finest downloaded data near the spot; coarser data for ground far away and wherever the finest has none.' : 'No terrain data is downloaded yet.',
       { disabled: !info.available },
     ),
     ...sources.map((source) =>
       source.installed
-        ? option(source.id, source.label, `Covers ${source.coverage}. ${source.note ?? ''}`.trim())
+        ? option(
+            source.id,
+            source.label,
+            `Covers ${source.coverage}. ${source.note ?? ''}${source.incomplete ? ' To get the rest (finished tiles are skipped), run this and reload:' : ''}`.trim(),
+            { command: source.incomplete ? source.fetch : null },
+          )
         : option(source.id, source.label, `Covers ${source.coverage}. Not downloaded (${source.sizeText}). To get it, run this and reload:`, {
             disabled: true,
             command: source.fetch,

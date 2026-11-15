@@ -7,13 +7,15 @@
 // sweep from src/surface/shadows.js gives the height of the lowest unblocked sunbeam above every cell; a
 // solar panel is lit when it stands above that height. Earth is treated the same way, for the antenna.
 // "Visible" means the centre of the Sun's or Earth's disc clears the terrain.
+// Each grid asks for terrain as fine as its own cells, so "best available" terrain (server/composite.mjs)
+// reads its finest data for the search area and coarser data for the far grid.
 import { MOON_RADIUS_KM } from '../src/astro/coords.js';
 import { ephemerisSeries } from '../src/astro/ephemeris.js';
 import { altAz } from '../src/astro/sky.js';
 import { cellOffset, offsetToLatLon, searchGrid } from '../src/finder/grid.js';
 import { FAIL, cellScore, defaultFinder, pickSites } from '../src/finder/score.js';
 import { buildShadowGrid, sampleGrid, sweepShadows } from '../src/surface/shadows.js';
-import { heightAt, slopeAt } from './lola-polar.mjs';
+import { heightAt, sampleAt } from './lola-polar.mjs';
 
 const R = MOON_RADIUS_KM * 1000;
 const DEG = Math.PI / 180;
@@ -45,15 +47,15 @@ export function searchLanding(dem, params) {
   const count = n * n;
 
   // ---- Terrain on the two grids -------------------------------------------------------------------------
-  const sceneHeight = (x, z) => {
+  const sceneHeight = (wantM) => (x, z) => {
     const d = Math.hypot(x, z);
     const at = offsetToLatLon(center, x, -z);
-    const h = heightAt(dem, at.lat, at.lon);
+    const h = heightAt(dem, at.lat, at.lon, wantM);
     return Number.isNaN(h) ? NaN : (R + h) * Math.cos(d / R) - (R + groundHeightM);
   };
-  const fine = buildShadowGrid(halfSizeM, cellM, sceneHeight);
+  const fine = buildShadowGrid(halfSizeM, cellM, sceneHeight(cellM));
   const coarseHalf = Math.ceil((halfSizeM + FAR_MARGIN_M) / COARSE_CELL_M) * COARSE_CELL_M;
-  const coarse = buildShadowGrid(coarseHalf, COARSE_CELL_M, sceneHeight);
+  const coarse = buildShadowGrid(coarseHalf, COARSE_CELL_M, sceneHeight(COARSE_CELL_M));
   const beyondFine = (x, z) => sampleGrid(coarse, coarse.M, x, z);
 
   // ---- What does not change with time: height, slope, and each cell's own "up" ----------------------------
@@ -67,17 +69,18 @@ export function searchLanding(dem, params) {
   const sinDipPanel = new Float32Array(count);
   const sinDipAntenna = new Float32Array(count);
   const radiusM = p.radiusKm * 1000;
+  const cell = [0, 0]; // reused: [height, slope] of the current cell
   for (let row = 0; row < n; row++) {
     for (let col = 0; col < n; col++) {
       const c = row * n + col;
       const { east, north } = cellOffset(grid, row, col);
       const at = offsetToLatLon(center, east, north);
-      const h = heightAt(dem, at.lat, at.lon);
+      const h = sampleAt(dem, at.lat, at.lon, cell, cellM)[0];
       if (Number.isNaN(h)) continue;
       valid[c] = 1;
       inside[c] = Math.hypot(east, north) <= radiusM ? 1 : 0;
       elevation[c] = h;
-      slope[c] = slopeAt(dem, at.lat, at.lon);
+      slope[c] = cell[1];
       // The cell's own vertical, for one extra test: is the body above a smooth Moon's horizon here at all?
       // (The sweep covers real terrain; this catches night caused by the Moon's bulk beyond the coarse grid.)
       const y = fine.Y[c] + R + groundHeightM;

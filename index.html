@@ -10,57 +10,136 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
     />
+    <!-- Linked here, not imported from main.js, so the page is laid out before the app's script has loaded. -->
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <div class="app">
-      <aside class="panel" aria-label="Mission and ranking">
-        <header>
+      <aside class="panel" aria-label="Mission steps">
+        <header class="flow-head">
           <h1>Lunar Landing Site Navigator</h1>
-          <p class="lede">Pick a landing date and what matters to your mission. Sites are ranked by how well they fit.</p>
+          <ol class="steps" id="steps" aria-label="Steps of the mission plan"></ol>
         </header>
 
-        <p class="notice" id="terrainNotice">
-          <strong>The ranking does not use terrain yet.</strong> It assumes a smooth Moon. For real terrain and
-          shadows, select a site your terrain data covers and press "Look around from here".
-        </p>
+        <div class="flow-body" id="flowBody">
+          <section data-steps="1" id="missionSection">
+            <h2 class="step-title">Plan a mission</h2>
+            <div id="profiles" class="profiles"></div>
+            <div id="setup" class="setup"></div>
+          </section>
 
-        <section aria-labelledby="missionTitle">
-          <h2 class="eyebrow" id="missionTitle">Mission</h2>
-          <div id="mission" class="fields"></div>
-        </section>
+          <section data-steps="2">
+            <h2 class="step-title">Regions that fit</h2>
+            <p class="lede" id="regionsLede"></p>
+            <ol id="regions" class="regions"></ol>
+          </section>
 
-        <section aria-labelledby="weightsTitle">
-          <h2 class="eyebrow" id="weightsTitle">What matters</h2>
-          <div id="weights" class="weights"></div>
-        </section>
+          <section data-steps="2" class="result">
+            <h3 id="finderTitle"></h3>
+            <p class="caveats" id="finderSummary"></p>
+            <ol class="found" id="finderSites"></ol>
+          </section>
 
-        <section aria-labelledby="terrainTitle">
-          <h2 class="eyebrow" id="terrainTitle">Terrain data</h2>
-          <div id="terrainPicker" class="terrain-picker"></div>
-        </section>
+          <section data-steps="3">
+            <h2 class="step-title">Start and drive</h2>
+            <div class="lensbuttons two" id="finderClickMode"></div>
+            <button type="button" id="suggestDrive">Suggest a drive</button>
+            <div class="finder-dests" id="finderDests"></div>
+            <!-- Play first, so it is on screen without scrolling; the route choices and the plan follow. -->
+            <div class="playback" id="playback"></div>
+            <div class="route-options" id="finderRouteOptions"></div>
+            <p class="route-text" id="finderRoute"></p>
+            <div class="schedule" id="finderSchedule"></div>
+          </section>
 
-        <section aria-labelledby="finderFormTitle">
-          <h2 class="eyebrow" id="finderFormTitle">Find landing sites</h2>
-          <div id="finderForm" class="finder-form"></div>
-        </section>
-
-        <section aria-labelledby="rankingTitle">
-          <h2 class="eyebrow" id="rankingTitle">Ranked sites</h2>
-          <ol id="ranking" class="ranking"></ol>
-          <form id="addPoint" class="addpoint">
-            <span class="eyebrow">Add your own point</span>
-            <div class="row">
-              <label>Lat <input id="addLat" type="number" min="-90" max="90" step="any" placeholder="-89.5" required /></label>
-              <label>Lon <input id="addLon" type="number" min="-180" max="360" step="any" placeholder="0" required /></label>
-              <button type="submit">Add</button>
+          <section data-steps="2 3">
+            <div class="legend" id="finderLegend" hidden></div>
+            <div class="lensbar" role="group" aria-label="Colour the map by">
+              <span class="eyebrow">Colour the map by</span>
+              <div class="lensbuttons" id="finderLayers"></div>
             </div>
-            <span class="hint">Degrees, north and east positive. Or click anywhere on the Moon; double-click to stand there.</span>
-          </form>
-        </section>
+            <details class="explain">
+              <summary>What these results leave out</summary>
+              <p class="caveats" id="finderNotes"></p>
+              <p class="caveats" id="planNotes"></p>
+            </details>
+          </section>
 
-        <footer class="sources">
-          Sun and Earth positions: Astronomy Engine, checked against NASA JPL Horizons. Moon map: NASA LRO/LROC (CGI
-          Moon Kit). Coordinates: mean-Earth / polar-axis frame, east-positive longitude.
+          <section data-steps="5">
+            <h2 class="step-title">Ride along</h2>
+            <div class="playback" id="driveNow"></div>
+            <div class="credits" id="credits"></div>
+          </section>
+
+          <section data-steps="4 5" class="hud" id="hud" aria-label="What you can see from here">
+            <h2 class="step-title" id="hudTitle"></h2>
+            <div class="coords" id="hudCoords"></div>
+            <dl class="sky" id="hudSky"></dl>
+            <div class="eyebrow">With real terrain, over this mission</div>
+            <ul id="hudStats"></ul>
+            <div class="lensbar" role="group" aria-label="Colour the ground by">
+              <span class="eyebrow">Colour the ground by</span>
+              <div class="lensbuttons" id="lensButtons"></div>
+            </div>
+            <label class="eye">Eye height (m) <input id="eyeHeight" type="number" min="0.5" max="100" step="0.1" value="1.7" /></label>
+            <details class="explain">
+              <summary>What this view leaves out</summary>
+              <p class="caveats" id="hudNotes"></p>
+            </details>
+          </section>
+
+          <section data-steps="1">
+            <!-- Not part of the demo: shown only when the address has ?tools (see main.js). -->
+            <details class="more" id="moreTools" hidden>
+              <summary>More tools: known sites ranked, weights, terrain data, exact numbers</summary>
+              <div class="more-body">
+                <p class="notice" id="terrainNotice">
+                  <strong>This ranked list does not use terrain.</strong> It assumes a smooth Moon. The mission steps above
+                  search the real terrain.
+                </p>
+
+                <section aria-labelledby="missionTitle">
+                  <h2 class="eyebrow" id="missionTitle">Mission</h2>
+                  <div id="mission" class="fields"></div>
+                </section>
+
+                <section aria-labelledby="weightsTitle">
+                  <h2 class="eyebrow" id="weightsTitle">What matters</h2>
+                  <div id="weights" class="weights"></div>
+                </section>
+
+                <section aria-labelledby="terrainTitle">
+                  <h2 class="eyebrow" id="terrainTitle">Terrain data</h2>
+                  <div id="terrainPicker" class="terrain-picker"></div>
+                </section>
+
+                <section aria-labelledby="finderFormTitle">
+                  <h2 class="eyebrow" id="finderFormTitle">Find landing sites round the selected site</h2>
+                  <div id="finderForm" class="finder-form"></div>
+                </section>
+
+                <section aria-labelledby="rankingTitle">
+                  <h2 class="eyebrow" id="rankingTitle">Ranked sites</h2>
+                  <ol id="ranking" class="ranking"></ol>
+                  <form id="addPoint" class="addpoint">
+                    <span class="eyebrow">Add your own point</span>
+                    <div class="row">
+                      <label>Lat <input id="addLat" type="number" min="-90" max="90" step="any" placeholder="-89.5" required /></label>
+                      <label>Lon <input id="addLon" type="number" min="-180" max="360" step="any" placeholder="0" required /></label>
+                      <button type="submit">Add</button>
+                    </div>
+                    <span class="hint">Degrees, north and east positive. Or click anywhere on the Moon; double-click to stand there.</span>
+                  </form>
+                </section>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <footer class="flow-nav">
+          <p class="flow-hint" id="flowHint" hidden></p>
+          <button type="button" id="flowBack">Back</button>
+          <button type="button" id="flowNext" class="primary">Next</button>
         </footer>
       </aside>
 
@@ -93,30 +172,12 @@
         </div>
 
         <div class="finder" id="finder" hidden>
-          <div class="finder-side">
-            <aside class="hud finder-hud" aria-label="Landing sites found">
-              <div class="hud-head"><button type="button" id="finderBack">Back to the Moon</button></div>
-              <h2 id="finderTitle"></h2>
-              <p class="caveats" id="finderSummary"></p>
-              <ol class="found" id="finderSites"></ol>
-              <p class="caveats" id="finderNotes"></p>
-            </aside>
-            <div class="lensbar" role="group" aria-label="What a click on the map sets">
-              <span class="eyebrow">A click on the map sets the rover's</span>
-              <div class="lensbuttons two" id="finderClickMode"></div>
-              <p class="route-text" id="finderRoute"></p>
-              <div class="schedule" id="finderSchedule"></div>
-            </div>
-            <div class="legend" id="finderLegend" hidden></div>
-            <div class="lensbar" role="group" aria-label="Colour the map by">
-              <span class="eyebrow">Colour the map by</span>
-              <div class="lensbuttons" id="finderLayers"></div>
-            </div>
-          </div>
           <div class="finder-map" id="finderMap">
             <canvas id="finderCanvas" aria-label="Map of the search area, north up. Point at it to read values; click to select a spot."></canvas>
             <div class="tip" id="finderTip" hidden></div>
           </div>
+          <!-- The drive's timeline, beside the map rather than over it (step 3; see flow.js and styles.css). -->
+          <aside class="drive-timeline" id="driveTimeline" aria-label="Timeline of the drive"></aside>
         </div>
 
         <div class="surface" id="surface" hidden>
@@ -130,26 +191,7 @@
           <div class="tip" id="surfaceTip" hidden></div>
           <div class="lenspanel">
             <div class="legend" id="lensLegend" hidden></div>
-            <div class="lensbar" role="group" aria-label="Colour the ground by">
-              <span class="eyebrow">Colour the ground by</span>
-              <div class="lensbuttons" id="lensButtons"></div>
-            </div>
           </div>
-          <aside class="hud" id="hud" aria-label="What you can see from here">
-            <div class="hud-head">
-              <button type="button" id="surfaceBack">Back to the Moon</button>
-              <label class="eye">Eye height (m) <input id="eyeHeight" type="number" min="0.5" max="100" step="0.1" value="1.7" /></label>
-            </div>
-            <h2 id="hudTitle"></h2>
-            <div class="coords" id="hudCoords"></div>
-            <details id="hudDetails" open>
-              <summary>What you can see from here</summary>
-              <dl class="sky" id="hudSky"></dl>
-              <div class="eyebrow">With real terrain, over this mission</div>
-              <ul id="hudStats"></ul>
-              <p class="caveats" id="hudNotes"></p>
-            </details>
-          </aside>
         </div>
 
         <div class="status" id="status">Loading the Moon map…</div>

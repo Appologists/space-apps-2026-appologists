@@ -103,8 +103,40 @@ Checks we ran (2026-11-14):
 The fine grain on the ground is decoration generated in the shader (`src/surface/ground-grain.js`), at scales
 below 80 m only. It is not data.
 
-What is missing: real detail finer than 80 m, light bounced into shadow, any terrain north of 80° S (if the data
-ends within 300 km of the viewer, the ground beyond is drawn flat and blue-grey, and the app says so).
+What is missing: real detail finer than the data (80 m at the south pole, 59 m elsewhere with
+`lola-global-512`), light bounced into shadow. Where no downloaded dataset has data within 300 km of the
+viewer, the ground beyond is drawn flat and blue-grey, and the app says so.
+
+### Which dataset answers a sample
+
+```
+ server/terrain-sources.mjs   the list of datasets, which are downloaded, and "best available" for a spot
+        │ opens each with its reader, once
+        ├─ server/lola-polar.mjs      south-pole grid, in memory (115 MB)
+        ├─ server/equirect.mjs        whole-Moon float TIFFs, in memory (66 MB, 1 GB)
+        └─ server/equirect-tiles.mjs  whole Moon at 59 m, sixteen 2.1 GB tiles, read from disk on demand
+ server/composite.mjs         "best available": picks among them for each sample
+ heightAt / sampleAt (server/lola-polar.mjs)   the two entry points everything else calls
+```
+
+- **The tiled reader.** The sixteen tiles are treated as one grid of 184,320 by 92,160 pixels, cut into
+  blocks of 1024 by 128 pixels (256 kB). A block is read the first time a sample falls in it and kept in a
+  cache capped at 1024 blocks (268 MB); when the cache is full, the quarter used longest ago is dropped. Only
+  complete tiles are opened (the size must match, so a `.part` download is ignored), a missing tile gives no
+  data, and the folder is looked at again every 15 s for tiles that have arrived.
+- **How fine.** `heightAt(dem, lat, lon, wantM)` and `sampleAt(dem, lat, lon, out, wantM)` take the detail the
+  caller needs, in metres per pixel. Only "best available" uses it: regional grids first where they cover,
+  then the coarsest whole-Moon dataset that is still that fine, then finer ones, then coarser ones. The
+  surface view's rings ask for the gap to the next ring; the finder's two grids ask for their cell size.
+  Choosing one dataset in the picker bypasses all this and reads that dataset everywhere.
+- **What it costs.** At Apollo 11 with every dataset downloaded, a surface view reads 23 blocks (6 MB) of
+  59 m data and the rest from memory. With the 59 m data chosen by itself the same view reads 382 blocks
+  (100 MB) and takes about 3 s the first time.
+
+Check we ran (2026-11-14, `npm run check:tiles`, all 16 tiles): 3,000 points per tile against the 470 m
+whole-Moon map gave correlations of 0.9998 to 1.0000, mean differences of at most 2.1 m and a spread of
+13–23 m (the two maps differ in detail, not in place). The four southern tiles against the 80 m south-pole
+grid between 80° and 88° S: correlation 1.0000, mean difference at most 0.1 m, spread 1.8–3.2 m.
 
 ## The landing-site finder
 
@@ -139,3 +171,77 @@ finder and the surface view can differ by a few percent, because they sample tim
 **Reach and route** run in the browser on the finder's rasters (`src/finder/route.js`): a shortest-path search
 over cells whose slope is within the rover's limit, stopping at the rover's range. A 400 by 400 raster takes
 about 70 ms, so it is redone whenever the start, the destination or the rover changes.
+
+## The drive planner
+
+```
+ start, destinations, rover ──▶ planMission() ──▶ plan: route, order, when to leave each cell
+ (src/ui/finder-mode.js)        (src/finder/planner.js)      │
+                                                             ▼
+        map: route, stops, waits ◀── simulatePlan() replays it step by step ──▶ strip and words
+        (src/finder/map-view.js)     (src/finder/schedule.js)                   (src/ui/finder-schedule.js, src/finder/plan-text.js)
+```
+
+It runs in the browser on the finder's rasters and the two per-step masks (`sunMask`, `earthMask`).
+
+- **The rules** live in `schedule.js` (decision O): the rover leaves a cell only while that cell is sunlit (and
+  sees Earth, if required), checked on the hour and at every cell it reaches; darkness is counted at the end of
+  each step for the cell it last reached; too long a run of darkness and it is lost.
+- **The search** is over place and time. For every cell the masks are first turned into its unbroken stretches
+  of sunlight (once per search result). A state is "on this cell during this stretch": waiting inside a stretch
+  costs nothing, so only the earliest moment the rover can be there is kept (plus, rarely, a slightly later one
+  with less darkness behind it). From a state the rover can hop to a neighbour at once; wait and hop so that it
+  arrives as the neighbour's next stretch of sunlight begins, or in the last dark hour before it; or stay
+  through the dark until its own cell is lit again. States are taken in time order, so the first way found to
+  each is the earliest.
+- **Several destinations:** one such search per set of destinations already visited, each started from every
+  way the smaller sets ended, so every order is covered (at most five destinations, 31 searches). A first quick
+  pass in "nearest next" order gives a finishing time that lets the full pass stop early.
+- **Distance and range:** every state remembers how far the rover has driven; ways that could no longer reach
+  the remaining destinations within the range are dropped. After the earliest arrival is known, a second pass
+  that also keeps shorter ways looks for a drive arriving in the same hour with less driving.
+- **The replay is the judge.** The plan is a route plus, for each cell, the earliest time to leave it.
+  `simulatePlan` drives it by the rules, and what the map, the strip and the text show is that replay. If the
+  two ever disagree the plan carries `selfCheck: false` and the panel says so.
+- **When nothing works** the planner tries again with one limit lifted at a time (darkness, range, Earth) and,
+  for several destinations, each destination alone, and `plan-text.js` puts the result into words.
+
+Simplifications, all on the safe side: the rover pauses only on cell centres; it starts a hop only when the
+whole hop fits in one stretch of light; times are good to one step of the search (an hour for missions up to
+14 days). It finds a workable plan and prefers the earliest arrival; it does not promise the best plan, and it
+does not look for the safest one.
+
+Checks we ran (2026-11-14): on 8,182 random maps of 16 to 25 cells an exhaustive search of every allowed drive
+agreed with the planner on whether a plan exists and on the arrival hour, every time (400 of these run in
+`npm test`). On a real search at Shackleton's rim (89.45° S, 137.31° W, 250 by 250 cells of 80 m, 337 hourly
+steps) one destination took 35 to 290 ms and tours of three to five stops 0.5 to 3 s; every plan's replay
+matched. Not checked: other sites, the coarser whole-Moon terrain, missions longer than 14 days.
+
+## The mission steps
+
+`src/ui/flow.js` is the walk-through in the left panel: Mission, Regions, Drive, Surface, Ride. It computes
+nothing itself. It decides which view is on the stage and passes values between the pieces that do the work:
+
+| Step | What does the work |
+| --- | --- |
+| 1 Mission | Fills the finder's values and the mission from a profile in `data/missions.json`, or from the big custom choices |
+| 2 Regions | One landing search per region (`searchQuestion` in `src/finder/client.js` builds each question); the 3D Moon stays on the stage, turned to the chosen region, with every region marked by its result (`setRegions` in `src/globe/globe.js`); the finder's flat map comes in at step 3 |
+| 3 Drive | The finder's reach, route and drive planner, unchanged. `src/finder/playback.js` turns a plan into "where is the rover at hour t" |
+| 4 Surface | The surface view, opened at the rover's start |
+| 5 Ride | The same surface view with `setPosition()` moving the viewpoint along the route |
+
+Sections of `index.html` carry `data-steps="2 3"`; the flow shows the ones that list the current step.
+
+**One clock.** Playback keeps hours after landing. It moves the app's time slider (so the globe and the
+surface view's Sun follow), tells the map which time step's sunlight to draw (`setTime`, the `now` layer in
+`map-layers.js`) and where the rover is (`setRover`). Moving the app's own slider feeds back into it. In the
+ride the Sun steps three times a second, because each step redraws every shadow; the viewpoint moves every frame.
+
+**The address.** `src/ui/flow-state.js` writes the step, profile, date, limits, region, start and destinations
+into the part of the address after `#`, and reads them back on load. The flow then replays the steps up to
+the saved one; with kept searches that takes about two seconds.
+
+**Kept searches.** `server/terrain-plugin.mjs` keeps each search answer under a key made of the question
+(keys sorted), the terrain data the search can read, and the modified dates of the search code. Answers live
+in memory and in `node_modules/.cache/landing-search` (about 7 MB each, never committed). `npm run demo:warm`
+asks every profile's seven searches of a running app, so a talk starts with them all kept.
