@@ -129,6 +129,7 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
   );
 
   // ---- Camera ---------------------------------------------------------------------------------
+  const MAX_ZOOM = 40;
   let zoom = 1;
   function updateCamera() {
     const v = (camera.fov / 2) * DEG;
@@ -139,8 +140,11 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     camera.updateProjectionMatrix();
   }
   function setZoom(z) {
-    zoom = THREE.MathUtils.clamp(z, 0.8, 40);
-    if (animation) animation.zoomFrom = animation.zoomTo = zoom; // a manual zoom wins over a turn in progress
+    zoom = THREE.MathUtils.clamp(z, 0.8, MAX_ZOOM);
+    if (animation) {
+      animation.zoomFrom = animation.zoomTo = zoom; // a manual zoom wins over a turn in progress
+      animation.zoomMid = null;
+    }
     updateCamera();
     requestRender();
   }
@@ -166,14 +170,25 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, centre)).invert();
   }
   let animation = null;
-  function animateTo(quaternion, targetZoom = zoom) {
+  /**
+   * Turn (and zoom) the Moon to a new orientation. Resolves when the motion ends (or is cut short by the user).
+   * `arc`: on a long turn, pull back a little in the middle and come in again, as a camera would fly.
+   */
+  function animateTo(quaternion, targetZoom = zoom, { duration = 750, arc = false } = {}) {
+    animation?.done?.();
     if (reduceMotion) {
       moon.quaternion.copy(quaternion);
       setZoom(targetZoom);
-      return;
+      return Promise.resolve();
     }
-    animation = { from: moon.quaternion.clone(), to: quaternion, zoomFrom: zoom, zoomTo: targetZoom, t0: performance.now(), duration: 750 };
-    requestRender();
+    const from = moon.quaternion.clone();
+    const angle = 2 * Math.acos(Math.min(1, Math.abs(from.dot(quaternion)))); // radians turned
+    // Pull back to at most this zoom mid-way: more for a longer turn, never further out than the whole Moon.
+    const zoomMid = arc && angle > 0.2 ? Math.min(zoom, targetZoom, THREE.MathUtils.lerp(Math.min(zoom, targetZoom), 1, Math.min(angle / Math.PI, 1))) : null;
+    return new Promise((resolve) => {
+      animation = { from, to: quaternion, zoomFrom: zoom, zoomTo: targetZoom, zoomMid, t0: performance.now(), duration, done: resolve };
+      requestRender();
+    });
   }
   const VIEWS = {
     near: () => animateTo(quatFacing(0, 0), 1),
@@ -316,7 +331,16 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     // Sites crowd together at the poles and sit under the pole rod, so go to a close-up there.
     targetZoom ??= nearPole ? Math.max(zoom, 6) : zoom;
     const up = nearPole ? localOf(0, lat < 0 ? 0 : 180) : new V3(0, 1, 0);
-    animateTo(quatFacing(lat, lon, up), targetZoom);
+    return animateTo(quatFacing(lat, lon, up), targetZoom);
+  }
+  /**
+   * Fly to a point: turn it to face the viewer and zoom right in, pulling back mid-way on a long turn.
+   * @returns {Promise<void>} resolves when the camera arrives
+   */
+  function flyTo(lat, lon, targetZoom = MAX_ZOOM, duration = 1900) {
+    const nearPole = Math.abs(lat) > 80;
+    const up = nearPole ? localOf(0, lat < 0 ? 0 : 180) : new V3(0, 1, 0);
+    return animateTo(quatFacing(lat, lon, up), targetZoom, { duration, arc: true });
   }
   /** The site marker (or, while regions are shown, the region marker) nearest the pointer, if close enough. */
   function siteNear(clientX, clientY, tolerancePx = regionEntries.length ? 18 : 11) {
@@ -367,6 +391,7 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    animation?.done?.();
     animation = null;
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
@@ -476,9 +501,18 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
       const k = Math.min((now - animation.t0) / animation.duration, 1);
       const eased = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
       moon.quaternion.slerpQuaternions(animation.from, animation.to, eased);
-      zoom = animation.zoomFrom * Math.pow(animation.zoomTo / animation.zoomFrom, eased);
+      const { zoomFrom, zoomTo, zoomMid } = animation;
+      if (zoomMid) {
+        // Log-space path through the pulled-back zoom: out over the first part of the turn, then in.
+        const lz = Math.log(zoomFrom) * (1 - eased) * (1 - eased) + 2 * Math.log(zoomMid) * eased * (1 - eased) + Math.log(zoomTo) * eased * eased;
+        zoom = Math.exp(lz);
+      } else zoom = zoomFrom * Math.pow(zoomTo / zoomFrom, eased);
       updateCamera();
-      if (k >= 1) animation = null;
+      if (k >= 1) {
+        const finished = animation.done;
+        animation = null;
+        finished?.();
+      }
       needsRender = true;
     }
     if (!needsRender) return;
@@ -505,6 +539,8 @@ export function createGlobe({ canvas, stage, labelsEl, tipEl, textureUrl, onPick
     setSelected,
     setRegions,
     focus,
+    flyTo,
+    getZoom: () => zoom,
     view: (name) => VIEWS[name]?.(),
     zoomBy: (factor) => setZoom(zoom * factor),
     setOption(name, on) {

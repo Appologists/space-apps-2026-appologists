@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { fetchTerrainPatch, savedSpot } from '../src/terrain/client.js';
+import { fetchTerrainPatch, forgetTerrainPatches, savedSpot } from '../src/terrain/client.js';
 import { horizonDipDeg, visibilityStats } from '../src/astro/sky.js';
 import { buildShadowGrid, litFraction, sampleGrid, sweepShadows } from '../src/surface/shadows.js';
 import {
@@ -211,6 +211,7 @@ describe.skipIf(!haveData)('real LOLA 80 m data', () => {
 describe('the ground for the ride on the hosted website (no server)', () => {
   const reply = (status, type, body) => ({ ok: status >= 200 && status < 300, status, headers: { get: () => type }, arrayBuffer: async () => body, json: async () => ({}) });
   const withFetch = async (answers, run) => {
+    forgetTerrainPatches(); // each case asks afresh, not from the terrain kept in memory
     const asked = [];
     const real = globalThis.fetch;
     globalThis.fetch = async (url) => {
@@ -248,6 +249,24 @@ describe('the ground for the ride on the hosted website (no server)', () => {
     expect(live.result.value.heights.length).toBeGreaterThan(0);
     const failed = await withFetch(() => ({ ...reply(400, 'application/json'), json: async () => ({ error: 'No terrain data here.', hint: 'npm run data:fetch' }) }), () => fetchTerrainPatch(10, 20));
     expect(failed.result.error.message).toBe('No terrain data here. Run: npm run data:fetch');
+  });
+
+  it('keeps a spot\'s terrain in memory, but not a failure', async () => {
+    const bytes = encodePatch(fakePatch((d) => d / 100)).buffer;
+    const twice = await withFetch(() => reply(200, 'application/octet-stream', bytes), async () => {
+      const first = await fetchTerrainPatch(-88.1, 33);
+      const again = await fetchTerrainPatch(-88.1, 33);
+      return first === again;
+    });
+    expect(twice.result.value).toBe(true);
+    expect(twice.asked).toHaveLength(1);
+    let calls = 0;
+    const flaky = await withFetch(() => (++calls === 1 ? ({ ...reply(500, 'application/json'), json: async () => ({ error: 'busy' }) }) : reply(200, 'application/octet-stream', bytes)), async () => {
+      await fetchTerrainPatch(-88.2, 33).catch(() => null);
+      return fetchTerrainPatch(-88.2, 33);
+    });
+    expect(flaky.result.value.heights.length).toBeGreaterThan(0);
+    expect(flaky.asked).toHaveLength(2);
   });
 
   it('says so in plain words when a spot is not saved', async () => {

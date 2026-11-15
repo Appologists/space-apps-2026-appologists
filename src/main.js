@@ -112,7 +112,26 @@ async function lookAround(site) {
   if (!terrainCovers(info, site.lat, state.terrainSource)) {
     return setStatus(`No terrain data here: the chosen terrain data covers ${coverageText(info, state.terrainSource)}.`, 7000);
   }
-  await surface.open(site);
+  if (surface.isOpen()) return surface.open(site); // already on the surface: just move
+  return flyDown(site);
+}
+
+/**
+ * The arrival: the panel over the globe fades, the Moon turns the spot to face you and zooms in (pulling
+ * back mid-way on a long turn), then "whoosh": the globe blows past and the surface view fades in while the
+ * eye comes down from a few kilometres up to standing height. The terrain loads during the flight.
+ */
+async function flyDown(site) {
+  const app = document.querySelector('.app');
+  app.classList.add('flying');
+  // If the browser pauses animation (a hidden tab), do not wait for the globe for ever.
+  const flight = Promise.race([globe.flyTo(site.lat, site.lon), new Promise((resolve) => setTimeout(resolve, 3200))]);
+  // The whoosh starts only once the globe has arrived and the terrain is in, so the stage is never empty.
+  const opened = await surface.open(site, { intro: { revealAfter: flight, onReveal: () => app.classList.add('whoosh') } });
+  // Once the surface covers the stage, put the globe back as it was, ready for the way out. If the surface did
+  // not open (no terrain here), put it back at once.
+  setTimeout(() => app.classList.remove('flying', 'whoosh'), opened ? 1000 : 0);
+  return opened;
 }
 
 const allSites = () => (state.customSite ? [...sitesData.sites, state.customSite] : sitesData.sites);

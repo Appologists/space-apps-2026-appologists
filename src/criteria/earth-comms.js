@@ -6,7 +6,7 @@ export default {
   id: 'earthComms',
   label: 'Direct-to-Earth communication',
   description:
-    'Share of the mission with Earth above the horizon, so the lander can talk to Earth without a relay satellite.',
+    'Share of the mission with Earth above the horizon. While it is, a direct link without a relay satellite is possible (antennas and station schedules are not checked).',
   status: 'ready',
   defaultWeight: 0.7,
   evaluate(site, ctx) {
@@ -22,7 +22,7 @@ export default {
         pct === 100
           ? 'Earth in view for the whole mission'
           : pct === 0
-            ? 'Earth never in view: needs a relay satellite'
+            ? 'Earth never in view: no direct contact, a relay satellite would be needed'
             : `Earth in view ${pct}% of the time, longest pass ${formatHours(stats.longestRunHours)}`,
       facts: {
         visibleFraction: stats.fraction,
