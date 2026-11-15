@@ -126,6 +126,7 @@ export function shortestPlan(result, start, destinations, rover, order) {
     speedMPerHour: rover.speedMPerHour,
     maxDarknessHours: rover.maxDarknessHours,
     needEarthToDrive: !!rover.needEarthToDrive,
+    surviveAfterArrival: !!rover.surviveAfterArrival,
   });
   const H = result.stepHours;
   const stops = ends.map(([pathIndex, destination]) => {
