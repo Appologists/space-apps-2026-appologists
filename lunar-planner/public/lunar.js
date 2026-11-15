@@ -1,7 +1,7 @@
 import * as T from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {initGame, complete, count, collect, showFact, fillFactCard} from './lunar-game.js';
-import {openSurface, updateSky, setLayer, setSunlight, setElevationColors, setExaggeration, getView, face as surfaceFace, birdsEye, resizeSurface} from './lunar-surface.js';
+import {openSurface, updateSky, setLayer, setSunlight, setElevationColors, setExaggeration, getView, face as surfaceFace, birdsEye, resizeSurface, setTool, clearMeasure, setSkyTracks, setTracksVisible, snapshot} from './lunar-surface.js';
 import {showStreetView, loadEpic, showSdo} from './lunar-bodies.js';
 import {initSouthPole, showPage as showSouthPole, refreshTime as refreshSouthPole, spSites, selectSp, topSpId, analyze as analyzeSouthPole} from './lunar-southpole.js';
 
@@ -1197,13 +1197,15 @@ function drawStrip() {
     const bw = w / s.length;
     const sunH = Math.round(h * 0.66);
     const gap = Math.max(2, Math.round(h * 0.08));
+    const real = s.length && terrainClear(s[0], 'sun') !== null;
     s.forEach((x, i) => {
-        const color = x.sun_el > 0.27 ? '#f2b84b' : x.sun_el > -0.27 ? '#8a6a3c' : null;
+        const sunReal = real ? terrainClear(x, 'sun') : null;
+        const color = sunReal === null ? (x.sun_el > 0.27 ? '#f2b84b' : x.sun_el > -0.27 ? '#8a6a3c' : null) : (sunReal ? '#f2b84b' : null);
         if (color) {
             ctx.fillStyle = color;
             ctx.fillRect(i * bw, 0, Math.ceil(bw), sunH);
         }
-        if (x.earth_ok) {
+        if (real ? terrainClear(x, 'earth') : x.earth_ok) {
             ctx.fillStyle = '#7fb2ff';
             ctx.fillRect(i * bw, sunH + gap, Math.ceil(bw), h - sunH - gap);
         }
@@ -1288,15 +1290,32 @@ function renderWeek() {
         return;
     }
     $('week').hidden = false;
-    const m = c.result.summary;
     const stepH = c.result.window.step_minutes / 60;
-    const hours = c.result.samples.length * stepH;
-    const night = longestFalse(c.result.samples, 'sun_ok', stepH);
-    $('wk-sun').innerHTML = m.sun.longest_h >= 48 ? bigNum((m.sun.longest_h / 24).toFixed(1), 'days') : bigNum(Math.round(m.sun.longest_h), 'h');
-    $('wk-night').innerHTML = night >= 48 ? bigNum((night / 24).toFixed(1), 'days') : bigNum(Math.round(night), 'h');
-    $('wk-lit').innerHTML = bigNum(Math.round(100 * m.sun.total_h / hours), '%');
-    $('wk-both').innerHTML = bigNum(Math.round(m.both.total_h), 'h');
-    $('wk-note').textContent = `${c.name} \u00b7 ${c.result.window.days} days from ${c.result.window.start.slice(0, 10)} (UTC)`;
+    const samples = c.result.samples;
+    const hours = samples.length * stepH;
+    // In the surface view, once the real horizon is loaded, every number uses it; otherwise a smooth Moon.
+    const real = samples.length && terrainClear(samples[0], 'sun') !== null;
+    const sunOk = samples.map(x => (real ? terrainClear(x, 'sun') : x.sun_ok));
+    const earthOk = samples.map(x => (real ? terrainClear(x, 'earth') : x.earth_ok));
+    const run = flags => {
+        let best = 0;
+        let n = 0;
+        for (const f of flags) {
+            n = f ? n + 1 : 0;
+            best = Math.max(best, n);
+        }
+        return best * stepH;
+    };
+    const sunRun = run(sunOk);
+    const night = run(sunOk.map(f => !f));
+    const lit = sunOk.filter(Boolean).length * stepH;
+    const both = sunOk.filter((f, i) => f && earthOk[i]).length * stepH;
+    const big = h => (h >= 48 ? bigNum((h / 24).toFixed(1), 'days') : bigNum(Math.round(h), 'h'));
+    $('wk-sun').innerHTML = big(sunRun);
+    $('wk-night').innerHTML = big(night);
+    $('wk-lit').innerHTML = bigNum(Math.round((100 * lit) / hours), '%');
+    $('wk-both').innerHTML = bigNum(Math.round(both), 'h');
+    $('wk-note').textContent = `${c.name} \u00b7 ${c.result.window.days} days from ${c.result.window.start.slice(0, 10)} UTC \u00b7 ${real ? 'real terrain horizon' : 'smooth-Moon horizon'}`;
 }
 
 function renderSelected() {
@@ -1570,6 +1589,11 @@ async function loadSurfaceSpot(lat, lon, name) {
     if (surfaceSpot === spot && mode === 'surface') {
         setupTimeline();
         renderSelected();
+        if (spot.result) {
+            setSkyTracks(spot.result.samples);
+            setTracksVisible(tracksOn);
+        }
+        drawHorizon();
     }
 }
 
@@ -1637,6 +1661,7 @@ async function openSurfaceAt(lat, lon, label, withElevation) {
         b.classList.toggle('active', Boolean(p && Math.abs(p.lat - lat) < 1e-6 && Math.abs(p.lon - lon) < 1e-6));
     }
     loadSurfaceSpot(lat, lon, label);
+    loadHorizon(lat, lon);
     complete('surface');
     if (presets.some(p => p.category === 'apollo' && p.name === label)) {
         collect('apollo', label, 3, 'apollo3');
@@ -1659,6 +1684,7 @@ async function openSurfaceAt(lat, lon, label, withElevation) {
                 const d = pt.distanceM < 1000 ? `${Math.round(pt.distanceM)} m away` : `${(pt.distanceM / 1000).toFixed(1)} km away`;
                 showTip(pt.x, pt.y, `${fmtLat(pt.lat)}, ${fmtLon(pt.lon)}`, `Elevation ${(pt.heightM / 1000).toFixed(2)} km \u00b7 ${d}`);
             },
+            onMeasure: showMeasure,
             onWalk: (m, la, lo) => {
                 surfacePos.walked = m;
                 surfacePos.lat = la;
@@ -1706,12 +1732,16 @@ function renderSurfaceReadout() {
     if (mode !== 'surface' || !surfacePos) {
         return;
     }
+    drawHorizon();
     const s = currentSample();
     fetchPoint(surfacePos.lat, surfacePos.lon);
     $('readout').hidden = false;
-    const lit = s && s.sun_el > 0.27;
-    const partial = s && !lit && s.sun_el > -0.27;
-    const home = s && s.earth_ok;
+    const sunReal = terrainClear(s, 'sun');
+    const earthReal = terrainClear(s, 'earth');
+    const lit = s && (sunReal === null ? s.sun_el > 0.27 : sunReal);
+    const partial = s && !lit && sunReal === null && s.sun_el > -0.27;
+    const home = s && (earthReal === null ? s.earth_ok : earthReal);
+    const basis = sunReal === null ? 'smooth Moon' : 'real terrain';
     const hKm = pointInfo ? pointInfo.elevation_km : elevationAt(surfacePos.lat, surfacePos.lon);
     const height = hKm === null || hKm === undefined ? '\u2014' : `${hKm >= 0 ? '+' : ''}${(hKm * 1000).toFixed(1)} m`;
     const slope = pointInfo ? `${pointInfo.slope_deg.toFixed(1)}\u00b0` : '\u2014';
@@ -1722,8 +1752,9 @@ function renderSurfaceReadout() {
         <div class="rows over">
             <span><i class="dot sun"></i>Sun</span><b>${s ? `az ${s.sun_az.toFixed(1)}\u00b0 \u00b7 el ${s.sun_el.toFixed(2)}\u00b0` : '\u2014'}</b>
             <span><i class="dot earth"></i>Earth</span><b>${s ? `az ${s.earth_az.toFixed(1)}\u00b0 \u00b7 el ${s.earth_el.toFixed(2)}\u00b0` : '\u2014'}</b>
-            <span>Is the rover in sun?</span><b><i class="pill ${lit ? 'sun' : partial ? 'part' : ''}">${s ? (lit ? 'full sun' : partial ? 'partial sun' : 'in shadow') : '\u2014'}</i></b>
-            <span>Can it call home?</span><b><i class="pill ${home ? 'earth' : ''}">${s ? (home ? 'Earth in view' : 'Earth has set') : '\u2014'}</i></b>
+            <span>Is the rover in sun?</span><b><i class="pill ${lit ? 'sun' : partial ? 'part' : ''}">${s ? (lit ? 'full sun' : partial ? 'partial sun' : (sunReal === false && s.sun_el > 0 ? 'terrain shadow' : 'in shadow')) : '\u2014'}</i></b>
+            <span>Can it call home?</span><b><i class="pill ${home ? 'earth' : ''}">${s ? (home ? 'Earth in view' : (earthReal === false && s.earth_el > 0 ? 'behind terrain' : 'Earth has set')) : '\u2014'}</i></b>
+            <small class="full">Sun and Earth checked against the ${basis} horizon</small>
             <span>Height</span><b>${height}</b>
             <span>Ground slope</span><b>${slope}</b>
             <span>Temperature</span><b>${temp ? Math.round(temp) + ' K' : '\u2014'}</b>
@@ -3031,6 +3062,11 @@ function searchItems(q) {
             out.push({group: 'Pages', icon: '\u00bb', label, sub, run: () => setMode(id)});
         }
     }
+    if (hit('Education') || hit('learn') || hit('quiz') || hit('facts')) {
+        out.push({group: 'Pages', icon: '\u00bb', label: 'Education', sub: '3D lab, facts, quiz and leaderboard (opens /learn)', run: () => {
+            window.location.href = '/learn';
+        }});
+    }
     return out.slice(0, 40);
 }
 
@@ -3226,4 +3262,336 @@ loadSites().then(() => {
         flyTo(upAt(8, 25).multiplyScalar(3.1), new T.Vector3());
     }
     $('analyze').click();
+});
+
+
+// ================= Surface tools: measure, real horizon, snapshot =================
+let tracksOn = true;
+
+function setSurfaceTool(name) {
+    setTool(name);
+    for (const b of document.querySelectorAll('#sf-tools [data-tool]')) {
+        b.classList.toggle('active', b.dataset.tool === name);
+    }
+    $('hint').textContent = name === 'measure'
+        ? 'click two points on the ground · Esc clears'
+        : 'drag look around · click walk there · WASD move · scroll zoom';
+}
+
+function showMeasure(m) {
+    const out = $('measure-out');
+    if (!m) {
+        out.hidden = true;
+        return;
+    }
+    out.hidden = false;
+    if (m.pending) {
+        out.textContent = 'First point set. Click a second point.';
+        return;
+    }
+    const dist = m.groundM < 1000 ? `${m.groundM.toFixed(0)} m` : `${(m.groundM / 1000).toFixed(2)} km`;
+    out.replaceChildren(
+        ...[['Ground distance', dist], ['Height change', `${m.dh >= 0 ? '+' : ''}${m.dh.toFixed(0)} m`], ['Mean slope', `${m.grade.toFixed(1)}°`], ['Bearing', `${m.bearing.toFixed(0)}° ${compass(m.bearing)}`]]
+            .map(([k, v]) => {
+                const d = document.createElement('div');
+                const a = document.createElement('span');
+                const b = document.createElement('b');
+                a.textContent = k;
+                b.textContent = v;
+                d.append(a, b);
+                return d;
+            }));
+}
+
+for (const b of document.querySelectorAll('#sf-tools [data-tool]')) {
+    b.onclick = () => setSurfaceTool(b.dataset.tool);
+}
+
+$('sf-tracks').onclick = () => {
+    tracksOn = !tracksOn;
+    $('sf-tracks').classList.toggle('active', tracksOn);
+    setTracksVisible(tracksOn);
+};
+
+$('sf-snap').onclick = () => {
+    const url = snapshot();
+    if (!url) {
+        return;
+    }
+    const a = document.createElement('a');
+    const name = (surfacePos?.label || 'surface').replace(/[^\w-]+/g, '-').toLowerCase();
+    a.href = url;
+    a.download = `lunar-${name}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')}.png`;
+    a.click();
+    setStatus('Snapshot saved.');
+};
+
+// ---- Real horizon (the team's terrain service and horizonProfile, from src/terrain/polar-grid.js) ----
+/** In the surface view, once the real horizon is loaded: is the Sun (or Earth) clear of the terrain? Else null. */
+function terrainClear(sample, key) {
+    if (mode !== 'surface' || !hz.panel || !sample || !surfacePos || hz.lat !== surfacePos.openLat || hz.lon !== surfacePos.openLon) {
+        return null;
+    }
+    const profile = key === 'sun' ? hz.panel : hz.antenna;
+    return sample[key + '_el'] > hz.grid.horizonAt(profile, sample[key + '_az']);
+}
+
+const hz = {lat: null, lon: null, patch: null, eye: null, panel: null, antenna: null, grid: null, error: '', open: false, full: false};
+
+async function loadHorizon(lat, lon) {
+    hz.lat = lat;
+    hz.lon = lon;
+    hz.patch = null;
+    hz.error = '';
+    try {
+        hz.grid = hz.grid || await import('/src/terrain/polar-grid.js');
+        const r = await fetch(`/api/terrain/polar?lat=${lat}&lon=${lon}&source=auto`);
+        if (!r.ok) {
+            const j = await r.json().catch(() => ({}));
+            throw new Error(j.error || 'No terrain data here.');
+        }
+        const patch = hz.grid.decodePatch(await r.arrayBuffer());
+        if (hz.lat !== lat || hz.lon !== lon) {
+            return;
+        }
+        hz.patch = patch;
+        hz.panel = hz.grid.horizonProfile(patch, Number($('panel').value) || 1.5);
+        hz.antenna = hz.grid.horizonProfile(patch, Number($('antenna').value) || 2);
+        $('hz-source').textContent = patch.sourceLabel ? `NASA LOLA, ${patch.sourceLabel}` : 'NASA LOLA';
+        renderWeek();
+        drawStrip();
+        renderSurfaceReadout();
+    } catch (e) {
+        hz.error = e.message || 'The real horizon needs the team app files (src/) and terrain data.';
+    }
+    drawHorizon();
+}
+
+function hzStats() {
+    const c = surfaceSpot?.result;
+    if (!c || !hz.panel) {
+        return null;
+    }
+    const step = c.window.step_minutes / 60;
+    const at = (profile, az) => hz.grid.horizonAt(profile, az);
+    const runs = flags => {
+        let best = 0;
+        let run = 0;
+        for (const f of flags) {
+            run = f ? run + 1 : 0;
+            best = Math.max(best, run);
+        }
+        return best * step;
+    };
+    const sunReal = c.samples.map(x => x.sun_el > at(hz.panel, x.sun_az));
+    const earthReal = c.samples.map(x => x.earth_el > at(hz.antenna, x.earth_az));
+    const n = c.samples.length;
+    return {
+        sunPct: (100 * sunReal.filter(Boolean).length) / n,
+        sunPctSmooth: (100 * c.samples.filter(x => x.sun_ok).length) / n,
+        sunRun: runs(sunReal),
+        earthPct: (100 * earthReal.filter(Boolean).length) / n,
+        earthPctSmooth: (100 * c.samples.filter(x => x.earth_ok).length) / n,
+        sunReal,
+        earthReal,
+    };
+}
+
+function drawHorizon() {
+    if (!hz.open) {
+        return;
+    }
+    const cv = $('hz-chart');
+    const W = cv.clientWidth;
+    const H = cv.clientHeight;
+    cv.width = W * devicePixelRatio;
+    cv.height = H * devicePixelRatio;
+    const g = cv.getContext('2d');
+    g.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const note = $('hz-note');
+    const stats = $('hz-stats');
+    stats.replaceChildren();
+    if (!hz.panel) {
+        g.fillStyle = '#a39e95';
+        g.font = '13px "IBM Plex Mono", monospace';
+        g.fillText(hz.error || 'Loading terrain around this spot…', 16, 28);
+        note.textContent = '';
+        return;
+    }
+    const c = surfaceSpot?.result;
+    const samples = c ? c.samples : [];
+    const L = 44;
+    const R = 12;
+    const T = 10;
+    const B = 22;
+    const pw = W - L - R;
+    const ph = H - T - B;
+    let top = 10;
+    let bottom = -4;
+    for (const v of hz.panel) {
+        top = Math.max(top, v + 3);
+        bottom = Math.min(bottom, v - 2);
+    }
+    if (hz.full) {
+        for (const x of samples) {
+            top = Math.max(top, x.sun_el + 3, x.earth_el + 3);
+        }
+        top = Math.min(90, top);
+    }
+    const X = az => L + (az / 360) * pw;
+    const Y = el => T + ((top - el) / (top - bottom)) * ph;
+    // Grid.
+    g.font = '10px "IBM Plex Mono", monospace';
+    g.strokeStyle = 'rgba(255,255,255,0.07)';
+    g.fillStyle = '#6b6760';
+    const stepEl = top - bottom > 40 ? 15 : top - bottom > 16 ? 5 : 2;
+    for (let e = Math.ceil(bottom / stepEl) * stepEl; e <= top; e += stepEl) {
+        g.beginPath();
+        g.moveTo(L, Y(e));
+        g.lineTo(L + pw, Y(e));
+        g.stroke();
+        g.fillText(`${e}°`, 8, Y(e) + 3);
+    }
+    ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'].forEach((name, i) => {
+        const x = X(i * 45);
+        g.beginPath();
+        g.moveTo(x, T);
+        g.lineTo(x, T + ph);
+        g.stroke();
+        g.fillText(name, x - 4, H - 6);
+    });
+    // Level horizon (0 deg) and the real terrain.
+    g.strokeStyle = 'rgba(255,255,255,0.25)';
+    g.setLineDash([4, 4]);
+    g.beginPath();
+    g.moveTo(L, Y(0));
+    g.lineTo(L + pw, Y(0));
+    g.stroke();
+    g.setLineDash([]);
+    g.beginPath();
+    g.moveTo(L, T + ph);
+    const n = hz.panel.length;
+    for (let j = 0; j <= n; j++) {
+        g.lineTo(X((j / n) * 360), Y(hz.panel[j % n]));
+    }
+    g.lineTo(L + pw, T + ph);
+    g.closePath();
+    const fill = g.createLinearGradient(0, T, 0, T + ph);
+    fill.addColorStop(0, 'rgba(120,108,92,0.85)');
+    fill.addColorStop(1, 'rgba(40,36,32,0.95)');
+    g.fillStyle = fill;
+    g.fill();
+    g.strokeStyle = '#d6b98c';
+    g.lineWidth = 1.5;
+    g.stroke();
+    g.lineWidth = 1;
+    // Sun and Earth tracks over the window: bright where they clear the terrain, dim where it hides them.
+    const st = hzStats();
+    const dots = (key, real, on, off) => {
+        samples.forEach((x, i) => {
+            const el = x[key + '_el'];
+            if (el > top || el < bottom) {
+                return;
+            }
+            g.fillStyle = real && real[i] ? on : off;
+            g.beginPath();
+            g.arc(X(x[key + '_az']), Y(el), 2.2, 0, Math.PI * 2);
+            g.fill();
+        });
+    };
+    dots('earth', st?.earthReal, '#7fb2ff', 'rgba(127,178,255,0.25)');
+    dots('sun', st?.sunReal, '#f2b84b', 'rgba(242,184,75,0.25)');
+    const now = currentSample();
+    if (now) {
+        for (const [key, color] of [['earth', '#7fb2ff'], ['sun', '#f2b84b']]) {
+            const el = now[key + '_el'];
+            if (el <= top && el >= bottom) {
+                g.strokeStyle = '#ffffff';
+                g.lineWidth = 2;
+                g.fillStyle = color;
+                g.beginPath();
+                g.arc(X(now[key + '_az']), Y(el), 6, 0, Math.PI * 2);
+                g.fill();
+                g.stroke();
+                g.lineWidth = 1;
+            }
+        }
+    }
+    if (st) {
+        const chip = (label, value, sub) => {
+            const d = document.createElement('div');
+            const a = document.createElement('span');
+            const b = document.createElement('b');
+            const s2 = document.createElement('small');
+            a.textContent = label;
+            b.textContent = value;
+            s2.textContent = sub;
+            d.append(a, b, s2);
+            return d;
+        };
+        stats.append(
+            chip('Sunlit, real terrain', `${st.sunPct.toFixed(0)}%`, `smooth Moon ${st.sunPctSmooth.toFixed(0)}%`),
+            chip('Longest sunlit run', `${Math.round(st.sunRun)} h`, `panel ${$('panel').value} m up`),
+            chip('Earth in view, real terrain', `${st.earthPct.toFixed(0)}%`, `smooth Moon ${st.earthPctSmooth.toFixed(0)}%`),
+        );
+    }
+    const p = hz.patch;
+    note.textContent = `Highest terrain seen from ${$('panel').value} m above the ground in every direction, out to 300 km (720 directions). `
+        + `Dots: the Sun and Earth each ${c ? c.window.step_minutes : 60} min over the mission window; dim where terrain hides them. `
+        + `Terrain: ${p.sourceLabel || p.dataset}, about ${Math.round(p.pixelM)} m per pixel.`;
+}
+
+function setHorizonOpen(open) {
+    hz.open = open;
+    const panel = $('horizon-panel');
+    panel.classList.toggle('open', open);
+    panel.setAttribute('aria-hidden', String(!open));
+    $('sf-horizon').classList.toggle('active', open);
+    if (open) {
+        requestAnimationFrame(drawHorizon);
+    }
+}
+
+$('sf-horizon').onclick = () => setHorizonOpen(!hz.open);
+$('hz-close').onclick = () => setHorizonOpen(false);
+$('hz-near').onclick = () => {
+    hz.full = false;
+    $('hz-near').classList.add('active');
+    $('hz-full').classList.remove('active');
+    drawHorizon();
+};
+$('hz-full').onclick = () => {
+    hz.full = true;
+    $('hz-full').classList.add('active');
+    $('hz-near').classList.remove('active');
+    drawHorizon();
+};
+$('hz-chart').addEventListener('mousemove', e => {
+    if (!hz.panel) {
+        return;
+    }
+    const r = $('hz-chart').getBoundingClientRect();
+    const az = Math.max(0, Math.min(360, ((e.clientX - r.left - 44) / (r.width - 56)) * 360));
+    showTip(e.clientX, e.clientY, `Azimuth ${az.toFixed(1)}° ${compass(az)}`, `Terrain horizon ${hz.grid.horizonAt(hz.panel, az).toFixed(2)}°`);
+});
+$('hz-chart').addEventListener('mouseleave', () => hideTip());
+new ResizeObserver(() => drawHorizon()).observe($('horizon-panel'));
+
+window.addEventListener('keydown', e => {
+    if (mode !== 'surface' || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey) {
+        return;
+    }
+    const k = e.key.toLowerCase();
+    if (k === 'm') {
+        const on = !document.querySelector('#sf-tools [data-tool="measure"]').classList.contains('active');
+        setSurfaceTool(on ? 'measure' : 'walk');
+    } else if (k === 'h') {
+        setHorizonOpen(!hz.open);
+    } else if (k === 'p') {
+        $('sf-snap').click();
+    } else if (k === 'escape') {
+        clearMeasure();
+        setHorizonOpen(false);
+    }
 });
