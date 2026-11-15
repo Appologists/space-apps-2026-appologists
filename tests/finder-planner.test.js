@@ -178,10 +178,24 @@ describe('planMission, when nothing works', () => {
     expect(plan.reasons[0].helps).toEqual([]);
   });
 
-  it('shows the drive when the rover gets there and then freezes, and what would help', () => {
+  it('counts reaching the last destination as success, whatever the light does there afterwards (decision U)', () => {
+    const r = fake();
+    r.dark(3, 5, 20, 47); // the destination goes dark for good after the rover gets there
+    const fragile = { ...rover, maxDarknessHours: 10 };
+    const plan = planMission(r, at(3, 0), [at(3, 5)], fragile);
+    expect(plan.ok).toBe(true);
+    expect(plan.status).toBe('ok');
+    expect(plan.drive.arrivalHours).toBe(5);
+    expect(plan.drive.survived).toBe(true);
+    expect(plan.drive.lostAtHours).toBeNull();
+    expect(plan.drive.timeline[40]).toBe(STATE.ARRIVED);
+    expectSound(r, plan, fragile);
+  });
+
+  it('with the old rule, shows the drive when the rover gets there and then freezes, and what would help', () => {
     const r = fake();
     r.dark(3, 5, 20, 47);
-    const fragile = { ...rover, maxDarknessHours: 10 };
+    const fragile = { ...rover, maxDarknessHours: 10, surviveAfterArrival: true };
     const plan = planMission(r, at(3, 0), [at(3, 5)], fragile);
     expect(plan.ok).toBe(false);
     expect(plan.status).toBe('lost-after-arrival');
@@ -192,10 +206,10 @@ describe('planMission, when nothing works', () => {
     expect(plan.reasons[0].helps[0].longestDarkH).toBe(28);
   });
 
-  it('arrives late on purpose when that is the only way not to freeze', () => {
+  it('with the old rule, arrives late on purpose when that is the only way not to freeze', () => {
     const r = fake();
     r.dark(3, 5, 4, 30); // dark for 27 hours soon after an early arrival; the rover survives 10
-    const fragile = { ...rover, maxDarknessHours: 10 };
+    const fragile = { ...rover, maxDarknessHours: 10, surviveAfterArrival: true };
     const plan = planMission(r, at(3, 0), [at(3, 5)], fragile);
     expect(plan.ok).toBe(true);
     // arrives in hour 20 (recorded dark for hours 20 to 30 would be 11): so hour 21, dark for 10
@@ -240,7 +254,7 @@ describe('planMission, several destinations', () => {
   it('goes to the further one first when the nearer one is still in shadow', () => {
     const r = fake({ n: 9 });
     for (let row = 0; row < 9; row++) r.dark(row, 6, 0, 7);
-    const strict = { ...rover, maxDarknessHours: 0 };
+    const strict = { ...rover, maxDarknessHours: 0, surviveAfterArrival: true }; // the old rule: A must be lit when it stops there
     // A is 2 cells east, in the shadow until hour 8; B is 3 cells west.
     const plan = planMission(r, at(4, 4), [at(4, 6), at(4, 1)], strict);
     expect(plan.ok).toBe(true);
@@ -281,7 +295,7 @@ describe('latestDeparture', () => {
   it('finds how long the rover can stay at the start without arriving later', () => {
     const r = fake();
     r.dark(3, 5, 0, 19);
-    const strict = { ...rover, maxDarknessHours: 0 };
+    const strict = { ...rover, maxDarknessHours: 0, surviveAfterArrival: true };
     const now = planMission(r, at(3, 0), [at(3, 5)], strict);
     expect(now.drive.arrivalHours).toBe(21);
     const found = latestDeparture(r, at(3, 0), [at(3, 5)], strict);
@@ -303,7 +317,8 @@ function random(seed) {
   };
 }
 
-/** Every drive the rules allow (pausing only on cell centres, hops only when they fit in the light): the earliest safe arrival. */
+/** Every drive the rules allow (pausing only on cell centres, hops only when they fit in the light): the earliest
+ *  arrival that counts. With limits.surviveAfterArrival it must also outlast the darkness at the destination. */
 function exhaustive(r, startCell, destCell, limits) {
   const { n, steps, stepHours: H, maskStride, sunMask, earthMask, windowHours } = r;
   const lit = (c, s) => maskBit(sunMask, maskStride, s, c) === 1;
@@ -355,8 +370,8 @@ function exhaustive(r, startCell, destCell, limits) {
           let d = carry;
           let tail = 0; // dark steps at the very end of the mission: counted in full, however late it arrives
           while (tail < steps && !lit(b, steps - 1 - tail)) tail++;
-          let safe = !(tail > maxDark && rec >= steps - tail);
-          for (let u = rec; u < steps && safe; u++) {
+          let safe = !limits.surviveAfterArrival || !(tail > maxDark && rec >= steps - tail);
+          for (let u = rec; u < steps && safe && limits.surviveAfterArrival; u++) {
             d = lit(b, u) ? 0 : d + 1;
             if (d > maxDark) safe = false;
           }
@@ -402,7 +417,10 @@ function randomMap(rand, { n, steps }) {
 }
 
 describe('planner against an exhaustive search', () => {
-  it('finds a plan whenever one exists, never claims an impossible one, and arrives as early', () => {
+  it.each([
+    ['success on arrival (decision U)', false],
+    ['the old rule: survive at the destination until the mission ends', true],
+  ])('finds a plan whenever one exists, never claims an impossible one, and arrives as early: %s', (_, surviveAfterArrival) => {
     const rand = random(20261114);
     let compared = 0;
     let later = 0;
@@ -416,6 +434,7 @@ describe('planner against an exhaustive search', () => {
         speedMPerHour: [100, 250, 60][trial % 3],
         maxDarknessHours: Math.floor(rand() * 4),
         needEarthToDrive: rand() < 0.3,
+        surviveAfterArrival,
       };
       const start = at(Math.floor(rand() * n), Math.floor(rand() * n));
       const dest = at(Math.floor(rand() * n), Math.floor(rand() * n));
@@ -479,7 +498,7 @@ describe('planText', () => {
 
     const frozen = fake();
     frozen.dark(3, 5, 20, 47);
-    const fragile = { ...rover, maxDarknessHours: 10 };
+    const fragile = { ...rover, maxDarknessHours: 10, surviveAfterArrival: true };
     const lost = planText(frozen, planMission(frozen, at(3, 0), [at(3, 5)], fragile), { rover: fragile, destinations: [at(3, 5)] });
     expect(lost.headline).toContain('but is lost 30 h after landing');
     expect(lost.lines[0]).toContain('It would work if the rover survived longer darkness');

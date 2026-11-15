@@ -117,6 +117,7 @@ function makeContext(result, rover) {
     rangeM: rover.rangeM ?? Infinity,
     maxSlopeDeg: rover.maxSlopeDeg,
     maxDark: Number.isFinite(rover.maxDarknessHours) ? Math.floor(rover.maxDarknessHours / H + 1e-9) : BIG,
+    afterArrival: !!rover.surviveAfterArrival, // must it outlast the darkness at the last destination? (decision U)
     ok: drivableMask(result, rover.maxSlopeDeg),
     lit,
     drive,
@@ -486,7 +487,9 @@ function solve(ctx, seed, cells, { order = null, cap = 1, best = null } = {}) {
     let allow = null;
     if (missing.length === 1) {
       finalCell = cells[missing[0]];
-      allow = stayAllowance(ctx, finalCell);
+      // Reaching the last destination is success (decision U): any darkness it brings or meets there is allowed,
+      // unless the old rule is asked for.
+      allow = ctx.afterArrival ? stayAllowance(ctx, finalCell) : new Int32Array(ctx.steps + 1).fill(BIG);
     } else if (order) exportAt[cells[order[popcount(mask)]]] = order[popcount(mask)];
     else for (const i of missing) exportAt[cells[i]] = i;
     const out = searchLayer(ctx, seeds, { exportAt, finalCell, allow, lb, cap, best: safe ?? best });
@@ -592,6 +595,7 @@ function buildPlan(result, rover, tried, final, status) {
     speedMPerHour: rover.speedMPerHour,
     maxDarknessHours: rover.maxDarknessHours,
     needEarthToDrive: !!rover.needEarthToDrive,
+    surviveAfterArrival: !!rover.surviveAfterArrival,
   });
   const stops = atStart.map((destination) => ({ destination, row: (final.path[0] / n) | 0, col: final.path[0] % n, pathIndex: 0, arrivalHours: 0 }));
   for (const visit of final.visits) {
@@ -659,11 +663,12 @@ function diagnose(result, start, destinations, rover) {
  * @param {object} result        a FinderResult with sunMask and earthMask (see types.js)
  * @param {{row: number, col: number}} start
  * @param {{row: number, col: number}[]} destinations  one to MAX_DESTINATIONS
- * @param {{maxSlopeDeg: number, rangeM: number, speedMPerHour: number, maxDarknessHours: number, needEarthToDrive?: boolean, departHours?: number}} rover
+ * @param {{maxSlopeDeg: number, rangeM: number, speedMPerHour: number, maxDarknessHours: number, needEarthToDrive?: boolean, departHours?: number, surviveAfterArrival?: boolean}} rover
  *        departHours: the rover leaves the start no earlier than this
  * @param {{order?: number[], explain?: boolean}} [options]  order: keep to this visiting order; explain: false skips the "why not" checks
  * @returns a plan:
- *   ok        reaches every destination and is not lost before the mission ends
+ *   ok        reaches every destination without being lost on the way (with rover.surviveAfterArrival, also
+ *             outlasts the darkness at the last one until the mission ends)
  *   status    'ok' | 'lost-after-arrival' (it gets there, then freezes) | 'no-plan'
  *   order     destination numbers (as given) in visiting order
  *   path      cell indices from the start to the last destination; null without a plan

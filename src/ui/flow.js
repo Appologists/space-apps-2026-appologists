@@ -693,7 +693,7 @@ export function createFlow({ app, globe, finder, surface, api }) {
   function play() {
     const result = finder.getResult();
     if (!track || !result) return;
-    // Play from an hour before it sets off to an hour after it stops (or is lost after arriving), in 10 to 16
+    // Play from an hour before it sets off until it arrives (or an hour after it is lost), in 10 to 16
     // seconds. Each frame moves on from clock.hours, so "Next change" can move the clock while it plays.
     const from = Math.max(track.startHours - 1, 0);
     const to = playEnd(result);
@@ -718,8 +718,10 @@ export function createFlow({ app, globe, finder, surface, api }) {
     drawClock();
   }
 
-  /** Where playing stops: an hour after the last change of what the rover does. */
+  /** Where playing stops: when the rover reaches its last destination (Daniel, 2026-11-14), or an hour after
+   *  it is lost on the way. */
   function playEnd(result) {
+    if (track.arrivalHours != null) return Math.min(track.arrivalHours, result.windowHours);
     return Math.min(Math.max(track.endHours, track.changes.at(-1) ?? 0) + 1, result.windowHours);
   }
 

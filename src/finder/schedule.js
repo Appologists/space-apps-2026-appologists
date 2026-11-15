@@ -6,6 +6,9 @@
 //  - Otherwise it waits where it is. Between two cells, the cell behind it decides the light.
 //  - Darkness is counted at the end of every step for the cell it has last reached. If the unbroken darkness
 //    is longer than it survives, it is lost.
+//  - Once it reaches the last destination the drive has succeeded, and darkness there is no longer counted
+//    (decision U, Daniel 2026-11-14). `surviveAfterArrival: true` brings back the old rule: it must also
+//    outlast every darkness at the last destination until the mission ends.
 // simulatePlan() replays a route with optional "do not leave before" times; the planner (planner.js) chooses
 // those times and the route, and is checked against this replay.
 
@@ -35,11 +38,12 @@ export function hopLength(result, a, b) {
  * @param {number[]|null} [options.leave]  for each path index, the earliest time (hours after landing) the rover may
  *        leave that cell; missing entries mean "as soon as the rules allow"
  * @param {number} [options.departHours]   earliest time it may leave the start
+ * @param {boolean} [options.surviveAfterArrival]  also count darkness after it arrives (the old rule; default off)
  * @returns the drive: `timeline` (a STATE per step), `positionM`, `lit`, `earth`, `cellIndex` (path index of the
  *        cell last reached, per step), `reachHours` (when each path cell was reached; NaN if never), and totals.
  *        `arrivalHours` is the end of the step in which it arrived.
  */
-export function simulatePlan(result, path, { leave = null, departHours = 0, speedMPerHour, maxDarknessHours, needSunToDrive = true, needEarthToDrive = false }) {
+export function simulatePlan(result, path, { leave = null, departHours = 0, speedMPerHour, maxDarknessHours, needSunToDrive = true, needEarthToDrive = false, surviveAfterArrival = false }) {
   const { steps, stepHours: H, windowHours, maskStride, sunMask, earthMask } = result;
   const last = path.length - 1;
   const hop = new Float64Array(Math.max(last, 0)); // hours of driving from path[p] to path[p + 1]
@@ -133,6 +137,7 @@ export function simulatePlan(result, path, { leave = null, departHours = 0, spee
     positionM[s] = pos;
     cellIndex[s] = idx;
     timeline[s] = state;
+    if (arrived && !surviveAfterArrival) continue; // there: the drive has succeeded, whatever the light does now
     if (isLit) darkRun = 0;
     else darkRun++;
     longestDarkH = Math.max(longestDarkH, darkRun * H);
