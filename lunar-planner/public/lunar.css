@@ -4077,3 +4077,36 @@ header.topbar nav a.nav-link:focus-visible {
         display: none;
     }
 }
+
+/* Home: the Education button is a link to /learn, styled like "Drop me on the surface". */
+.home-actions a.home-link {
+    display: block;
+    padding: 13px 22px;
+    border: 1px solid #383838;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text);
+    font: 400 13.5px/20.925px var(--mono);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.2s var(--ease), background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.home-actions a.home-link:hover {
+    border-color: #5a5a5a;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.home-actions a.home-link:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Home page: the week card and surface panels stay hidden until you enter the explorer. */
+body.at-home #week,
+body.at-home #surface-tools,
+body.at-home #measure-out,
+body.at-home #horizon-panel {
+    display: none !important;
+}
