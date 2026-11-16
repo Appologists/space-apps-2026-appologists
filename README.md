@@ -160,7 +160,7 @@ is checked against NASA JPL Horizons, and the finder, the date scan and the powe
 
 ## The team
 
-Khiem Hoang Tran · Prasiddha (Nick) · Thanh Minh Nguyen · Rishi Jasuja · Karley Browning · Daniel Blackburn · Patrick
+Khiem Hoang Tran · Nick Prasiddha · Thanh Minh Nguyen · Rishi Jasuja · Karley Browning · Daniel Blackburn 
 
 ## Credits
 
