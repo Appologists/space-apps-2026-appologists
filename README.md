@@ -4,7 +4,7 @@
 
 <a href="https://appologists-lunar-navigator.netlify.app/"><img src="public/site-qr.svg" alt="QR code that opens the live app" width="132" align="right"></a>
 
-Team Apollogists' project for the NASA Space Apps Challenge 2026 (Seattle), challenge
+Team Apollogistics' project for the NASA Space Apps Challenge 2026 (Seattle), challenge
 [Lunar Landing Site Navigator](https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/).
 
 **Try it now:** <https://appologists-lunar-navigator.netlify.app/> (or scan the code). Nothing to install.
