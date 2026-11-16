@@ -1,5 +1,5 @@
 # APOLLOGISTICS
-- Lunar Landing Site Navigator -
+Lunar Landing Site Navigator
 
 **Tell us what your rover can survive. We'll tell you when and where it can land on the Moon, and then let you stand there.**
 
