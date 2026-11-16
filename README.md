@@ -38,6 +38,12 @@ Most tools show you the sky for a place and date you already picked. We turned t
 5. **Stand there.** Street view puts you on the surface at the landing spot: real terrain, real shadows, the
    Sun and Earth where they would be. It works in a Meta Quest headset too.
 
+### See it in VR
+
+[![Karley standing on the Moon's south pole in VR](https://img.youtube.com/vi/30NepHTtvfc/hqdefault.jpg)](https://www.youtube.com/watch?v=30NepHTtvfc)
+
+*Karley walks the landing site in a Meta Quest headset. Click to watch.*
+
 <img src="public/images/viper.jpg" alt="Artist's concept of NASA's VIPER rover on the Moon" width="100%">
 <sub>VIPER, the rover our ready-made mission is built around. Artist's concept: NASA Ames / Daniel Rutter.</sub>
 
